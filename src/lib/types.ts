@@ -3,6 +3,7 @@
 export type ViewId =
   | 'home'
   | 'trade'
+  | 'markets'
   | 'p2p'
   | 'payments'
   | 'wallet'

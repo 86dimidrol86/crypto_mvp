@@ -1,0 +1,12 @@
+{
+  "name": "ruscrypto-market-service",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun --hot index.ts"
+  },
+  "dependencies": {
+    "socket.io": "*",
+    "cors": "^2.8.5"
+  }
+}

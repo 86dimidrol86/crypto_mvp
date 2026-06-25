@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { fetchTickers, jitterPrice } from '@/lib/market'
+import { useLiveMarket } from '@/lib/use-live-market'
 import type { CoinTicker, OrderSide, OrderType, Trade } from '@/lib/types'
 import { formatPrice, formatNumber, formatPercent, formatAmount } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -69,33 +70,225 @@ function priceDecimals(price: number): number {
 }
 
 // ─── Order Book ─────────────────────────────────────────────────────────────
-function OrderBook({ price, pair }: { price: number; pair: string }) {
+interface BookRowProps {
+  price: number
+  amount: number
+  maxAmount: number
+  side: 'ask' | 'bid'
+  decimals: number
+}
+
+/**
+ * Single order-book row with flash-on-update animation.
+ * Tracks previous price in a ref and applies `flash-up`/`flash-down`
+ * class for 600ms when the price changes.
+ */
+function BookRow({ price, amount, maxAmount, side, decimals }: BookRowProps) {
+  const prevPriceRef = useRef<number>(price)
+  const [flash, setFlash] = useState<'up' | 'down' | null>(null)
+
+  useEffect(() => {
+    const prev = prevPriceRef.current
+    if (price !== prev) {
+      setFlash(price > prev ? 'up' : 'down')
+      prevPriceRef.current = price
+      const t = setTimeout(() => setFlash(null), 600)
+      return () => clearTimeout(t)
+    }
+    return undefined
+  }, [price])
+
+  const total = price * amount
+  const wPct = (amount / (maxAmount || 1)) * 100
+  const colorClass = side === 'ask' ? 'text-destructive' : 'text-success'
+  const barClass = side === 'ask' ? 'bg-destructive/15' : 'bg-success/15'
+
+  return (
+    <div
+      className={cn(
+        'relative grid grid-cols-3 px-3 py-[3px] text-xs font-mono tabular-nums transition-colors',
+        flash === 'up' && 'flash-up',
+        flash === 'down' && 'flash-down'
+      )}
+    >
+      <div
+        className={cn('absolute inset-y-0 right-0', barClass)}
+        style={{ width: `${wPct}%` }}
+        aria-hidden
+      />
+      <span className={cn('relative', colorClass)}>
+        {price.toLocaleString('ru-RU', {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals,
+        })}
+      </span>
+      <span className="relative text-right text-foreground/90">
+        {amount.toLocaleString('ru-RU', { maximumFractionDigits: 4 })}
+      </span>
+      <span className="relative text-right text-muted-foreground">
+        {total.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
+      </span>
+    </div>
+  )
+}
+
+// ─── Depth Chart ────────────────────────────────────────────────────────────
+interface DepthChartProps {
+  asks: { price: number; amount: number }[]
+  bids: { price: number; amount: number }[]
+  midPrice: number
+}
+
+/**
+ * Compact cumulative-depth visualization.
+ * Renders green (bids, left) and red (asks, right) area charts over price.
+ */
+function DepthChart({ asks, bids, midPrice }: DepthChartProps) {
+  const W = 320
+  const H = 80
+  const PAD = 2
+
+  if (asks.length === 0 || bids.length === 0 || midPrice <= 0) {
+    return (
+      <div className="h-[80px] flex items-center justify-center text-[10px] text-muted-foreground">
+        Загрузка глубины…
+      </div>
+    )
+  }
+
+  // Cumulative depth from mid outward (bids from highest price down, asks from lowest price up)
+  const bidLevels = [...bids].sort((a, b) => b.price - a.price)
+  const askLevels = [...asks].sort((a, b) => a.price - b.price)
+
+  const bidCurve = bidLevels.reduce<Array<{ price: number; cum: number }>>(
+    (acc, l) => {
+      const prev = acc.length > 0 ? acc[acc.length - 1].cum : 0
+      acc.push({ price: l.price, cum: prev + l.amount })
+      return acc
+    },
+    []
+  )
+  const bidCum = bidCurve.length > 0 ? bidCurve[bidCurve.length - 1].cum : 0
+
+  const askCurve = askLevels.reduce<Array<{ price: number; cum: number }>>(
+    (acc, l) => {
+      const prev = acc.length > 0 ? acc[acc.length - 1].cum : 0
+      acc.push({ price: l.price, cum: prev + l.amount })
+      return acc
+    },
+    []
+  )
+  const askCum = askCurve.length > 0 ? askCurve[askCurve.length - 1].cum : 0
+
+  const minPrice = bidCurve[bidCurve.length - 1]?.price ?? midPrice
+  const maxPrice = askCurve[askCurve.length - 1]?.price ?? midPrice
+  const priceRange = Math.max(maxPrice - minPrice, midPrice * 0.0001)
+  const maxCum = Math.max(bidCum, askCum, 1)
+
+  const halfW = (W - PAD * 2) / 2
+
+  // Bids occupy left half (price ascending L→R toward mid), asks right half
+  const bidPts = bidCurve.map((p) => {
+    const x = PAD + ((p.price - minPrice) / priceRange) * halfW
+    const y = H - PAD - (p.cum / maxCum) * (H - PAD * 2)
+    return `${x.toFixed(2)},${y.toFixed(2)}`
+  })
+  const bidArea = `${PAD},${H - PAD} ${bidPts.join(' ')} ${PAD + halfW},${H - PAD}`
+
+  const askPts = askCurve.map((p) => {
+    const x = PAD + halfW + ((p.price - midPrice) / priceRange) * halfW
+    const y = H - PAD - (p.cum / maxCum) * (H - PAD * 2)
+    return `${x.toFixed(2)},${y.toFixed(2)}`
+  })
+  const askArea = `${PAD + halfW},${H - PAD} ${askPts.join(' ')} ${W - PAD},${H - PAD}`
+
+  const bidLine = bidPts.join(' ')
+  const askLine = askPts.join(' ')
+  const midX = PAD + halfW
+
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      width="100%"
+      height={H}
+      preserveAspectRatio="none"
+      className="overflow-visible"
+    >
+      <defs>
+        <linearGradient id="depthBid" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="oklch(0.7 0.17 155)" stopOpacity="0.45" />
+          <stop offset="100%" stopColor="oklch(0.7 0.17 155)" stopOpacity="0.05" />
+        </linearGradient>
+        <linearGradient id="depthAsk" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="oklch(0.62 0.22 25)" stopOpacity="0.45" />
+          <stop offset="100%" stopColor="oklch(0.62 0.22 25)" stopOpacity="0.05" />
+        </linearGradient>
+      </defs>
+      <polygon points={bidArea} fill="url(#depthBid)" />
+      <polyline points={bidLine} fill="none" stroke="oklch(0.7 0.17 155)" strokeWidth="1.2" />
+      <polygon points={askArea} fill="url(#depthAsk)" />
+      <polyline points={askLine} fill="none" stroke="oklch(0.62 0.22 25)" strokeWidth="1.2" />
+      {/* Mid-price marker */}
+      <line
+        x1={midX}
+        y1={PAD}
+        x2={midX}
+        y2={H - PAD}
+        stroke="oklch(0.82 0.16 85)"
+        strokeWidth="1"
+        strokeDasharray="2,2"
+        opacity="0.6"
+      />
+    </svg>
+  )
+}
+
+function OrderBook({ price, pair, liveBook, connected }: {
+  price: number
+  pair: string
+  liveBook: ReturnType<typeof useLiveMarket>['orderBook']
+  connected: boolean
+}) {
   const levels = useMemo(() => {
-    if (price <= 0) return { asks: [], bids: [] }
+    // Prefer live order book from WebSocket
+    if (liveBook && liveBook.asks.length > 0) {
+      const asks = liveBook.asks.slice(0, 12)
+      const bids = liveBook.bids.slice(0, 12)
+      const maxAmount = Math.max(...asks.map((l) => l.amount), ...bids.map((l) => l.amount))
+      return { asks, bids, maxAmount, spread: liveBook.spread }
+    }
+    // Fallback: mock from price
+    if (price <= 0) return { asks: [], bids: [], maxAmount: 1, spread: 0 }
     const tick = price * 0.0005
     const askRaw = Array.from({ length: 12 }, (_, i) => {
       const p = price + tick * (i + 1)
       const amount = parseFloat((Math.random() * 4 + 0.05).toFixed(4))
-      return { price: p, amount }
+      return { price: p, amount, total: 0 }
     })
     const bidRaw = Array.from({ length: 12 }, (_, i) => {
       const p = price - tick * (i + 1)
       const amount = parseFloat((Math.random() * 4 + 0.05).toFixed(4))
-      return { price: Math.max(p, 0.0001), amount }
+      return { price: Math.max(p, 0.0001), amount, total: 0 }
     })
     const maxAmount = Math.max(...askRaw.map((l) => l.amount), ...bidRaw.map((l) => l.amount))
-    return { asks: askRaw, bids: bidRaw, maxAmount }
-  }, [price])
+    return { asks: askRaw, bids: bidRaw, maxAmount, spread: askRaw[0] && bidRaw[0] ? askRaw[0].price - bidRaw[0].price : 0 }
+  }, [price, liveBook])
 
-  const spread = levels.asks[0] && levels.bids[0] ? levels.asks[0].price - levels.bids[0].price : 0
+  const spread = levels.spread || 0
   const spreadPct = price > 0 ? (spread / price) * 100 : 0
   const decimals = priceDecimals(price)
+  const midPrice = price > 0 ? price : (liveBook?.midPrice ?? 0)
 
   return (
     <Card className="overflow-hidden bg-card border-border">
       <div className="px-3 py-2.5 border-b border-border flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
           Биржевой стакан
+          {connected && (
+            <span className="inline-flex items-center gap-1 text-[9px] text-success">
+              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" /> LIVE
+            </span>
+          )}
         </span>
         <span className="text-[10px] text-muted-foreground">{pair}</span>
       </div>
@@ -107,34 +300,16 @@ function OrderBook({ price, pair }: { price: number; pair: string }) {
       <ScrollArea className="h-[260px]">
         {/* Asks (reversed: lowest first at bottom) */}
         <div className="flex flex-col-reverse">
-          {levels.asks.map((l, i) => {
-            const total = l.price * l.amount
-            const wPct = (l.amount / (levels.maxAmount || 1)) * 100
-            return (
-              <div
-                key={`a-${i}`}
-                className="relative grid grid-cols-3 px-3 py-[3px] text-xs font-mono tabular-nums"
-              >
-                <div
-                  className="absolute inset-y-0 right-0 bg-destructive/15"
-                  style={{ width: `${wPct}%` }}
-                  aria-hidden
-                />
-                <span className="relative text-destructive">
-                  {l.price.toLocaleString('ru-RU', {
-                    minimumFractionDigits: decimals,
-                    maximumFractionDigits: decimals,
-                  })}
-                </span>
-                <span className="relative text-right text-foreground/90">
-                  {l.amount.toLocaleString('ru-RU', { maximumFractionDigits: 4 })}
-                </span>
-                <span className="relative text-right text-muted-foreground">
-                  {total.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
-                </span>
-              </div>
-            )
-          })}
+          {levels.asks.map((l, i) => (
+            <BookRow
+              key={`a-${i}`}
+              price={l.price}
+              amount={l.amount}
+              maxAmount={levels.maxAmount}
+              side="ask"
+              decimals={decimals}
+            />
+          ))}
         </div>
       </ScrollArea>
 
@@ -163,50 +338,55 @@ function OrderBook({ price, pair }: { price: number; pair: string }) {
       {/* Bids */}
       <ScrollArea className="h-[260px]">
         <div className="flex flex-col">
-          {levels.bids.map((l, i) => {
-            const total = l.price * l.amount
-            const wPct = (l.amount / (levels.maxAmount || 1)) * 100
-            return (
-              <div
-                key={`b-${i}`}
-                className="relative grid grid-cols-3 px-3 py-[3px] text-xs font-mono tabular-nums"
-              >
-                <div
-                  className="absolute inset-y-0 right-0 bg-success/15"
-                  style={{ width: `${wPct}%` }}
-                  aria-hidden
-                />
-                <span className="relative text-success">
-                  {l.price.toLocaleString('ru-RU', {
-                    minimumFractionDigits: decimals,
-                    maximumFractionDigits: decimals,
-                  })}
-                </span>
-                <span className="relative text-right text-foreground/90">
-                  {l.amount.toLocaleString('ru-RU', { maximumFractionDigits: 4 })}
-                </span>
-                <span className="relative text-right text-muted-foreground">
-                  {total.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
-                </span>
-              </div>
-            )
-          })}
+          {levels.bids.map((l, i) => (
+            <BookRow
+              key={`b-${i}`}
+              price={l.price}
+              amount={l.amount}
+              maxAmount={levels.maxAmount}
+              side="bid"
+              decimals={decimals}
+            />
+          ))}
         </div>
       </ScrollArea>
+
+      {/* Depth chart */}
+      <div className="border-t border-border px-3 pt-2 pb-3">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Глубина рынка
+          </span>
+          <div className="flex items-center gap-3 text-[9px] text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-sm bg-success/60" /> Bids
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-sm bg-destructive/60" /> Asks
+            </span>
+          </div>
+        </div>
+        <DepthChart asks={levels.asks} bids={levels.bids} midPrice={midPrice} />
+      </div>
     </Card>
   )
 }
 
 // ─── Recent Trades Tape ─────────────────────────────────────────────────────
-function RecentTrades({ price, pair }: { price: number; pair: string }) {
-  const [trades, setTrades] = useState<RecentTrade[]>([])
+function RecentTrades({ price, pair, liveTrades, connected }: {
+  price: number
+  pair: string
+  liveTrades: ReturnType<typeof useLiveMarket>['trades']
+  connected: boolean
+}) {
+  const [mockTrades, setMockTrades] = useState<RecentTrade[]>([])
 
-  // Seed initial trades + append a new mock trade every 2s
+  // Fallback mock trades if no live data
   useEffect(() => {
+    if (connected && liveTrades.length > 0) return
     if (price <= 0) return
-    // Seed if empty (deferred to microtask to satisfy lint).
     const seedTimer = setTimeout(() => {
-      setTrades((prev) => {
+      setMockTrades((prev) => {
         if (prev.length > 0) return prev
         return Array.from({ length: 18 }, () => {
           const side: OrderSide = Math.random() > 0.5 ? 'buy' : 'sell'
@@ -231,21 +411,30 @@ function RecentTrades({ price, pair }: { price: number; pair: string }) {
         side,
         time: fmtTimeNow(),
       }
-      setTrades((prev) => [t, ...prev].slice(0, 30))
+      setMockTrades((prev) => [t, ...prev].slice(0, 30))
     }, 2000)
     return () => {
       clearTimeout(seedTimer)
       clearInterval(interval)
     }
-  }, [price])
+  }, [price, connected, liveTrades.length])
+
+  const trades = connected && liveTrades.length > 0
+    ? liveTrades.map((t) => ({ id: t.id, price: t.price, amount: t.amount, side: t.side, time: t.time }))
+    : mockTrades
 
   const decimals = priceDecimals(price)
 
   return (
     <Card className="overflow-hidden bg-card border-border">
       <div className="px-3 py-2.5 border-b border-border flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
           Последние сделки
+          {connected && (
+            <span className="inline-flex items-center gap-1 text-[9px] text-success">
+              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" /> LIVE
+            </span>
+          )}
         </span>
         <span className="text-[10px] text-muted-foreground">{pair}</span>
       </div>
@@ -607,6 +796,9 @@ export function TradeView() {
   const [livePrice, setLivePrice] = useState<number>(0)
   const [highlight, setHighlight] = useState<'up' | 'down' | null>(null)
 
+  // Live WebSocket market data
+  const { orderBook: liveBook, livePrice: wsPrice, trades: liveTrades, connected } = useLiveMarket(selectedPair)
+
   // Fetch tickers + poll every 5s
   useEffect(() => {
     let mounted = true
@@ -629,14 +821,12 @@ export function TradeView() {
   )
 
   // Smooth jitter every 1.2s for the live price ticker feel.
-  // Reset baseline whenever the ticker symbol changes (pair switch or fresh fetch).
   const tickerSymbol = ticker?.symbol
   const tickerPrice = ticker?.priceRub ?? 0
   const prevPriceRef = useRef(0)
   useEffect(() => {
     if (tickerPrice <= 0) return
     prevPriceRef.current = tickerPrice
-    // Seed the live price (deferred to a microtask to satisfy lint).
     const seedTimer = setTimeout(() => setLivePrice(tickerPrice), 0)
     const interval = setInterval(() => {
       const baseline = prevPriceRef.current > 0 ? prevPriceRef.current : tickerPrice
@@ -650,6 +840,16 @@ export function TradeView() {
       clearInterval(interval)
     }
   }, [tickerSymbol, tickerPrice])
+
+  // Sync live price from WebSocket (overrides jitter when WS is live)
+  useEffect(() => {
+    if (connected && wsPrice > 0) {
+      setLivePrice((prev) => {
+        if (prev > 0 && wsPrice !== prev) setHighlight(wsPrice > prev ? 'up' : 'down')
+        return wsPrice
+      })
+    }
+  }, [wsPrice, connected])
 
   // Auto-clear highlight
   useEffect(() => {
@@ -704,9 +904,9 @@ export function TradeView() {
           <div className="flex items-baseline gap-3">
             <span
               className={cn(
-                'text-2xl lg:text-3xl font-mono font-bold tabular-nums transition-colors',
-                highlight === 'up' && 'text-success',
-                highlight === 'down' && 'text-destructive',
+                'inline-block rounded-md px-2 py-0.5 text-2xl lg:text-3xl font-mono font-bold tabular-nums transition-colors',
+                highlight === 'up' && 'flash-up text-success',
+                highlight === 'down' && 'flash-down text-destructive',
                 !highlight && 'text-foreground'
               )}
             >
@@ -772,12 +972,12 @@ export function TradeView() {
               </div>
             </Card>
 
-            <RecentTrades price={livePrice} pair={selectedPair} />
+            <RecentTrades price={livePrice} pair={selectedPair} liveTrades={liveTrades} connected={connected} />
           </div>
 
           {/* RIGHT */}
           <div className="space-y-4">
-            <OrderBook price={livePrice} pair={selectedPair} />
+            <OrderBook price={livePrice} pair={selectedPair} liveBook={liveBook} connected={connected} />
             <OrderForm price={livePrice} pair={selectedPair} ticker={ticker} />
             <MyTrades pair={selectedPair} />
           </div>

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/lib/store'
+import { useApi, apiPatch } from '@/lib/use-api'
 import type {
   AlertSeverity,
   AlertStatus,
@@ -269,7 +270,13 @@ function ShapExplainer({ alert }: { alert: ComplianceAlert }) {
   )
 }
 
-function AlertDetail({ alert }: { alert: ComplianceAlert }) {
+function AlertDetail({
+  alert,
+  onReviewed,
+}: {
+  alert: ComplianceAlert
+  onReviewed?: () => void
+}) {
   const reviewAlert = useAppStore((s) => s.reviewAlert)
   const pushNotification = useAppStore((s) => s.pushNotification)
 
@@ -278,7 +285,13 @@ function AlertDetail({ alert }: { alert: ComplianceAlert }) {
   const isOpen = alert.status === 'OPEN' || alert.status === 'REVIEWING'
   const isCritical = alert.severity === 'CRITICAL'
 
-  const handleAction = (status: AlertStatus, label: string, toastMsg?: string) => {
+  const handleAction = async (status: AlertStatus, label: string, toastMsg?: string) => {
+    // Persist review decision via API (resilience: still mirror locally on failure)
+    try {
+      await apiPatch('/api/compliance', { id: alert.id, status })
+    } catch {
+      // Ignore API error — local store update is still applied
+    }
     reviewAlert(alert.id, status)
     pushNotification(`Алерт ${label}`, `${TYPE_LABEL[alert.type] || alert.type} • ${alert.ruleId}`)
     if (toastMsg) {
@@ -286,6 +299,7 @@ function AlertDetail({ alert }: { alert: ComplianceAlert }) {
     } else {
       toast.success(`Алерт переведён в статус: ${STATUS_LABEL[status]}`)
     }
+    onReviewed?.()
   }
 
   return (
@@ -485,8 +499,7 @@ function EmptyDetail() {
   )
 }
 
-function QuarantineCard() {
-  const alerts = useAppStore((s) => s.alerts)
+function QuarantineCard({ alerts }: { alerts: ComplianceAlert[] }) {
   const criticalOpen = alerts.filter(
     (a) => a.severity === 'CRITICAL' && (a.status === 'OPEN' || a.status === 'REVIEWING')
   ).length
@@ -539,8 +552,20 @@ function QuarantineCard() {
 }
 
 export function ComplianceView() {
-  const alerts = useAppStore((s) => s.alerts)
+  const storeAlerts = useAppStore((s) => s.alerts)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const complianceUrl = refreshKey ? `/api/compliance?t=${refreshKey}` : '/api/compliance'
+  const { data } = useApi<{ alerts: ComplianceAlert[] }>(complianceUrl)
+
+  // Prefer API alerts when present; fall back to store for resilience
+  const apiAlerts: ComplianceAlert[] | null =
+    data?.alerts && Array.isArray(data.alerts) && data.alerts.length > 0
+      ? (data.alerts as ComplianceAlert[])
+      : null
+  const alerts = apiAlerts ?? storeAlerts
+
+  const refresh = () => setRefreshKey((k) => k + 1)
 
   const effectiveId =
     selectedId && alerts.some((a) => a.id === selectedId)
@@ -685,11 +710,11 @@ export function ComplianceView() {
           </Card>
 
           {/* Detail */}
-          {selected ? <AlertDetail alert={selected} /> : <EmptyDetail />}
+          {selected ? <AlertDetail alert={selected} onReviewed={refresh} /> : <EmptyDetail />}
         </div>
 
         {/* Quarantine */}
-        <QuarantineCard />
+        <QuarantineCard alerts={alerts} />
 
         {/* Footer note */}
         <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-muted-foreground pt-2">

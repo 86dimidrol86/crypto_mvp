@@ -17,8 +17,9 @@ import {
   Network,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
+import { useApi, apiPost } from '@/lib/use-api'
 import { fetchTickers, getUsdRubRate } from '@/lib/market'
-import type { CoinTicker, TxType } from '@/lib/types'
+import type { Balance, CoinTicker, Transaction, TxType } from '@/lib/types'
 import {
   formatPrice,
   formatNumber,
@@ -105,8 +106,7 @@ function statusBadge(status: string) {
 }
 
 // ─── Total balance card ─────────────────────────────────────────────────────
-function TotalBalanceCard() {
-  const balances = useAppStore((s) => s.balances)
+function TotalBalanceCard({ balances }: { balances: Balance[] }) {
   const [tickers, setTickers] = useState<CoinTicker[]>([])
   const [usdRub, setUsdRub] = useState<number>(92.5)
 
@@ -176,8 +176,7 @@ function TotalBalanceCard() {
 }
 
 // ─── Assets tab ─────────────────────────────────────────────────────────────
-function AssetsTab() {
-  const balances = useAppStore((s) => s.balances)
+function AssetsTab({ balances }: { balances: Balance[] }) {
   const [tickers, setTickers] = useState<CoinTicker[]>([])
   const [usdRub, setUsdRub] = useState<number>(92.5)
 
@@ -255,7 +254,7 @@ function AssetsTab() {
 }
 
 // ─── Deposit tab ────────────────────────────────────────────────────────────
-function DepositTab() {
+function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
   const generateDepositAddress = useAppStore((s) => s.generateDepositAddress)
   const depositAddress = useAppStore((s) => s.depositAddress)
   const [asset, setAsset] = useState<Asset>('USDT')
@@ -268,17 +267,29 @@ function DepositTab() {
     setNetwork(NETWORKS_BY_ASSET[a][0].id)
   }
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     setLoading(true)
-    setTimeout(() => {
-      const addr = generateDepositAddress(asset, network)
-      setLoading(false)
-      toast.success('Адрес пополнения сгенерирован', {
-        description: `${asset} • ${network}`,
-      })
-      // addr is stored in depositAddress via the action
-      void addr
-    }, 600)
+    let addr = ''
+    try {
+      const res = await apiPost<{ address: string }>(
+        '/api/wallet',
+        { action: 'deposit', asset, network }
+      )
+      addr = res.address
+    } catch {
+      // Network/API failure — fall back to local generator (resilience)
+      addr = generateDepositAddress(asset, network)
+    }
+    if (!addr) {
+      addr = generateDepositAddress(asset, network)
+    }
+    // Mirror address into store so it persists for the UI session
+    useAppStore.setState({ depositAddress: addr })
+    setLoading(false)
+    toast.success('Адрес пополнения сгенерирован', {
+      description: `${asset} • ${network}`,
+    })
+    onDeposited?.()
   }
 
   const handleCopy = async () => {
@@ -455,8 +466,13 @@ function DepositTab() {
 }
 
 // ─── Withdraw tab ───────────────────────────────────────────────────────────
-function WithdrawTab() {
-  const balances = useAppStore((s) => s.balances)
+function WithdrawTab({
+  balances,
+  onWithdrawn,
+}: {
+  balances: Balance[]
+  onWithdrawn?: () => void
+}) {
   const withdraw = useAppStore((s) => s.withdraw)
   const [tickers, setTickers] = useState<CoinTicker[]>([])
   const [usdRub, setUsdRub] = useState<number>(92.5)
@@ -509,7 +525,7 @@ function WithdrawTab() {
     setAmount(String(available))
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (amountNum <= 0) {
       toast.error('Введите сумму вывода')
       return
@@ -526,6 +542,17 @@ function WithdrawTab() {
       toast.error('Введите 2FA-код (6 цифр)')
       return
     }
+    try {
+      await apiPost('/api/wallet', {
+        action: 'withdraw',
+        asset,
+        amount: amountNum,
+        address,
+      })
+    } catch {
+      // API failure — still mirror locally for UX continuity (resilience)
+    }
+    // Apply local optimistic update + notification + toast regardless
     withdraw(asset, amountNum, address)
     toast.success('Заявка на вывод создана', {
       description: `${formatAmount(amountNum, asset)} → ${address.slice(0, 12)}...`,
@@ -533,6 +560,7 @@ function WithdrawTab() {
     setAmount('')
     setAddress('')
     setTwofa('')
+    onWithdrawn?.()
   }
 
   return (
@@ -718,9 +746,7 @@ function WithdrawTab() {
 }
 
 // ─── History tab ────────────────────────────────────────────────────────────
-function HistoryTab() {
-  const transactions = useAppStore((s) => s.transactions)
-
+function HistoryTab({ transactions }: { transactions: Transaction[] }) {
   if (transactions.length === 0) {
     return (
       <Card className="p-12 text-center">
@@ -793,6 +819,32 @@ function HistoryTab() {
 
 // ─── Main WalletView ────────────────────────────────────────────────────────
 export function WalletView() {
+  // Refresh trigger — bump to force a re-fetch from /api/wallet
+  const [refreshKey, setRefreshKey] = useState(0)
+  const walletUrl = refreshKey ? `/api/wallet?t=${refreshKey}` : '/api/wallet'
+  const { data } = useApi<{ balances: Balance[]; transactions: Transaction[] }>(
+    walletUrl,
+    { refresh: 0 }
+  )
+
+  const storeBalances = useAppStore((s) => s.balances)
+  const storeTransactions = useAppStore((s) => s.transactions)
+
+  // Prefer API data when present; fall back to store for resilience
+  const apiBalances = data?.balances && data.balances.length > 0 ? data.balances : null
+  const apiTransactions = data?.transactions ?? null
+
+  const balances = apiBalances ?? storeBalances
+
+  // Merge transactions: API takes precedence by id; store-only txs come after
+  const transactions = useMemo(() => {
+    if (!apiTransactions || apiTransactions.length === 0) return storeTransactions
+    const apiIds = new Set(apiTransactions.map((t) => t.id))
+    return [...apiTransactions, ...storeTransactions.filter((t) => !apiIds.has(t.id))]
+  }, [apiTransactions, storeTransactions])
+
+  const refresh = () => setRefreshKey((k) => k + 1)
+
   return (
     <div className="flex-1 bg-background">
       <div className="mx-auto max-w-[1400px] px-4 lg:px-6 py-6 space-y-6">
@@ -808,7 +860,7 @@ export function WalletView() {
           </div>
         </div>
 
-        <TotalBalanceCard />
+        <TotalBalanceCard balances={balances} />
 
         <Tabs defaultValue="assets" className="w-full">
           <TabsList className="h-10 bg-muted/60 p-1">
@@ -830,16 +882,16 @@ export function WalletView() {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="assets" className="mt-4">
-            <AssetsTab />
+            <AssetsTab balances={balances} />
           </TabsContent>
           <TabsContent value="deposit" className="mt-4">
-            <DepositTab />
+            <DepositTab onDeposited={refresh} />
           </TabsContent>
           <TabsContent value="withdraw" className="mt-4">
-            <WithdrawTab />
+            <WithdrawTab balances={balances} onWithdrawn={refresh} />
           </TabsContent>
           <TabsContent value="history" className="mt-4">
-            <HistoryTab />
+            <HistoryTab transactions={transactions} />
           </TabsContent>
         </Tabs>
       </div>

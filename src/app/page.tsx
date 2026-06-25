@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import {
   Home,
   CandlestickChart,
+  LineChart,
   Users,
   Send,
   Wallet,
@@ -30,7 +31,9 @@ import {
 import { useState } from 'react'
 import { PriceTicker } from '@/components/price-ticker'
 import { NotificationsBell } from '@/components/notifications-bell'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { HomeView } from '@/components/views/home-view'
+import { MarketsView } from '@/components/views/markets-view'
 import { TradeView } from '@/components/views/trade-view'
 import { P2PView } from '@/components/views/p2p-view'
 import { PaymentsView } from '@/components/views/payments-view'
@@ -52,6 +55,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { id: 'home', label: 'Главная', icon: Home, group: 'Обзор' },
   { id: 'trade', label: 'Торги', icon: CandlestickChart, group: 'Торговля' },
+  { id: 'markets', label: 'Рынки', icon: LineChart, group: 'Торговля' },
   { id: 'p2p', label: 'P2P', icon: Users, group: 'Торговля' },
   { id: 'payments', label: 'Кросс-бордер', icon: Send, group: 'Торговля' },
   { id: 'wallet', label: 'Кошелёк', icon: Wallet, group: 'Активы' },
@@ -65,6 +69,7 @@ const NAV: NavItem[] = [
 const VIEW_COMPONENTS: Record<ViewId, React.ComponentType> = {
   home: HomeView,
   trade: TradeView,
+  markets: MarketsView,
   p2p: P2PView,
   payments: PaymentsView,
   wallet: WalletView,
@@ -178,7 +183,8 @@ function Header() {
           <PriceTicker />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          <ThemeToggle />
           <NotificationsBell />
           {isAuthed ? (
             <Button

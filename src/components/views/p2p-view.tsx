@@ -15,6 +15,7 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
+import { useApi, apiPost, apiPatch } from '@/lib/use-api'
 import type { P2POffer, P2PDeal, OrderSide, DealStatus } from '@/lib/types'
 import { formatNumber, formatPrice } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -43,6 +44,49 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { toast } from 'sonner'
 
 const PAYMENT_METHODS = ['СБП', 'Тинькофф', 'Сбер', 'Альфа-Банк', 'Райффайзен', 'СБП + Тинькофф']
+
+// Normalize a raw API P2P offer record into the frontend P2POffer type.
+// The DB-backed offer lacks a `user` display name; we synthesize one from the id.
+function normalizeApiOffer(raw: any): P2POffer {
+  const id: string = raw.id ?? ''
+  return {
+    id,
+    type: (raw.type === 'buy' || raw.type === 'sell' ? raw.type : 'sell') as OrderSide,
+    asset: raw.asset ?? 'USDT',
+    fiat: raw.fiat ?? 'RUB',
+    price: Number(raw.price ?? 0),
+    amount: Number(raw.amount ?? 0),
+    user: raw.user ?? `Трейдер ${id.slice(-4)}`,
+    method: raw.method ?? 'СБП',
+    completed: Number(raw.completed ?? 0),
+    rating: typeof raw.rating === 'number' ? raw.rating : undefined,
+  }
+}
+
+// Normalize a raw API P2P deal record into the frontend P2PDeal type.
+// The DB schema doesn't carry the taker's side explicitly — default to 'buy'.
+function normalizeApiDeal(raw: any): P2PDeal {
+  const id: string = raw.id ?? ''
+  const time: string =
+    raw.time ??
+    (raw.createdAt
+      ? new Date(raw.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+      : '')
+  const amount = Number(raw.amount ?? 0)
+  const price = Number(raw.price ?? 0)
+  return {
+    id,
+    type: (raw.type === 'buy' || raw.type === 'sell' ? raw.type : 'buy') as OrderSide,
+    asset: raw.asset ?? 'USDT',
+    amount,
+    price,
+    total: Number(raw.total ?? amount * price),
+    counterparty: raw.counterparty ?? `Контрагент ${id.slice(-4)}`,
+    paymentMethod: raw.paymentMethod ?? raw.method ?? 'СБП',
+    status: (raw.status ?? 'PENDING') as DealStatus,
+    time,
+  }
+}
 
 function Avatar({ name, size = 36 }: { name: string; size?: number }) {
   const initial = name.slice(0, 1).toUpperCase()
@@ -157,9 +201,15 @@ function OfferRow({
 }
 
 // ─── Offers section ─────────────────────────────────────────────────────────
-function OffersSection() {
-  const p2pOffers = useAppStore((s) => s.p2pOffers)
-  const acceptP2POffer = useAppStore((s) => s.acceptP2POffer)
+function OffersSection({
+  apiOffers,
+  onAcceptOffer,
+}: {
+  apiOffers: P2POffer[] | null
+  onAcceptOffer: (offer: P2POffer) => void
+}) {
+  const storeOffers = useAppStore((s) => s.p2pOffers)
+  const offers = apiOffers && apiOffers.length > 0 ? apiOffers : storeOffers
   const [tab, setTab] = useState<'buy' | 'sell'>('buy')
   const [search, setSearch] = useState('')
   const [minPrice, setMinPrice] = useState('')
@@ -169,7 +219,7 @@ function OffersSection() {
   // buy tab: show offers where maker is SELLING (so we can BUY from them)
   // sell tab: show offers where maker is BUYING (so we can SELL to them)
   const filtered = useMemo(() => {
-    let list = p2pOffers.filter((o) => (tab === 'buy' ? o.type === 'sell' : o.type === 'buy'))
+    let list = offers.filter((o) => (tab === 'buy' ? o.type === 'sell' : o.type === 'buy'))
     const q = search.trim().toLowerCase()
     if (q) {
       list = list.filter(
@@ -184,10 +234,10 @@ function OffersSection() {
     if (sort === 'price-asc') list = [...list].sort((a, b) => a.price - b.price)
     if (sort === 'price-desc') list = [...list].sort((a, b) => b.price - a.price)
     return list
-  }, [p2pOffers, tab, search, minPrice, maxPrice, sort])
+  }, [offers, tab, search, minPrice, maxPrice, sort])
 
   const handleAccept = (offer: P2POffer) => {
-    acceptP2POffer(offer)
+    onAcceptOffer(offer)
     toast.success('Сделка P2P создана', {
       description: `${formatNumber(offer.amount, 0)} USDT • ${formatNumber(
         offer.price,
@@ -294,9 +344,11 @@ function OffersSection() {
 function CreateOfferDialog({
   open,
   onOpenChange,
+  onCreated,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
+  onCreated?: () => void
 }) {
   const addP2POffer = useAppStore((s) => s.addP2POffer)
   const [type, setType] = useState<OrderSide>('buy')
@@ -304,7 +356,7 @@ function CreateOfferDialog({
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState<string>('СБП')
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const p = parseFloat(price)
     const a = parseFloat(amount)
     if (!p || p <= 0) {
@@ -314,6 +366,18 @@ function CreateOfferDialog({
     if (!a || a <= 0) {
       toast.error('Введите количество USDT')
       return
+    }
+    // Persist via API (fire-and-forget resilience; local store update is the source of UI truth)
+    try {
+      await apiPost('/api/p2p', {
+        action: 'create',
+        type,
+        price: p,
+        amount: a,
+        method,
+      })
+    } catch {
+      // Ignore API error — still mirror locally
     }
     addP2POffer({
       type,
@@ -334,6 +398,7 @@ function CreateOfferDialog({
     setPrice('')
     setAmount('')
     onOpenChange(false)
+    onCreated?.()
   }
 
   return (
@@ -568,8 +633,14 @@ function ChatWidget({
 }
 
 // ─── My Deals section ───────────────────────────────────────────────────────
-function MyDealsSection() {
-  const p2pDeals = useAppStore((s) => s.p2pDeals)
+function MyDealsSection({
+  apiDeals,
+  onRefresh,
+}: {
+  apiDeals: P2PDeal[] | null
+  onRefresh?: () => void
+}) {
+  const storeDeals = useAppStore((s) => s.p2pDeals)
   const updateDealStatus = useAppStore((s) => s.updateDealStatus)
   const [subtab, setSubtab] = useState<'active' | 'completed'>('active')
   const [chatDealId, setChatDealId] = useState<string | null>(null)
@@ -577,13 +648,25 @@ function MyDealsSection() {
   const activeStatuses: DealStatus[] = ['PENDING', 'PAID', 'DISPUTE']
   const completedStatuses: DealStatus[] = ['COMPLETED', 'CANCELLED']
 
+  // Merge API deals + store deals (dedupe by id; API takes precedence)
+  const p2pDeals = useMemo(() => {
+    if (!apiDeals || apiDeals.length === 0) return storeDeals
+    const apiIds = new Set(apiDeals.map((d) => d.id))
+    return [...apiDeals, ...storeDeals.filter((d) => !apiIds.has(d.id))]
+  }, [apiDeals, storeDeals])
+
   const filtered = p2pDeals.filter((d) =>
     subtab === 'active' ? activeStatuses.includes(d.status) : completedStatuses.includes(d.status)
   )
 
   const chatDeal = p2pDeals.find((d) => d.id === chatDealId) ?? null
 
-  const handleConfirm = (d: P2PDeal) => {
+  const handleConfirm = async (d: P2PDeal) => {
+    try {
+      await apiPatch('/api/p2p', { id: d.id, status: 'COMPLETED' })
+    } catch {
+      // Ignore API error — still mirror locally
+    }
     updateDealStatus(d.id, 'COMPLETED')
     toast.success('Сделка завершена', {
       description: `${formatNumber(d.amount, 0)} USDT • ${formatNumber(
@@ -591,12 +674,19 @@ function MyDealsSection() {
         0
       )} ₽`,
     })
+    onRefresh?.()
   }
-  const handleCancel = (d: P2PDeal) => {
+  const handleCancel = async (d: P2PDeal) => {
+    try {
+      await apiPatch('/api/p2p', { id: d.id, status: 'CANCELLED' })
+    } catch {
+      // Ignore API error — still mirror locally
+    }
     updateDealStatus(d.id, 'CANCELLED')
     toast.error('Сделка отменена', {
       description: `${d.counterparty} • ${formatNumber(d.amount, 0)} USDT`,
     })
+    onRefresh?.()
   }
 
   return (
@@ -723,6 +813,33 @@ function MyDealsSection() {
 // ─── Main P2PView ───────────────────────────────────────────────────────────
 export function P2PView() {
   const [createOpen, setCreateOpen] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const p2pUrl = refreshKey ? `/api/p2p?t=${refreshKey}` : '/api/p2p'
+  const { data } = useApi<any>(p2pUrl)
+  const acceptP2POffer = useAppStore((s) => s.acceptP2POffer)
+
+  // Normalize API payloads (offers/deals come back as raw DB rows + rating/time)
+  const apiOffers: P2POffer[] | null = useMemo(() => {
+    if (!data?.offers || !Array.isArray(data.offers) || data.offers.length === 0) return null
+    return data.offers.map(normalizeApiOffer)
+  }, [data])
+  const apiDeals: P2PDeal[] | null = useMemo(() => {
+    if (!data?.deals || !Array.isArray(data.deals) || data.deals.length === 0) return null
+    return data.deals.map(normalizeApiDeal)
+  }, [data])
+
+  const refresh = () => setRefreshKey((k) => k + 1)
+
+  // Accept an offer: persist via API then mirror in store for instant UI
+  const handleAcceptOffer = async (offer: P2POffer) => {
+    try {
+      await apiPost('/api/p2p', { action: 'accept', offerId: offer.id })
+    } catch {
+      // Ignore API error — still mirror locally
+    }
+    acceptP2POffer(offer)
+    refresh()
+  }
 
   return (
     <div className="flex-1 bg-background">
@@ -780,12 +897,12 @@ export function P2PView() {
           </Card>
         </div>
 
-        <OffersSection />
+        <OffersSection apiOffers={apiOffers} onAcceptOffer={handleAcceptOffer} />
 
-        <MyDealsSection />
+        <MyDealsSection apiDeals={apiDeals} onRefresh={refresh} />
       </div>
 
-      <CreateOfferDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <CreateOfferDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={refresh} />
     </div>
   )
 }

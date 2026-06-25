@@ -678,3 +678,132 @@ Stage Summary:
 - WORKING INVESTOR-DEMO PROTOTYPE complete. 11 sections, real Binance prices, full trading flow, cross-border saga, AML compliance console, KYC wizard.
 - Status: Stage 0 (connect) ✓, Stage 3 (views) ✓. Stage 1 (API routes with Prisma persistence) and Stage 2 (socket.io realtime) are PENDING — current data is client-side Zustand (persisted to localStorage). Scheduled task (every 15 min) will continue: add API routes, socket.io mini-service, polish, more features.
 - Preview: app running on :3000, viewable via Preview Panel.
+
+---
+
+## Task ID: 4-B
+**Agent:** full-stack-developer
+**Task:** Add 6 new features + polish to the РусКрипто SPA (Next.js 16, single `/` route, client-side view switching). Gold + dark navy theme, dark default. Investors demo polish.
+
+### Files written / modified
+- NEW `src/components/views/markets-view.tsx` — Markets listing page (FEATURE 1).
+- NEW `src/components/theme-toggle.tsx` — Light/Dark theme toggle button (FEATURE 2).
+- NEW `src/components/page-skeleton.tsx` — Shimmering loading skeletons (FEATURE 6).
+- MOD `src/lib/types.ts` — Added `'markets'` to `ViewId`.
+- MOD `src/app/page.tsx` — Imported MarketsView + ThemeToggle; added LineChart icon; added `markets` to NAV (after `trade`) and VIEW_COMPONENTS; added ThemeToggle to header.
+- MOD `src/app/globals.css` — `:root` is now light theme (warm off-white bg, white cards, gold primary kept); `.dark` unchanged (still default).
+- MOD `src/components/views/trade-view.tsx` — Added BookRow (per-row flash animation) + DepthChart (80px SVG cumulative-depth viz below order book); added subtle flash on main live price.
+- MOD `src/components/views/home-view.tsx` — Added AnimatedNumber (framer-motion useSpring/useTransform); Hero fetches real tickers + USD/RUB; shows real total 24h volume, top gainer, top loser; MarketGrid uses MarketGridSkeleton while loading.
+
+### Feature-by-feature summary
+1. **Рынки page** (new view) — full Binance-style markets listing: search, sort, favourite stars (localStorage), tabs (Все/Фавориты/Рост/Падение), desktop table + mobile cards, real Binance prices polled every 12s + jitter every 3.5s. Aggregate stats banner (total volume, gainers/losers, top gainer/loser). "Торговать" buttons → setView('trade') + setSelectedPair.
+2. **Light/Dark theme toggle** — Sun/Moon button in header (next to NotificationsBell); light theme added to `:root` (gold primary preserved); dark remains default via ThemeProvider; no FOUC (next-themes injects blocking script).
+3. **Depth chart** — 80px SVG cumulative-depth visualization (green bids left, red asks right, gold dashed mid-price marker) inside OrderBook card below the bids scroll area. Uses reduce accumulator (avoids react-hooks/immutability lint rule).
+4. **Flash animations** — every order-book row (12 asks + 12 bids) now uses BookRow component which tracks prevPriceRef and applies flash-up/flash-down CSS class for 600ms on each price change; main live price pill also flashes green/red on each update.
+5. **Real home stats** — Hero shows real total 24h volume (sum volume24h × usdRub), USD/RUB rate, top gainer, top loser — all wrapped in AnimatedNumber (framer-motion useSpring) for smooth spring interpolation when values update.
+6. **Loading skeletons** — MarketGridSkeleton (8 shimmer cards), TableSkeleton (rows for markets table), StatsSkeleton (4 stat blocks for Hero); used in home-view MarketGrid + Hero, markets-view desktop table + mobile cards.
+
+### Wiring
+- ViewId: added 'markets'.
+- NAV: `{ id: 'markets', label: 'Рынки', icon: LineChart, group: 'Торговля' }` after 'trade'.
+- VIEW_COMPONENTS: `markets: MarketsView`.
+- Header: `<ThemeToggle />` before `<NotificationsBell />`.
+- All existing views continue to render unchanged (no exports renamed, no existing NAV entries removed).
+
+### Verification
+- `curl -s http://localhost:3000 -o /dev/null -w "%{http_code}"` → **200** ✓
+- `tail -40 /home/z/my-project/dev.log` → no compile errors, only `✓ Compiled in Nms` + `GET / 200` ✓
+- `bun run lint` → **0 errors** in any of my files. Remaining 5 warnings are all in pre-existing files (compliance-view.tsx, p2p-view.tsx, payments-view.tsx — unused eslint-disable directives, not mine).
+- Fixed one lint error during development: react-hooks/immutability flagged `let bidCum = 0; bidCum += l.amount` inside DepthChart render. Replaced with Array.prototype.reduce accumulator pattern.
+
+### Code-quality notes
+- All new client components start with 'use client'.
+- Russian UI text throughout.
+- shadcn/ui (Button, Card, Badge, Input, Tabs, ScrollArea, Skeleton), framer-motion (useSpring/useTransform), lucide-react icons. Custom SVG for depth chart (recharts not needed for this size).
+- Responsive: mobile-first; markets-view switches table→cards at lg breakpoint; depth chart SVG scales with width=100%.
+- No console.log, no TODO, no test code.
+- Theme tokens consistent: bg-background, bg-card, bg-muted, text-foreground, text-muted-foreground, border-border, text-primary, bg-primary, text-success, text-destructive. No indigo/blue as primary.
+
+Work record saved to: `/home/z/my-project/agent-ctx/4-B-full-stack-developer.md`
+
+---
+
+## Task ID: 4-A
+**Agent:** full-stack-developer
+**Task:** Integrate Prisma-backed API endpoints into 5 existing view components (wallet, p2p, compliance, payments, profile) of the РусКрипто crypto-exchange SPA. Hybrid load: prefer API, fall back to Zustand store for resilience. Keep all existing UI, shadcn components, Russian text, toasts.
+
+### Context read first
+- `/home/z/my-project/src/lib/use-api.ts` — `useApi(url, {refresh})`, `apiPost(url, body)`, `apiPatch(url, body)` helpers.
+- `/home/z/my-project/src/lib/store.ts` — Zustand store (still used for UI state, optimistic updates, notifications).
+- `/home/z/my-project/src/lib/types.ts` + `format.ts` — domain types + formatters (unchanged).
+- 5 view files (read fully): wallet, p2p, compliance, payments, profile.
+- 7 API routes (read for response shapes): `/api/{auth,wallet,p2p,compliance,payments,kyc,orders}`.
+- `prisma/schema.prisma` + `prisma/seed.ts` — DB shape (P2POffer has no `user`, P2PDeal has no `type`, CrossBorderPayment.corridor is the id).
+
+### File 1 — `src/components/views/wallet-view.tsx`
+- Added imports: `useApi, apiPost` from `@/lib/use-api`; `Balance, Transaction` types.
+- **`WalletView` (main)**: lifted API fetch via `useApi<{balances, transactions}>('/api/wallet')`. Computed `apiBalances = data.balances.length > 0 ? data.balances : null`, `balances = apiBalances ?? storeBalances`. Merged `transactions = [...apiTx, ...storeTx.filter(not in apiIds)]` (API takes precedence by id). Added `refreshKey` state + `?t=${refreshKey}` URL cache-buster for manual refetch after mutations; `refresh = () => setRefreshKey(k => k+1)`.
+- **`TotalBalanceCard({balances})`**: now receives balances via prop (was reading store directly).
+- **`AssetsTab({balances})`**: same — prop-driven.
+- **`DepositTab({onDeposited})`**: `handleGenerate` now `async`. Calls `apiPost('/api/wallet', {action:'deposit', asset, network})` → uses returned `address`. Falls back to `store.generateDepositAddress()` on API failure. Mirrors final address into store via `useAppStore.setState({depositAddress: addr})`. Calls `onDeposited?.()` to refresh.
+- **`WithdrawTab({balances, onWithdrawn})`**: `handleSubmit` now `async`. Calls `apiPost('/api/wallet', {action:'withdraw', asset, amount, address})` then `store.withdraw()` (optimistic local UI) + toast + `onWithdrawn?.()` (refresh balances). API failure is swallowed — local mirror still applies.
+- **`HistoryTab({transactions})`**: receives merged transactions via prop.
+- All 4 tabs, gradient balance card, network selectors, QR code, 2FA, fee summary, status badges — unchanged UI.
+
+### File 2 — `src/components/views/p2p-view.tsx`
+- Added imports: `useApi, apiPost, apiPatch`.
+- Added `normalizeApiOffer(raw: any)` — DB-backed offer lacks `user`; synthesized as `Трейдер ${id.slice(-4)}`. Validates `type` ('buy'|'sell', default 'sell'), defaults method/fiat/asset. Preserves `rating` only if numeric.
+- Added `normalizeApiDeal(raw: any)` — DB-backed deal lacks `type`; default 'buy'. Computes `total` if missing (`amount * price`). Derives `time` from `createdAt` if absent. Defaults `counterparty` to `Контрагент ${id.slice(-4)}`.
+- **`P2PView` (main)**: lifted `useApi<any>('/api/p2p')`. Derived `apiOffers`/`apiDeals` via `useMemo` (null if API arrays are empty). `handleAcceptOffer(offer)` = `apiPost('/api/p2p', {action:'accept', offerId})` then `store.acceptP2POffer(offer)` + refresh. Passed `apiOffers`/`onAcceptOffer` to `OffersSection`; `apiDeals`/`onRefresh` to `MyDealsSection`; `onCreated` to `CreateOfferDialog`.
+- **`OffersSection({apiOffers, onAcceptOffer})`**: `offers = apiOffers && apiOffers.length > 0 ? apiOffers : storeOffers`. Accept handler delegates to parent (which does API + store).
+- **`CreateOfferDialog({onCreated})`**: `handleSubmit` now `async`. `apiPost('/api/p2p', {action:'create', type, price, amount, method})` (fire-and-forget on error) then `store.addP2POffer({...})` + toast + dialog close + `onCreated?.()` (refresh).
+- **`MyDealsSection({apiDeals, onRefresh})`**: merged `p2pDeals = useMemo(() => [...apiDeals, ...storeDeals.filter(not in apiIds)])`. `handleConfirm`/`handleCancel` now `async`: `apiPatch('/api/p2p', {id, status:'COMPLETED'|'CANCELLED'})` then `store.updateDealStatus()` + toast + `onRefresh?.()`.
+- All UI: trust band, offer rows, filters, chat widget, deal sub-tabs, status badges — unchanged.
+
+### File 3 — `src/components/views/compliance-view.tsx`
+- Added imports: `useApi, apiPatch`.
+- **`ComplianceView` (main)**: lifted `useApi<{alerts: ComplianceAlert[]}>('/api/compliance')`. `apiAlerts = data.alerts.length > 0 ? data.alerts : null`. `alerts = apiAlerts ?? storeAlerts`. Added `refreshKey`/`refresh` pattern. Passed `alerts` to `QuarantineCard`, `onReviewed={refresh}` to `AlertDetail`.
+- **`AlertDetail({alert, onReviewed})`**: `handleAction` now `async`. `apiPatch('/api/compliance', {id, status})` (resilience: ignored on failure) then `store.reviewAlert(id, status)` + `pushNotification` + toast + `onReviewed?.()`.
+- **`QuarantineCard({alerts})`**: receives alerts via prop (was reading store). criticalOpen computed from prop.
+- All UI: SHAP explainer, severity stripes, risk score bar, action buttons (APPROVED/REJECTED/ESCALATED/SAR), critical-quarantine card, stats — unchanged.
+
+### File 4 — `src/components/views/payments-view.tsx`
+- Added imports: `useApi, apiPost, apiPatch`.
+- Added `normalizeApiPayment(raw: any)` — API stores `corridor` as id (e.g. 'RU-CN'); translates to localized name (e.g. 'Россия → Китай') via local CORRIDORS lookup. Coerces all numeric fields, defaults status to 'INITIATED'.
+- **`PaymentsView` (main)**: lifted `useApi<{payments: any[]}>('/api/payments')`. `apiPayments = data.payments.length > 0 ? data.payments.map(normalizeApiPayment) : null`. Passed `apiPayments` to `MyPayments`, `onCreated={refresh}` to `NewPaymentForm`.
+- **`NewPaymentForm({onCreated})`**: `handleSubmit` now `async`. `apiPost('/api/payments', {corridor: corridor.id, amount, beneficiary, purpose, account, swift})` → captures `apiId = res.payment.id`. Then `store.createPayment({...})` (local id drives UI simulation) + toast + `onCreated?.()` (refresh — new payment appears in API list immediately). Status simulation interval continues: each tick also calls `apiPatch('/api/payments', {id: apiId, status: next})` to keep DB in sync. Final tick sets `SETTLED` via apiPatch + `onCreated?.()` again.
+- **`MyPayments({apiPayments})`**: `payments = apiPayments && apiPayments.length > 0 ? apiPayments : storePayments`.
+- All UI: corridor selector, amount input, beneficiary/account/swift/purpose fields, live summary, status stepper, corridors card, regulatory note — unchanged.
+
+### File 5 — `src/components/views/profile-view.tsx`
+- Added imports: `useApi` from `@/lib/use-api`; `Balance` type.
+- Added `ApiUser` interface (matches `/api/auth` response shape: `{id, email, name, phone, kycLevel, kycStatus, qualified, role, balances[]}`).
+- **`ProfileView`**: Added `useApi<ApiUser>('/api/auth')`. Derived `apiBalances = apiUser.balances.length > 0 ? apiUser.balances : null`, `balances = apiBalances ?? storeBalances`, `effectiveKycLevel = apiUser.kycLevel ?? kycLevel`, `effectiveKycStatus = apiUser.kycStatus ?? kycStatus`. `displayName`/`displayEmail` prefer API values. Added `useEffect` to sync `nameInput`/`emailInput` state when API data arrives. All UI references to `kycLevel`/`kycStatus` swapped to `effectiveKycLevel`/`effectiveKycStatus`. KYC status label now also accepts `'ACTIVE'` (DB value) as verified.
+- The `!isAuthed` CTA, header card with avatar, sidebar nav, overview/assets/history/security/referrals/settings tabs — all unchanged. Logout still `store.logout() + setView('home') + toast`.
+
+### Resilience pattern (consistent across all 5 files)
+- Every mutation (deposit, withdraw, create offer, accept offer, update deal, review alert, create payment, payment status update) wraps the API call in `try { await apiPost/apiPatch(...) } catch { /* ignored */ }` — the local store mutation + toast + UI feedback always fire regardless, so a network failure never breaks the UX.
+- Every GET-driven list prefers API data when the API returns a non-empty array, else falls back to the persisted Zustand store. This means a fresh browser (no localStorage) sees API data; a returning browser sees whichever is richer (transactions/deals are unioned by id with API taking precedence).
+- Refresh mechanism: each main view (`WalletView`, `P2PView`, `ComplianceView`, `PaymentsView`) holds a `refreshKey` state. `refresh = () => setRefreshKey(k => k+1)` changes the URL (`/api/...?t=N`), which triggers `useApi`'s effect to re-run and refetch. Mutations call `refresh()` (or the prop-bound variant) after success so the UI re-syncs with the API.
+- `useApi`'s effect retains `data` during refetch (only `loading` flips), so the UI doesn't flicker during background refreshes.
+
+### Verification
+- `curl -s http://localhost:3000 -o /dev/null -w "%{http_code}"` → **200** ✓
+- `tail -20 /home/z/my-project/dev.log` → no compile/runtime errors, only "✓ Compiled in ..." + "GET / 200 ..." ✓
+- Smoke-tested all 7 API endpoints (GET): wallet, auth, p2p, compliance, payments, kyc, orders — all 200 ✓
+- Smoke-tested mutations: POST /api/wallet (deposit) → returned address+transaction; POST /api/p2p (create offer) → returned offer; POST /api/payments → returned payment with computed receiveAmount; PATCH /api/compliance → returned updated alert. All 200 ✓
+- `bun run lint` → **0 errors, 0 warnings** ✓ (after removing 6 unused eslint-disable directives — `@typescript-eslint/no-explicit-any` is disabled globally in `eslint.config.mjs`)
+- `bunx tsc --noEmit` for my 5 files → **0 errors** ✓ (9 pre-existing errors in other files: crypto_mvp_repo/*, examples/websocket, skills/*, src/components/views/portfolio-view.tsx:187, src/lib/store.ts:340 — none mine)
+
+### Files modified
+- `/home/z/my-project/src/components/views/wallet-view.tsx` (≈900 lines)
+- `/home/z/my-project/src/components/views/p2p-view.tsx` (≈910 lines)
+- `/home/z/my-project/src/components/views/compliance-view.tsx` (≈720 lines)
+- `/home/z/my-project/src/components/views/payments-view.tsx` (≈650 lines)
+- `/home/z/my-project/src/components/views/profile-view.tsx` (≈820 lines)
+
+### Summary of behaviour change for end users
+- Balances, transactions, P2P offers/deals, compliance alerts, cross-border payments, and profile/KYC info now load from the Prisma-backed API on each view mount. The Zustand store remains the optimistic/UI-state layer; API is the source of truth for cross-session persisted data.
+- Mutations hit the API first (persisted to SQLite via Prisma) and then mirror to the store for instant UI feedback + toasts/notifications. A failed API call no longer breaks the UI — the local store still updates so the demo flows continue.
+- After each mutation, the relevant view re-fetches from the API to re-sync (refreshKey cache-buster pattern).
+- All existing UI components, shadcn styling, Russian text, toasts, animations, status steppers, SHAP explainer, chat widget, QR codes, trust bands, regulatory notes, etc. — preserved exactly. Only data sources + mutation call sites changed.

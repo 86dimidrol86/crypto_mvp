@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowRight,
   ShieldCheck,
@@ -13,8 +13,9 @@ import {
   CheckCircle2,
   Scale,
 } from 'lucide-react'
+import { motion, useSpring, useTransform } from 'framer-motion'
 import { useAppStore } from '@/lib/store'
-import { fetchTickers, jitterPrice } from '@/lib/market'
+import { fetchTickers, jitterPrice, getUsdRubRate } from '@/lib/market'
 import type { CoinTicker } from '@/lib/types'
 import { formatPrice, formatPercent } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -23,10 +24,63 @@ import { Sparkline } from '@/components/sparkline'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { MarketGridSkeleton, StatsSkeleton } from '@/components/page-skeleton'
+
+/** Animated number using framer-motion spring. */
+function AnimatedNumber({
+  value,
+  format,
+  className,
+}: {
+  value: number
+  format: (n: number) => string
+  className?: string
+}) {
+  const mv = useSpring(value, { stiffness: 80, damping: 18 })
+  const text = useTransform(mv, (v) => format(v))
+  useEffect(() => {
+    mv.set(value)
+  }, [value, mv])
+  return <motion.span className={className}>{text}</motion.span>
+}
 
 function Hero() {
   const setView = useAppStore((s) => s.setView)
   const isAuthed = useAppStore((s) => s.isAuthed)
+  const [tickers, setTickers] = useState<CoinTicker[]>([])
+  const [usdRub, setUsdRub] = useState<number>(0)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let mounted = true
+    const load = async () => {
+      const [t, r] = await Promise.all([fetchTickers(), getUsdRubRate()])
+      if (mounted) {
+        setTickers(t)
+        setUsdRub(r)
+        setLoading(false)
+      }
+    }
+    load()
+    const interval = setInterval(load, 15000)
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
+  }, [])
+
+  // Aggregate 24h volume in RUB (sum of volume24h * usdRub)
+  const totalVolumeRub = useMemo(() => {
+    return tickers.reduce((s, c) => s + (c.volume24h ?? 0) * usdRub, 0)
+  }, [tickers, usdRub])
+
+  const topGainer = useMemo(() => {
+    return [...tickers].sort((a, b) => b.change24h - a.change24h)[0]
+  }, [tickers])
+  const topLoser = useMemo(() => {
+    return [...tickers].sort((a, b) => a.change24h - b.change24h)[0]
+  }, [tickers])
+
   return (
     <section className="relative overflow-hidden border-b border-border">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent" />
@@ -86,42 +140,93 @@ function Hero() {
           </div>
 
           <Card className="p-6 lg:p-8 bg-card/60 backdrop-blur border-border">
-            <div className="grid grid-cols-2 gap-5">
-              <div>
-                <div className="text-xs text-muted-foreground">Объём 24ч</div>
-                <div className="text-2xl font-bold mt-1">184.2M ₽</div>
-                <div className="text-xs text-success mt-0.5">+12.4% за день</div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">Активных пользователей</div>
-                <div className="text-2xl font-bold mt-1">38 450</div>
-                <div className="text-xs text-success mt-0.5">+847 за день</div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">Торговых пар</div>
-                <div className="text-2xl font-bold mt-1">52</div>
-                <div className="text-xs text-muted-foreground mt-0.5">RUB / USDT котировки</div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">Кросс-бордер коридоров</div>
-                <div className="text-2xl font-bold mt-1">7</div>
-                <div className="text-xs text-muted-foreground mt-0.5">CN · AE · TR · IN · СНГ</div>
-              </div>
-            </div>
-            <div className="mt-6 pt-6 border-t border-border grid grid-cols-3 gap-4 text-center">
-              <div>
-                <div className="text-lg font-bold text-primary">&lt;10 мс</div>
-                <div className="text-[10px] text-muted-foreground">matching latency</div>
-              </div>
-              <div>
-                <div className="text-lg font-bold text-primary">99.95%</div>
-                <div className="text-[10px] text-muted-foreground">SLA</div>
-              </div>
-              <div>
-                <div className="text-lg font-bold text-primary">100K TPS</div>
-                <div className="text-[10px] text-muted-foreground">пропускная</div>
-              </div>
-            </div>
+            {loading ? (
+              <StatsSkeleton />
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-5">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Объём 24ч</div>
+                    <div className="text-2xl font-bold mt-1 font-mono tabular-nums">
+                      <AnimatedNumber
+                        value={totalVolumeRub}
+                        format={(n) =>
+                          n >= 1_000_000_000
+                            ? `${(n / 1_000_000_000).toFixed(2)}B ₽`
+                            : n >= 1_000_000
+                            ? `${(n / 1_000_000).toFixed(2)}M ₽`
+                            : `${Math.round(n).toLocaleString('ru-RU')} ₽`
+                        }
+                      />
+                    </div>
+                    <div className="text-xs text-success mt-0.5 flex items-center gap-1">
+                      <TrendingUp className="w-3 h-3" />
+                      Реальные данные Binance
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">USD/RUB</div>
+                    <div className="text-2xl font-bold mt-1 font-mono tabular-nums">
+                      <AnimatedNumber
+                        value={usdRub}
+                        format={(n) => `${n.toFixed(2)} ₽`}
+                      />
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5">exchangerate-api</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Топ роста 24ч</div>
+                    <div className="text-2xl font-bold mt-1 flex items-center gap-2">
+                      {topGainer ? (
+                        <>
+                          <span className="text-success">{topGainer.symbol}</span>
+                          <span className="text-sm font-mono text-success">
+                            {formatPercent(topGainer.change24h)}
+                          </span>
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {topGainer ? topGainer.name : 'загрузка…'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Топ падения 24ч</div>
+                    <div className="text-2xl font-bold mt-1 flex items-center gap-2">
+                      {topLoser ? (
+                        <>
+                          <span className="text-destructive">{topLoser.symbol}</span>
+                          <span className="text-sm font-mono text-destructive">
+                            {formatPercent(topLoser.change24h)}
+                          </span>
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {topLoser ? topLoser.name : 'загрузка…'}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-6 pt-6 border-t border-border grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <div className="text-lg font-bold text-primary">&lt;10 мс</div>
+                    <div className="text-[10px] text-muted-foreground">matching latency</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-primary">99.95%</div>
+                    <div className="text-[10px] text-muted-foreground">SLA</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-primary">100K TPS</div>
+                    <div className="text-[10px] text-muted-foreground">пропускная</div>
+                  </div>
+                </div>
+              </>
+            )}
           </Card>
         </div>
       </div>
@@ -214,50 +319,54 @@ function MarketGrid() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {tickers.map((coin) => {
-            const status = highlight[coin.id]
-            const price = currency === 'rub' ? coin.priceRub : coin.priceUsd
-            const up = coin.change24h >= 0
-            return (
-              <Card
-                key={coin.id}
-                className={cn(
-                  'p-5 cursor-pointer transition-all hover:border-primary/40 hover:-translate-y-0.5 group',
-                  status === 'up' && 'ring-1 ring-success/40',
-                  status === 'down' && 'ring-1 ring-destructive/40'
-                )}
-                onClick={() => goTrade(coin.symbol)}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2.5">
-                    <CoinIcon symbol={coin.symbol} size={36} />
-                    <div>
-                      <div className="font-semibold text-sm">{coin.symbol}</div>
-                      <div className="text-[11px] text-muted-foreground">{coin.name}</div>
+        {tickers.length === 0 ? (
+          <MarketGridSkeleton count={8} />
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {tickers.map((coin) => {
+              const status = highlight[coin.id]
+              const price = currency === 'rub' ? coin.priceRub : coin.priceUsd
+              const up = coin.change24h >= 0
+              return (
+                <Card
+                  key={coin.id}
+                  className={cn(
+                    'p-5 cursor-pointer transition-all hover:border-primary/40 hover:-translate-y-0.5 group',
+                    status === 'up' && 'ring-1 ring-success/40',
+                    status === 'down' && 'ring-1 ring-destructive/40'
+                  )}
+                  onClick={() => goTrade(coin.symbol)}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2.5">
+                      <CoinIcon symbol={coin.symbol} size={36} />
+                      <div>
+                        <div className="font-semibold text-sm">{coin.symbol}</div>
+                        <div className="text-[11px] text-muted-foreground">{coin.name}</div>
+                      </div>
                     </div>
+                    <span
+                      className={cn(
+                        'flex items-center gap-0.5 text-xs font-medium px-2 py-0.5 rounded-md',
+                        up ? 'text-success bg-success/10' : 'text-destructive bg-destructive/10'
+                      )}
+                    >
+                      {up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                      {formatPercent(coin.change24h)}
+                    </span>
                   </div>
-                  <span
-                    className={cn(
-                      'flex items-center gap-0.5 text-xs font-medium px-2 py-0.5 rounded-md',
-                      up ? 'text-success bg-success/10' : 'text-destructive bg-destructive/10'
-                    )}
-                  >
-                    {up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                    {formatPercent(coin.change24h)}
-                  </span>
-                </div>
-                <div className="text-2xl font-mono font-bold tabular-nums">
-                  {formatPrice(price, currency)}
-                </div>
-                <div className="mt-3 flex items-center justify-between">
-                  <Sparkline data={generateSpark(coin.change24h)} width={90} height={28} />
-                  <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition" />
-                </div>
-              </Card>
-            )
-          })}
-        </div>
+                  <div className="text-2xl font-mono font-bold tabular-nums">
+                    {formatPrice(price, currency)}
+                  </div>
+                  <div className="mt-3 flex items-center justify-between">
+                    <Sparkline data={generateSpark(coin.change24h)} width={90} height={28} />
+                    <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition" />
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        )}
       </div>
     </section>
   )

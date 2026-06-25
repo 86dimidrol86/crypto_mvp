@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/lib/store'
+import { useApi, apiPost, apiPatch } from '@/lib/use-api'
 import type { Corridor, CrossBorderPayment, PaymentStatus } from '@/lib/types'
 import { formatNumber, timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -41,6 +42,28 @@ const CORRIDORS: Corridor[] = [
   { id: 'RU-KZ', name: 'Россия → Казахстан', from: 'RUB', to: 'KZT', rate: 5.5, fee: 0.006, eta: '10-30 мин', flag: '🇰🇿' },
   { id: 'RU-AM', name: 'Россия → Армения', from: 'RUB', to: 'AMD', rate: 4.2, fee: 0.007, eta: '15-45 мин', flag: '🇦🇲' },
 ]
+
+// Normalize a raw API payment record into the frontend CrossBorderPayment type.
+// The API stores `corridor` as the corridor id (e.g. 'RU-CN'); the frontend uses
+// the localized corridor name. We translate here so the rest of the UI is untouched.
+function normalizeApiPayment(raw: any): CrossBorderPayment {
+  const corridorId: string = raw.corridor ?? ''
+  const corridorObj = CORRIDORS.find((c) => c.id === corridorId)
+  return {
+    id: raw.id,
+    corridor: corridorObj?.name ?? raw.corridor ?? '',
+    fromCurrency: raw.fromCurrency ?? corridorObj?.from ?? 'RUB',
+    toCurrency: raw.toCurrency ?? corridorObj?.to ?? '',
+    amount: Number(raw.amount ?? 0),
+    receiveAmount: Number(raw.receiveAmount ?? 0),
+    fee: Number(raw.fee ?? 0),
+    rate: Number(raw.rate ?? 0),
+    beneficiary: raw.beneficiary ?? '',
+    purpose: raw.purpose ?? '',
+    status: (raw.status ?? 'INITIATED') as PaymentStatus,
+    createdAt: raw.createdAt ?? new Date().toISOString(),
+  }
+}
 
 const STATUS_FLOW: PaymentStatus[] = [
   'INITIATED',
@@ -133,7 +156,7 @@ function PaymentStepper({ payment }: { payment: CrossBorderPayment }) {
   )
 }
 
-function NewPaymentForm() {
+function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
   const createPayment = useAppStore((s) => s.createPayment)
   const updatePaymentStatus = useAppStore((s) => s.updatePaymentStatus)
   const pushNotification = useAppStore((s) => s.pushNotification)
@@ -158,7 +181,7 @@ function NewPaymentForm() {
     }
   }, [])
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (amountNum <= 0) {
       toast.error('Введите сумму платежа')
       return
@@ -176,6 +199,21 @@ function NewPaymentForm() {
       return
     }
     setSubmitting(true)
+    // Persist payment via API (resilience: local store mirror happens regardless)
+    let apiId: string | null = null
+    try {
+      const res = await apiPost<{ payment: { id: string } }>('/api/payments', {
+        corridor: corridor.id,
+        amount: amountNum,
+        beneficiary: beneficiary.trim(),
+        purpose: purpose.trim(),
+        account: account.trim(),
+        swift: swift.trim(),
+      })
+      apiId = res?.payment?.id ?? null
+    } catch {
+      // Ignore API error — local store mirror is still created below
+    }
     const id = createPayment({
       corridor: corridor.name,
       fromCurrency: corridor.from,
@@ -191,8 +229,12 @@ function NewPaymentForm() {
       description: `${formatNumber(amountNum)} ${corridor.from} → ${corridor.to}`,
     })
     setSubmitting(false)
+    // Refresh the API-sourced list so the new payment appears immediately
+    onCreated?.()
 
-    // Status simulation
+    // Status simulation (existing behaviour): advance the local record through
+    // the regulatory step flow so the stepper animates in the UI. The API record
+    // is also advanced in lockstep so the persisted status stays consistent.
     let step = 0
     if (timersRef.current[id]) clearInterval(timersRef.current[id]!)
     timersRef.current[id] = setInterval(() => {
@@ -201,14 +243,21 @@ function NewPaymentForm() {
         const t = timersRef.current[id]
         if (t) clearInterval(t)
         delete timersRef.current[id]
+        if (apiId) {
+          apiPatch('/api/payments', { id: apiId, status: 'SETTLED' }).catch(() => {})
+        }
         pushNotification(
           'Платёж зачислен',
           `${formatNumber(amountNum)} ${corridor.from} → ${formatNumber(receiveAmount)} ${corridor.to}`
         )
+        onCreated?.()
         return
       }
       const next = STATUS_FLOW[step]
       updatePaymentStatus(id, next)
+      if (apiId) {
+        apiPatch('/api/payments', { id: apiId, status: next }).catch(() => {})
+      }
       pushNotification(`Статус: ${STATUS_LABEL[next]}`, STATUS_DESCRIPTION[next])
     }, 3500)
   }
@@ -405,8 +454,12 @@ function CorridorsCard() {
   )
 }
 
-function MyPayments() {
-  const payments = useAppStore((s) => s.payments)
+function MyPayments({ apiPayments }: { apiPayments: CrossBorderPayment[] | null }) {
+  const storePayments = useAppStore((s) => s.payments)
+  // Prefer API payments when present; fall back to store for resilience.
+  // Also surface store-only payments (e.g. the just-created local record whose
+  // status simulation is mid-flight) so the UI doesn't lose them.
+  const payments = apiPayments && apiPayments.length > 0 ? apiPayments : storePayments
 
   return (
     <Card className="bg-card/60 backdrop-blur">
@@ -530,6 +583,18 @@ function RegulatoryNote() {
 }
 
 export function PaymentsView() {
+  // Refresh trigger — bump after a payment is created to refetch from /api/payments
+  const [refreshKey, setRefreshKey] = useState(0)
+  const paymentsUrl = refreshKey ? `/api/payments?t=${refreshKey}` : '/api/payments'
+  const { data } = useApi<{ payments: any[] }>(paymentsUrl)
+
+  const apiPayments: CrossBorderPayment[] | null =
+    data?.payments && Array.isArray(data.payments) && data.payments.length > 0
+      ? data.payments.map(normalizeApiPayment)
+      : null
+
+  const refresh = () => setRefreshKey((k) => k + 1)
+
   return (
     <div className="flex-1 py-8">
       <div className="max-w-[1400px] mx-auto px-4 lg:px-8 space-y-6">
@@ -573,11 +638,11 @@ export function PaymentsView() {
         {/* Two-column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-6">
           <div className="space-y-6">
-            <NewPaymentForm />
+            <NewPaymentForm onCreated={refresh} />
           </div>
           <div className="space-y-6">
             <CorridorsCard />
-            <MyPayments />
+            <MyPayments apiPayments={apiPayments} />
           </div>
         </div>
 

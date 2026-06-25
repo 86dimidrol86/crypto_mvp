@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   UserCircle,
   Wallet,
@@ -25,14 +25,14 @@ import {
   BadgeCheck,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
+import { useApi } from '@/lib/use-api'
 import { fetchTickers } from '@/lib/market'
-import type { CoinTicker } from '@/lib/types'
+import type { Balance, CoinTicker } from '@/lib/types'
 import {
   formatPrice,
   formatNumber,
   formatAmount,
 } from '@/lib/format'
-import { useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { CoinIcon } from '@/components/coin-icon'
 import { Button } from '@/components/ui/button'
@@ -60,6 +60,19 @@ import {
 import { toast } from 'sonner'
 
 type Tab = 'overview' | 'assets' | 'history' | 'security' | 'referrals' | 'settings'
+
+// Shape returned by GET /api/auth
+interface ApiUser {
+  id: string
+  email: string
+  name: string | null
+  phone: string | null
+  kycLevel: number
+  kycStatus: string
+  qualified: boolean
+  role: string
+  balances: Balance[]
+}
 
 const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'overview', label: 'Обзор', icon: UserCircle },
@@ -91,11 +104,19 @@ export function ProfileView() {
   const isAuthed = useAppStore((s) => s.isAuthed)
   const kycLevel = useAppStore((s) => s.kycLevel)
   const kycStatus = useAppStore((s) => s.kycStatus)
-  const balances = useAppStore((s) => s.balances)
+  const storeBalances = useAppStore((s) => s.balances)
   const orders = useAppStore((s) => s.orders)
   const transactions = useAppStore((s) => s.transactions)
   const logout = useAppStore((s) => s.logout)
   const setView = useAppStore((s) => s.setView)
+
+  // Hybrid: prefer /api/auth for cross-session persisted user data; fall back to store
+  const { data: apiUser } = useApi<ApiUser>('/api/auth')
+  const apiBalances =
+    apiUser?.balances && apiUser.balances.length > 0 ? apiUser.balances : null
+  const balances: Balance[] = apiBalances ?? storeBalances
+  const effectiveKycLevel: number = apiUser?.kycLevel ?? kycLevel
+  const effectiveKycStatus: string = apiUser?.kycStatus ?? kycStatus
 
   const [tab, setTab] = useState<Tab>('overview')
   const [tickers, setTickers] = useState<CoinTicker[]>([])
@@ -106,10 +127,16 @@ export function ProfileView() {
   const [notifEmail, setNotifEmail] = useState(true)
   const [notifSms, setNotifSms] = useState(false)
   const [notifTrades, setNotifTrades] = useState(true)
-  const [nameInput, setNameInput] = useState(userName || 'Иван Иванов')
-  const [emailInput, setEmailInput] = useState(userEmail || 'ivan.ivanov@ruscrypto.ru')
+  const [nameInput, setNameInput] = useState(apiUser?.name || userName || 'Иван Иванов')
+  const [emailInput, setEmailInput] = useState(apiUser?.email || userEmail || 'ivan.ivanov@ruscrypto.ru')
   const [language, setLanguage] = useState('ru')
   const [copied, setCopied] = useState(false)
+
+  // Keep settings inputs in sync with the API once it loads
+  useEffect(() => {
+    if (apiUser?.name) setNameInput(apiUser.name)
+    if (apiUser?.email) setEmailInput(apiUser.email)
+  }, [apiUser?.name, apiUser?.email])
 
   useEffect(() => {
     let mounted = true
@@ -129,14 +156,14 @@ export function ProfileView() {
     return s + (t ? b.amount * t.priceRub : 0)
   }, 0)
 
-  const displayName = userName || 'Иван Иванов'
-  const displayEmail = userEmail || 'ivan.ivanov@ruscrypto.ru'
+  const displayName = apiUser?.name || userName || 'Иван Иванов'
+  const displayEmail = apiUser?.email || userEmail || 'ivan.ivanov@ruscrypto.ru'
   const uid = 'RU-7842-9241'
-  const kycLabel = kycLevel === 0 ? 'Без верификации' : kycLevel === 1 ? 'Уровень 1' : 'Уровень 2'
+  const kycLabel = effectiveKycLevel === 0 ? 'Без верификации' : effectiveKycLevel === 1 ? 'Уровень 1' : 'Уровень 2'
   const kycBadgeColor =
-    kycLevel === 0
+    effectiveKycLevel === 0
       ? 'border-muted-foreground/30 text-muted-foreground'
-      : kycLevel === 1
+      : effectiveKycLevel === 1
       ? 'border-warning/30 text-warning bg-warning/5'
       : 'border-success/30 text-success bg-success/5'
 
@@ -222,7 +249,7 @@ export function ProfileView() {
               onClick={() => setView('kyc')}
               className="border-primary/30 text-primary shrink-0"
             >
-              {kycLevel === 2 ? 'Управление' : 'Пройти верификацию'}
+              {effectiveKycLevel === 2 ? 'Управление' : 'Пройти верификацию'}
             </Button>
           </div>
         </Card>
@@ -288,8 +315,8 @@ export function ProfileView() {
                       <div className="text-xs text-muted-foreground">KYC уровень</div>
                       <ShieldCheck className="w-4 h-4 text-success" />
                     </div>
-                    <div className="text-2xl font-bold tabular-nums">{kycLevel} <span className="text-base text-muted-foreground">/ 2</span></div>
-                    <div className="text-xs text-muted-foreground mt-2">{kycStatus === 'APPROVED' ? 'Верифицирован' : kycStatus === 'UNINITIATED' ? 'Не пройден' : 'На проверке'}</div>
+                    <div className="text-2xl font-bold tabular-nums">{effectiveKycLevel} <span className="text-base text-muted-foreground">/ 2</span></div>
+                    <div className="text-xs text-muted-foreground mt-2">{effectiveKycStatus === 'APPROVED' || effectiveKycStatus === 'ACTIVE' ? 'Верифицирован' : effectiveKycStatus === 'UNINITIATED' ? 'Не пройден' : 'На проверке'}</div>
                   </Card>
                 </div>
 
