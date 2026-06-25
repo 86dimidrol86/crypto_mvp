@@ -72,9 +72,9 @@ cat .env  # проверьте, что путь корректный
 echo "DATABASE_URL=file:$(Get-Location)/db/custom.db" > .env
 ```
 
-> ⚠️ **Важно:** Используйте именно **абсолютный путь** (`file:/home/user/crypto_mvp/db/custom.db`), а не относительный (`file:./db/custom.db`). Относительный путь может вызывать ошибку `Unable to open the database file` при запуске seed-скриптов.
-
-> **Примечание:** Используется SQLite — отдельный сервер БД не требуется. Файл БД создастся автоматически в `db/custom.db`.
+> ⚠️ **Важно:** 
+> - Используйте именно **абсолютный путь** (`file:/home/user/crypto_mvp/db/custom.db`), а не относительный (`file:./db/custom.db`). Относительный путь вызывает ошибку `Unable to open the database file`.
+> - Если в репозитории уже есть `.env` с путём `file:/home/z/my-project/...` — **удалите его** (`rm .env`) и создайте заново с вашим путём командой выше.
 
 ### 3.3. Генерация Prisma Client + создание схемы БД
 
@@ -262,6 +262,62 @@ echo "DATABASE_URL=file:$(pwd)/db/custom.db" > .env
 bun run db:generate
 bun run db:push
 bun prisma/seed-extended.ts
+```
+
+### Чёрный экран / 404 при открытии localhost:3000
+
+**Причина 1: `.env` с неверным путём к БД** (самая частая)
+В репозитории мог остаться `.env` с путём `file:/home/z/my-project/db/custom.db` (sandbox). На вашей машине этот путь не существует → API падает → чёрный экран.
+
+```bash
+# Удалите старый .env и создайте с вашим путём
+rm .env
+echo "DATABASE_URL=file:$(pwd)/db/custom.db" > .env
+cat .env  # должно быть: file:/Users/.../crypto_mvp/db/custom.db
+
+# Перегенерируйте Prisma + пересоздайте БД
+bun run db:generate
+bun run db:push
+bun prisma/seed-extended.ts
+
+# Перезапустите dev-сервер (Ctrl+C в терминале 2, затем)
+bun run dev
+```
+
+**Причина 2: Шрифты Google (Geist) не скачались**
+`layout.tsx` использует `Geist` из `next/font/google`. При первом запуске Next.js скачивает шрифты с Google Fonts. Если интернет/VPN блокирует — сборка падает.
+
+Решение: проверьте доступ к Google Fonts:
+```bash
+curl -I https://fonts.googleapis.com 2>&1 | head -1
+# Должно быть: HTTP/2 200
+```
+Если недоступно — используйте VPN или отключите шрифты (закомментируйте `Geist` в `layout.tsx`).
+
+**Причина 3: Не установлен `node_modules` или устарел**
+```bash
+rm -rf node_modules
+bun install
+bun run dev
+```
+
+**Причина 4: Ошибка в консоли браузера**
+Откройте DevTools (F12) → вкладка Console. Если есть ошибки — проверьте:
+- `Failed to fetch` → API routes падают (см. причину 1)
+- `Module not found` → переустановите зависимости (причина 3)
+- `Hydration mismatch` → очистите localStorage: `localStorage.clear()` в консоли браузера, затем обновите страницу
+
+### Диагностика: проверка API
+```bash
+# Проверьте, что API работает
+curl http://localhost:3000/api/market
+# Должен вернуть JSON с котировками
+
+curl http://localhost:3000/api/auth
+# Должен вернуть JSON с пользователем
+
+# Если API падает — проверьте .env и Prisma
+curl http://localhost:3000/api/analytics
 ```
 
 ### Live-котировки не обновляются (LIVE индикатор не горит)
