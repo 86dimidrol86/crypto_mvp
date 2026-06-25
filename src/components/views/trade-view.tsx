@@ -1,28 +1,41 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  useSortable,
+  arrayMove,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
 import {
   ChevronDown,
   TrendingUp,
   TrendingDown,
   CheckCircle2,
-  XCircle,
   ArrowDownRight,
-  ArrowUpRight,
+  GripVertical,
+  RotateCcw,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { fetchTickers, jitterPrice } from '@/lib/market'
 import { useLiveMarket } from '@/lib/use-live-market'
 import type { CoinTicker, OrderSide, OrderType, Trade } from '@/lib/types'
-import { formatPrice, formatNumber, formatPercent, formatAmount } from '@/lib/format'
+import { formatPrice, formatNumber, formatPercent } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { CoinIcon } from '@/components/coin-icon'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -42,12 +55,67 @@ const PAIRS = [
   'AVAX/RUB',
 ]
 
-interface RecentTrade {
-  id: string
-  price: number
-  amount: number
-  side: OrderSide
-  time: string
+// ─── Layout types & constants ───────────────────────────────────────────────
+type BlockId = 'chart' | 'trades' | 'book' | 'form' | 'mytrades'
+type ColumnId = 'left' | 'right'
+
+const DEFAULT_LEFT_ORDER: BlockId[] = ['chart', 'trades']
+const DEFAULT_RIGHT_ORDER: BlockId[] = ['book', 'form', 'mytrades']
+
+const BLOCK_TITLES: Record<BlockId, string> = {
+  chart: 'График',
+  trades: 'Сделки',
+  book: 'Стакан',
+  form: 'Ордер',
+  mytrades: 'Мои сделки',
+}
+
+const DEFAULT_SIZES = {
+  columns: [70, 30] as [number, number],
+  left: { chart: 75, trades: 25 } as Record<BlockId, number>,
+  right: { book: 40, form: 35, mytrades: 25 } as Record<BlockId, number>,
+}
+
+const MIN_SIZES = {
+  left: { chart: 15, trades: 10 } as Record<BlockId, number>,
+  right: { book: 18, form: 18, mytrades: 10 } as Record<BlockId, number>,
+}
+
+const LS_KEYS = {
+  leftOrder: 'trade-layout-order-left',
+  rightOrder: 'trade-layout-order-right',
+  leftSizes: 'trade-layout-sizes-left',
+  rightSizes: 'trade-layout-sizes-right',
+  columns: 'trade-layout-sizes-cols',
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function loadJSON<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return fallback
+    return JSON.parse(raw) as T
+  } catch {
+    return fallback
+  }
+}
+
+function saveJSON(key: string, value: unknown) {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    /* ignore */
+  }
+}
+
+function isValidOrder(saved: unknown, def: BlockId[]): saved is BlockId[] {
+  return (
+    Array.isArray(saved) &&
+    saved.length === def.length &&
+    saved.every((k) => def.includes(k as BlockId))
+  )
 }
 
 function uid() {
@@ -63,13 +131,346 @@ function fmtTimeNow(): string {
 }
 
 function priceDecimals(price: number): number {
-  if (price >= 1000) return 2
   if (price >= 1) return 2
   if (price >= 0.01) return 4
   return 6
 }
 
-// ─── Order Book ─────────────────────────────────────────────────────────────
+// ─── useTradeLayout: persist block order + panel sizes ──────────────────────
+function useTradeLayout() {
+  const [leftOrder, setLeftOrder] = useState<BlockId[]>(() => {
+    const saved = loadJSON<unknown>(LS_KEYS.leftOrder, DEFAULT_LEFT_ORDER)
+    return isValidOrder(saved, DEFAULT_LEFT_ORDER) ? saved : DEFAULT_LEFT_ORDER
+  })
+  const [rightOrder, setRightOrder] = useState<BlockId[]>(() => {
+    const saved = loadJSON<unknown>(LS_KEYS.rightOrder, DEFAULT_RIGHT_ORDER)
+    return isValidOrder(saved, DEFAULT_RIGHT_ORDER) ? saved : DEFAULT_RIGHT_ORDER
+  })
+  const [leftSizes, setLeftSizes] = useState<Record<BlockId, number>>(() =>
+    loadJSON(LS_KEYS.leftSizes, DEFAULT_SIZES.left)
+  )
+  const [rightSizes, setRightSizes] = useState<Record<BlockId, number>>(() =>
+    loadJSON(LS_KEYS.rightSizes, DEFAULT_SIZES.right)
+  )
+  const [columns, setColumns] = useState<[number, number]>(() =>
+    loadJSON(LS_KEYS.columns, DEFAULT_SIZES.columns)
+  )
+
+  // Per-key debounce timers so simultaneous onLayout callbacks from the three
+  // PanelGroups (cols + left + right) don't clobber each other's saves.
+  const saveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const debouncedSave = useCallback((key: string, value: unknown) => {
+    const timers = saveTimers.current
+    const existing = timers.get(key)
+    if (existing) clearTimeout(existing)
+    timers.set(
+      key,
+      setTimeout(() => {
+        saveJSON(key, value)
+        timers.delete(key)
+      }, 300)
+    )
+  }, [])
+
+  const onColumnsLayout = useCallback(
+    (sizes: number[]) => {
+      const next: [number, number] = [sizes[0] ?? 70, sizes[1] ?? 30]
+      setColumns(next)
+      debouncedSave(LS_KEYS.columns, next)
+    },
+    [debouncedSave]
+  )
+
+  const onLeftLayout = useCallback(
+    (sizes: number[]) => {
+      setLeftSizes((prev) => {
+        const next = { ...prev }
+        leftOrder.forEach((id, i) => {
+          next[id] = sizes[i] ?? prev[id] ?? 50
+        })
+        debouncedSave(LS_KEYS.leftSizes, next)
+        return next
+      })
+    },
+    [leftOrder, debouncedSave]
+  )
+
+  const onRightLayout = useCallback(
+    (sizes: number[]) => {
+      setRightSizes((prev) => {
+        const next = { ...prev }
+        rightOrder.forEach((id, i) => {
+          next[id] = sizes[i] ?? prev[id] ?? 50
+        })
+        debouncedSave(LS_KEYS.rightSizes, next)
+        return next
+      })
+    },
+    [rightOrder, debouncedSave]
+  )
+
+  const handleLeftReorder = useCallback((newOrder: BlockId[]) => {
+    setLeftOrder(newOrder)
+    saveJSON(LS_KEYS.leftOrder, newOrder)
+  }, [])
+  const handleRightReorder = useCallback((newOrder: BlockId[]) => {
+    setRightOrder(newOrder)
+    saveJSON(LS_KEYS.rightOrder, newOrder)
+  }, [])
+
+  const reset = useCallback(() => {
+    Object.values(LS_KEYS).forEach((k) => {
+      try {
+        localStorage.removeItem(k)
+      } catch {
+        /* ignore */
+      }
+    })
+    setLeftOrder(DEFAULT_LEFT_ORDER)
+    setRightOrder(DEFAULT_RIGHT_ORDER)
+    setLeftSizes(DEFAULT_SIZES.left)
+    setRightSizes(DEFAULT_SIZES.right)
+    setColumns(DEFAULT_SIZES.columns)
+    toast.success('Layout сброшен к значениям по умолчанию')
+  }, [])
+
+  return {
+    leftOrder,
+    rightOrder,
+    leftSizes,
+    rightSizes,
+    columns,
+    onColumnsLayout,
+    onLeftLayout,
+    onRightLayout,
+    handleLeftReorder,
+    handleRightReorder,
+    reset,
+  }
+}
+
+// ─── Small reusable bits ────────────────────────────────────────────────────
+function LiveBadge() {
+  return (
+    <span className="inline-flex items-center gap-0.5 text-[9px] text-success font-semibold uppercase tracking-wide">
+      <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+      LIVE
+    </span>
+  )
+}
+
+// ─── TradeResizeHandle: thin draggable divider between panels ───────────────
+function TradeResizeHandle({
+  id,
+  orientation,
+}: {
+  id: string
+  orientation: 'horizontal' | 'vertical'
+}) {
+  const isHoriz = orientation === 'horizontal'
+  return (
+    <PanelResizeHandle
+      id={id}
+      className={cn(
+        'relative group flex items-center justify-center shrink-0 z-10',
+        isHoriz ? 'w-2 cursor-col-resize' : 'h-2 cursor-row-resize'
+      )}
+    >
+      <div
+        className={cn(
+          'bg-border group-hover:bg-primary transition-colors',
+          isHoriz ? 'w-px h-full' : 'h-px w-full'
+        )}
+      />
+      <div
+        className={cn(
+          'absolute rounded-full bg-primary/50 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none',
+          isHoriz ? 'h-6 w-1' : 'w-6 h-1'
+        )}
+      />
+    </PanelResizeHandle>
+  )
+}
+
+// ─── SortableBlock: wrapper that makes a block drag-reorderable ─────────────
+function SortableBlock({
+  id,
+  render,
+}: {
+  id: BlockId
+  render: (dragHandle: ReactNode) => ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, isDragging, isOver } = useSortable({ id })
+  const dragHandle = (
+    <button
+      type="button"
+      {...attributes}
+      {...listeners}
+      className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-primary touch-none flex items-center justify-center shrink-0"
+      aria-label="Перетащить блок"
+      title="Перетащите, чтобы изменить порядок"
+    >
+      <GripVertical className="w-3.5 h-3.5" />
+    </button>
+  )
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        'flex-1 min-h-0 flex flex-col',
+        isDragging && 'opacity-30',
+        isOver && !isDragging && 'ring-2 ring-inset ring-primary/70 z-20'
+      )}
+    >
+      {render(dragHandle)}
+    </div>
+  )
+}
+
+// ─── ColumnPanelGroup: a vertical PanelGroup with drag-reorderable blocks ──
+function ColumnPanelGroup({
+  columnId,
+  order,
+  sizes,
+  minSizes,
+  onLayout,
+  onReorder,
+  renderBlock,
+}: {
+  columnId: ColumnId
+  order: BlockId[]
+  sizes: Record<BlockId, number>
+  minSizes: Record<BlockId, number>
+  onLayout: (sizes: number[]) => void
+  onReorder: (newOrder: BlockId[]) => void
+  renderBlock: (blockId: BlockId, dragHandle: ReactNode) => ReactNode
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  )
+  const [isDragging, setIsDragging] = useState(false)
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id) return
+      const oldIndex = order.indexOf(active.id as BlockId)
+      const newIndex = order.indexOf(over.id as BlockId)
+      if (oldIndex < 0 || newIndex < 0) return
+      onReorder(arrayMove(order, oldIndex, newIndex))
+    },
+    [order, onReorder]
+  )
+
+  // While dragging, disable iframe pointer events so the TradingView chart
+  // can't steal the cursor (see globals.css `body.trade-dnd-dragging`).
+  useEffect(() => {
+    if (isDragging) {
+      document.body.classList.add('trade-dnd-dragging')
+      return () => document.body.classList.remove('trade-dnd-dragging')
+    }
+    return undefined
+  }, [isDragging])
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={() => setIsDragging(true)}
+      onDragEnd={(e) => {
+        setIsDragging(false)
+        handleDragEnd(e)
+      }}
+      onDragCancel={() => setIsDragging(false)}
+    >
+      <PanelGroup
+        direction="vertical"
+        id={`trade-${columnId}`}
+        onLayout={onLayout}
+        className="h-full"
+      >
+        <SortableContext items={order} strategy={verticalListSortingStrategy}>
+          {order.map((blockId, i) => (
+            <Fragment key={blockId}>
+              {i > 0 && (
+                <TradeResizeHandle id={`${columnId}-h-${i}`} orientation="vertical" />
+              )}
+              <Panel
+                id={blockId}
+                order={i}
+                defaultSize={sizes[blockId] ?? 50}
+                minSize={minSizes[blockId] ?? 10}
+                className="flex flex-col"
+              >
+                <SortableBlock
+                  id={blockId}
+                  render={(dh) => renderBlock(blockId, dh)}
+                />
+              </Panel>
+            </Fragment>
+          ))}
+        </SortableContext>
+      </PanelGroup>
+    </DndContext>
+  )
+}
+
+// ─── Block: Chart (TradingView iframe, auto-reloads on significant resize) ─
+function ChartBlock({ dragHandle, symbol }: { dragHandle: ReactNode; symbol: string }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [reloadKey, setReloadKey] = useState(0)
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    let lastW = container.offsetWidth
+    let lastH = container.offsetHeight
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const ro = new ResizeObserver(() => {
+      const w = container.offsetWidth
+      const h = container.offsetHeight
+      // Only reload on a meaningful size change (avoids spamming on every tick)
+      if (Math.abs(w - lastW) > 60 || Math.abs(h - lastH) > 60) {
+        lastW = w
+        lastH = h
+        if (timer) clearTimeout(timer)
+        timer = setTimeout(() => setReloadKey((k) => k + 1), 600)
+      }
+    })
+    ro.observe(container)
+    return () => {
+      ro.disconnect()
+      if (timer) clearTimeout(timer)
+    }
+  }, [])
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col bg-card border border-border rounded-md overflow-hidden">
+      <div className="px-2 py-1 border-b border-border flex items-center gap-1.5 shrink-0">
+        {dragHandle}
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          График
+        </span>
+        <span className="ml-auto text-[10px] text-muted-foreground font-mono">
+          {symbol.replace('BINANCE:', '')}
+        </span>
+      </div>
+      <div ref={containerRef} className="flex-1 min-h-0 bg-black">
+        <iframe
+          key={reloadKey}
+          title="TradingView Chart"
+          src={`https://www.tradingview.com/widgetembed/?frameElementId=tv&symbol=${encodeURIComponent(
+            symbol
+          )}&interval=5&theme=dark&hide_side_toolbar=false&hide_top_toolbar=false&allow_symbol_change=false&hideideas=true&hide_volume=false&autosize=true`}
+          className="w-full h-full border-0"
+          allowFullScreen
+        />
+      </div>
+    </div>
+  )
+}
+
+// ─── Block: OrderBook (with depth chart) ────────────────────────────────────
 interface BookRowProps {
   price: number
   amount: number
@@ -78,11 +479,6 @@ interface BookRowProps {
   decimals: number
 }
 
-/**
- * Single order-book row with flash-on-update animation.
- * Tracks previous price in a ref and applies `flash-up`/`flash-down`
- * class for 600ms when the price changes.
- */
 function BookRow({ price, amount, maxAmount, side, decimals }: BookRowProps) {
   const prevPriceRef = useRef<number>(price)
   const [flash, setFlash] = useState<'up' | 'down' | null>(null)
@@ -106,16 +502,12 @@ function BookRow({ price, amount, maxAmount, side, decimals }: BookRowProps) {
   return (
     <div
       className={cn(
-        'relative grid grid-cols-3 px-3 py-[3px] text-xs font-mono tabular-nums transition-colors',
+        'relative grid grid-cols-3 px-2 py-[2px] text-[11px] font-mono tabular-nums transition-colors',
         flash === 'up' && 'flash-up',
         flash === 'down' && 'flash-down'
       )}
     >
-      <div
-        className={cn('absolute inset-y-0 right-0', barClass)}
-        style={{ width: `${wPct}%` }}
-        aria-hidden
-      />
+      <div className={cn('absolute inset-y-0 right-0', barClass)} style={{ width: `${wPct}%` }} aria-hidden />
       <span className={cn('relative', colorClass)}>
         {price.toLocaleString('ru-RU', {
           minimumFractionDigits: decimals,
@@ -132,31 +524,25 @@ function BookRow({ price, amount, maxAmount, side, decimals }: BookRowProps) {
   )
 }
 
-// ─── Depth Chart ────────────────────────────────────────────────────────────
 interface DepthChartProps {
   asks: { price: number; amount: number }[]
   bids: { price: number; amount: number }[]
   midPrice: number
 }
 
-/**
- * Compact cumulative-depth visualization.
- * Renders green (bids, left) and red (asks, right) area charts over price.
- */
 function DepthChart({ asks, bids, midPrice }: DepthChartProps) {
   const W = 320
-  const H = 80
+  const H = 60
   const PAD = 2
 
   if (asks.length === 0 || bids.length === 0 || midPrice <= 0) {
     return (
-      <div className="h-[80px] flex items-center justify-center text-[10px] text-muted-foreground">
+      <div className="h-[60px] flex items-center justify-center text-[10px] text-muted-foreground">
         Загрузка глубины…
       </div>
     )
   }
 
-  // Cumulative depth from mid outward (bids from highest price down, asks from lowest price up)
   const bidLevels = [...bids].sort((a, b) => b.price - a.price)
   const askLevels = [...asks].sort((a, b) => a.price - b.price)
 
@@ -184,10 +570,8 @@ function DepthChart({ asks, bids, midPrice }: DepthChartProps) {
   const maxPrice = askCurve[askCurve.length - 1]?.price ?? midPrice
   const priceRange = Math.max(maxPrice - minPrice, midPrice * 0.0001)
   const maxCum = Math.max(bidCum, askCum, 1)
-
   const halfW = (W - PAD * 2) / 2
 
-  // Bids occupy left half (price ascending L→R toward mid), asks right half
   const bidPts = bidCurve.map((p) => {
     const x = PAD + ((p.price - minPrice) / priceRange) * halfW
     const y = H - PAD - (p.cum / maxCum) * (H - PAD * 2)
@@ -228,7 +612,6 @@ function DepthChart({ asks, bids, midPrice }: DepthChartProps) {
       <polyline points={bidLine} fill="none" stroke="oklch(0.7 0.17 155)" strokeWidth="1.2" />
       <polygon points={askArea} fill="url(#depthAsk)" />
       <polyline points={askLine} fill="none" stroke="oklch(0.62 0.22 25)" strokeWidth="1.2" />
-      {/* Mid-price marker */}
       <line
         x1={midX}
         y1={PAD}
@@ -243,21 +626,26 @@ function DepthChart({ asks, bids, midPrice }: DepthChartProps) {
   )
 }
 
-function OrderBook({ price, pair, liveBook, connected }: {
+function OrderBook({
+  price,
+  pair,
+  liveBook,
+  connected,
+  dragHandle,
+}: {
   price: number
   pair: string
   liveBook: ReturnType<typeof useLiveMarket>['orderBook']
   connected: boolean
+  dragHandle: ReactNode
 }) {
   const levels = useMemo(() => {
-    // Prefer live order book from WebSocket
     if (liveBook && liveBook.asks.length > 0) {
       const asks = liveBook.asks.slice(0, 12)
       const bids = liveBook.bids.slice(0, 12)
       const maxAmount = Math.max(...asks.map((l) => l.amount), ...bids.map((l) => l.amount))
       return { asks, bids, maxAmount, spread: liveBook.spread }
     }
-    // Fallback: mock from price
     if (price <= 0) return { asks: [], bids: [], maxAmount: 1, spread: 0 }
     const tick = price * 0.0005
     const askRaw = Array.from({ length: 12 }, (_, i) => {
@@ -271,7 +659,12 @@ function OrderBook({ price, pair, liveBook, connected }: {
       return { price: Math.max(p, 0.0001), amount, total: 0 }
     })
     const maxAmount = Math.max(...askRaw.map((l) => l.amount), ...bidRaw.map((l) => l.amount))
-    return { asks: askRaw, bids: bidRaw, maxAmount, spread: askRaw[0] && bidRaw[0] ? askRaw[0].price - bidRaw[0].price : 0 }
+    return {
+      asks: askRaw,
+      bids: bidRaw,
+      maxAmount,
+      spread: askRaw[0] && bidRaw[0] ? askRaw[0].price - bidRaw[0].price : 0,
+    }
   }, [price, liveBook])
 
   const spread = levels.spread || 0
@@ -280,25 +673,23 @@ function OrderBook({ price, pair, liveBook, connected }: {
   const midPrice = price > 0 ? price : (liveBook?.midPrice ?? 0)
 
   return (
-    <Card className="overflow-hidden bg-card border-border">
-      <div className="px-3 py-2.5 border-b border-border flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-          Биржевой стакан
-          {connected && (
-            <span className="inline-flex items-center gap-1 text-[9px] text-success">
-              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" /> LIVE
-            </span>
-          )}
-        </span>
-        <span className="text-[10px] text-muted-foreground">{pair}</span>
+    <div className="flex-1 min-h-0 flex flex-col bg-card border border-border rounded-md overflow-hidden">
+      <div className="px-2 py-1 border-b border-border flex items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {dragHandle}
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Стакан
+          </span>
+          {connected && <LiveBadge />}
+        </div>
+        <span className="text-[10px] text-muted-foreground font-mono">{pair}</span>
       </div>
-      <div className="grid grid-cols-3 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+      <div className="grid grid-cols-3 px-2 py-1 text-[9px] uppercase tracking-wider text-muted-foreground shrink-0">
         <span>Цена ₽</span>
         <span className="text-right">Объём</span>
         <span className="text-right">Сумма</span>
       </div>
-      <ScrollArea className="h-[260px]">
-        {/* Asks (reversed: lowest first at bottom) */}
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
         <div className="flex flex-col-reverse">
           {levels.asks.map((l, i) => (
             <BookRow
@@ -311,12 +702,10 @@ function OrderBook({ price, pair, liveBook, connected }: {
             />
           ))}
         </div>
-      </ScrollArea>
-
-      {/* Spread / last price */}
-      <div className="border-y border-border bg-muted/40 px-3 py-2 flex items-center justify-between">
-        <div className="flex items-baseline gap-2">
-          <span className="text-lg font-mono font-bold tabular-nums text-primary">
+      </div>
+      <div className="border-y border-border bg-muted/40 px-2 py-1 flex items-center justify-between shrink-0">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-sm font-mono font-bold tabular-nums text-primary">
             {price > 0
               ? price.toLocaleString('ru-RU', {
                   minimumFractionDigits: decimals,
@@ -324,19 +713,17 @@ function OrderBook({ price, pair, liveBook, connected }: {
                 })
               : '— —'}
           </span>
-          <ArrowDownRight className="w-3.5 h-3.5 text-muted-foreground" />
+          <ArrowDownRight className="w-3 h-3 text-muted-foreground" />
         </div>
         <div className="text-right">
-          <div className="text-[10px] text-muted-foreground">Спред</div>
-          <div className="text-xs font-mono tabular-nums">
-            {spread.toLocaleString('ru-RU', { maximumFractionDigits: decimals })} ₽
+          <div className="text-[9px] text-muted-foreground leading-tight">Спред</div>
+          <div className="text-[10px] font-mono tabular-nums leading-tight">
+            {spread.toLocaleString('ru-RU', { maximumFractionDigits: decimals })}
             <span className="text-muted-foreground ml-1">({spreadPct.toFixed(3)}%)</span>
           </div>
         </div>
       </div>
-
-      {/* Bids */}
-      <ScrollArea className="h-[260px]">
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
         <div className="flex flex-col">
           {levels.bids.map((l, i) => (
             <BookRow
@@ -349,39 +736,51 @@ function OrderBook({ price, pair, liveBook, connected }: {
             />
           ))}
         </div>
-      </ScrollArea>
-
-      {/* Depth chart */}
-      <div className="border-t border-border px-3 pt-2 pb-3">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            Глубина рынка
+      </div>
+      <div className="border-t border-border px-2 pt-1 pb-1.5 shrink-0">
+        <div className="flex items-center justify-between mb-0.5">
+          <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
+            Глубина
           </span>
-          <div className="flex items-center gap-3 text-[9px] text-muted-foreground">
-            <span className="flex items-center gap-1">
+          <div className="flex items-center gap-2 text-[9px] text-muted-foreground">
+            <span className="flex items-center gap-0.5">
               <span className="w-2 h-2 rounded-sm bg-success/60" /> Bids
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-0.5">
               <span className="w-2 h-2 rounded-sm bg-destructive/60" /> Asks
             </span>
           </div>
         </div>
         <DepthChart asks={levels.asks} bids={levels.bids} midPrice={midPrice} />
       </div>
-    </Card>
+    </div>
   )
 }
 
-// ─── Recent Trades Tape ─────────────────────────────────────────────────────
-function RecentTrades({ price, pair, liveTrades, connected }: {
+// ─── Block: RecentTrades (tape) ─────────────────────────────────────────────
+interface RecentTrade {
+  id: string
+  price: number
+  amount: number
+  side: OrderSide
+  time: string
+}
+
+function RecentTrades({
+  price,
+  pair,
+  liveTrades,
+  connected,
+  dragHandle,
+}: {
   price: number
   pair: string
   liveTrades: ReturnType<typeof useLiveMarket>['trades']
   connected: boolean
+  dragHandle: ReactNode
 }) {
   const [mockTrades, setMockTrades] = useState<RecentTrade[]>([])
 
-  // Fallback mock trades if no live data
   useEffect(() => {
     if (connected && liveTrades.length > 0) return
     if (price <= 0) return
@@ -419,36 +818,42 @@ function RecentTrades({ price, pair, liveTrades, connected }: {
     }
   }, [price, connected, liveTrades.length])
 
-  const trades = connected && liveTrades.length > 0
-    ? liveTrades.map((t) => ({ id: t.id, price: t.price, amount: t.amount, side: t.side, time: t.time }))
-    : mockTrades
+  const trades =
+    connected && liveTrades.length > 0
+      ? liveTrades.map((t) => ({
+          id: t.id,
+          price: t.price,
+          amount: t.amount,
+          side: t.side,
+          time: t.time,
+        }))
+      : mockTrades
 
   const decimals = priceDecimals(price)
 
   return (
-    <Card className="overflow-hidden bg-card border-border">
-      <div className="px-3 py-2.5 border-b border-border flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-          Последние сделки
-          {connected && (
-            <span className="inline-flex items-center gap-1 text-[9px] text-success">
-              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" /> LIVE
-            </span>
-          )}
-        </span>
-        <span className="text-[10px] text-muted-foreground">{pair}</span>
+    <div className="flex-1 min-h-0 flex flex-col bg-card border border-border rounded-md overflow-hidden">
+      <div className="px-2 py-1 border-b border-border flex items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {dragHandle}
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Сделки
+          </span>
+          {connected && <LiveBadge />}
+        </div>
+        <span className="text-[10px] text-muted-foreground font-mono">{pair}</span>
       </div>
-      <div className="grid grid-cols-3 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
+      <div className="grid grid-cols-3 px-2 py-1 text-[9px] uppercase tracking-wider text-muted-foreground border-b border-border shrink-0">
         <span>Цена ₽</span>
         <span className="text-right">Объём</span>
         <span className="text-right">Время</span>
       </div>
-      <ScrollArea className="max-h-48">
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
         <div className="flex flex-col">
           {trades.map((t) => (
             <div
               key={t.id}
-              className="grid grid-cols-3 px-3 py-[3px] text-xs font-mono tabular-nums hover:bg-muted/40"
+              className="grid grid-cols-3 px-2 py-[2px] text-[11px] font-mono tabular-nums hover:bg-muted/40"
             >
               <span className={cn(t.side === 'buy' ? 'text-success' : 'text-destructive')}>
                 {t.price.toLocaleString('ru-RU', {
@@ -463,20 +868,22 @@ function RecentTrades({ price, pair, liveTrades, connected }: {
             </div>
           ))}
         </div>
-      </ScrollArea>
-    </Card>
+      </div>
+    </div>
   )
 }
 
-// ─── Order Form ─────────────────────────────────────────────────────────────
+// ─── Block: OrderForm (buy/sell) ────────────────────────────────────────────
 function OrderForm({
   price,
   pair,
   ticker,
+  dragHandle,
 }: {
   price: number
   pair: string
   ticker: CoinTicker | null
+  dragHandle: ReactNode
 }) {
   const balances = useAppStore((s) => s.balances)
   const placeOrder = useAppStore((s) => s.placeOrder)
@@ -499,9 +906,7 @@ function OrderForm({
   const quoteBalance = balances.find((b) => b.asset === quote)?.amount ?? 0
   const available = side === 'buy' ? quoteBalance : baseBalance
 
-  // Reset price input when pair or order type changes (NOT on every live price tick)
   useEffect(() => {
-    // Deferred to satisfy lint rule about setState in effect body.
     const resetTimer = setTimeout(() => {
       priceDirty.current = false
       setInputQty('')
@@ -572,12 +977,20 @@ function OrderForm({
   }
 
   return (
-    <Card className="overflow-hidden bg-card border-border">
-      <div className="grid grid-cols-2 gap-1 p-1.5">
+    <div className="flex-1 min-h-0 flex flex-col bg-card border border-border rounded-md overflow-hidden">
+      <div className="px-2 py-1 border-b border-border flex items-center gap-1.5 shrink-0">
+        {dragHandle}
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Ордер
+        </span>
+        <span className="ml-auto text-[10px] text-muted-foreground font-mono">{pair}</span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-1 p-1.5 shrink-0">
         <button
           onClick={() => setSide('buy')}
           className={cn(
-            'py-2 rounded-md text-sm font-semibold transition',
+            'py-1.5 rounded-md text-xs font-semibold transition',
             side === 'buy'
               ? 'bg-success text-success-foreground shadow-sm'
               : 'bg-muted/60 text-muted-foreground hover:bg-muted'
@@ -588,7 +1001,7 @@ function OrderForm({
         <button
           onClick={() => setSide('sell')}
           className={cn(
-            'py-2 rounded-md text-sm font-semibold transition',
+            'py-1.5 rounded-md text-xs font-semibold transition',
             side === 'sell'
               ? 'bg-destructive text-white shadow-sm'
               : 'bg-muted/60 text-muted-foreground hover:bg-muted'
@@ -598,13 +1011,12 @@ function OrderForm({
         </button>
       </div>
 
-      <div className="px-3 pb-3 pt-1 space-y-3">
-        {/* Order type toggle */}
-        <div className="flex gap-1 bg-muted/60 p-1 rounded-lg">
+      <div className="px-2 pb-1 pt-0.5 space-y-2 flex-1 min-h-0 overflow-y-auto scrollbar-thin">
+        <div className="flex gap-1 bg-muted/60 p-0.5 rounded-md">
           <button
             onClick={() => setOrderType('limit')}
             className={cn(
-              'flex-1 py-1.5 text-xs font-semibold rounded-md transition',
+              'flex-1 py-1 text-[11px] font-semibold rounded transition',
               orderType === 'limit' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'
             )}
           >
@@ -613,7 +1025,7 @@ function OrderForm({
           <button
             onClick={() => setOrderType('market')}
             className={cn(
-              'flex-1 py-1.5 text-xs font-semibold rounded-md transition',
+              'flex-1 py-1 text-[11px] font-semibold rounded transition',
               orderType === 'market' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'
             )}
           >
@@ -621,17 +1033,15 @@ function OrderForm({
           </button>
         </div>
 
-        {/* Available balance */}
-        <div className="flex items-center justify-between text-xs">
+        <div className="flex items-center justify-between text-[11px]">
           <span className="text-muted-foreground">Доступно</span>
           <span className="font-mono tabular-nums">
             {formatNumber(available, 6)} {side === 'buy' ? quote : base}
           </span>
         </div>
 
-        {/* Price input */}
-        <div className="space-y-1">
-          <label className="text-[10px] uppercase tracking-wider text-muted-foreground">
+        <div className="space-y-0.5">
+          <label className="text-[9px] uppercase tracking-wider text-muted-foreground">
             Цена {orderType === 'market' && '(рыночная)'}
           </label>
           <div className="relative">
@@ -642,17 +1052,16 @@ function OrderForm({
               onChange={(e) => setInputPrice(e.target.value)}
               disabled={orderType === 'market'}
               placeholder={orderType === 'market' ? 'По рынку' : ''}
-              className="pr-12 font-mono tabular-nums h-9"
+              className="pr-10 font-mono tabular-nums h-8 text-xs"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
               {quote}
             </span>
           </div>
         </div>
 
-        {/* Quantity input */}
-        <div className="space-y-1">
-          <label className="text-[10px] uppercase tracking-wider text-muted-foreground">
+        <div className="space-y-0.5">
+          <label className="text-[9px] uppercase tracking-wider text-muted-foreground">
             Количество
           </label>
           <div className="relative">
@@ -665,23 +1074,22 @@ function OrderForm({
                 setPct(0)
               }}
               placeholder="0.00"
-              className="pr-10 font-mono tabular-nums h-9"
+              className="pr-9 font-mono tabular-nums h-8 text-xs"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
               {base}
             </span>
           </div>
         </div>
 
-        {/* Percent slider */}
-        <div className="space-y-2">
-          <div className="grid grid-cols-4 gap-1.5">
+        <div className="space-y-1">
+          <div className="grid grid-cols-4 gap-1">
             {[25, 50, 75, 100].map((p) => (
               <button
                 key={p}
                 onClick={() => applyPercent(p)}
                 className={cn(
-                  'py-1 text-xs font-medium rounded-md transition border',
+                  'py-0.5 text-[11px] font-medium rounded transition border',
                   pct === p
                     ? side === 'buy'
                       ? 'bg-success/20 border-success/50 text-success'
@@ -693,29 +1101,27 @@ function OrderForm({
               </button>
             ))}
           </div>
-          <Slider value={[pct]} onValueChange={(v) => applyPercent(v[0])} max={100} step={1} />
+          <Slider value={[pct]} onValueChange={(v) => applyPercent(v[0])} max={100} step={1} className="py-0.5" />
         </div>
+      </div>
 
-        {/* Summary */}
-        <div className="space-y-1 pt-1 border-t border-border">
-          <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Итого</span>
-            <span className="font-mono tabular-nums">
-              {formatNumber(total)} {quote}
-            </span>
-          </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Комиссия 0.2%</span>
-            <span className="font-mono tabular-nums text-muted-foreground">
-              {formatNumber(fee)} {quote}
-            </span>
-          </div>
+      <div className="px-2 pb-2 pt-1 shrink-0 border-t border-border space-y-1">
+        <div className="flex justify-between text-[11px]">
+          <span className="text-muted-foreground">Итого</span>
+          <span className="font-mono tabular-nums">
+            {formatNumber(total)} {quote}
+          </span>
         </div>
-
+        <div className="flex justify-between text-[11px]">
+          <span className="text-muted-foreground">Комиссия 0.2%</span>
+          <span className="font-mono tabular-nums text-muted-foreground">
+            {formatNumber(fee)} {quote}
+          </span>
+        </div>
         <Button
           onClick={handleSubmit}
           className={cn(
-            'w-full h-10 font-semibold text-white shadow-sm',
+            'w-full h-9 font-semibold text-white shadow-sm text-xs',
             side === 'buy' ? 'bg-success hover:bg-success/90' : 'bg-destructive hover:bg-destructive/90'
           )}
         >
@@ -727,44 +1133,50 @@ function OrderForm({
           </div>
         )}
       </div>
-    </Card>
+    </div>
   )
 }
 
-// ─── My Trades History ──────────────────────────────────────────────────────
-function MyTrades({ pair }: { pair: string }) {
+// ─── Block: MyTrades (history from store.orders) ───────────────────────────
+function MyTrades({ pair, dragHandle }: { pair: string; dragHandle: ReactNode }) {
   const orders = useAppStore((s) => s.orders)
   const filtered = orders.filter((o) => o.pair === pair)
 
   return (
-    <Card className="overflow-hidden bg-card border-border">
-      <div className="px-3 py-2.5 border-b border-border">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="flex-1 min-h-0 flex flex-col bg-card border border-border rounded-md overflow-hidden">
+      <div className="px-2 py-1 border-b border-border flex items-center gap-1.5 shrink-0">
+        {dragHandle}
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Мои сделки
         </span>
+        {filtered.length > 0 && (
+          <span className="ml-auto text-[10px] text-muted-foreground font-mono">
+            {filtered.length}
+          </span>
+        )}
       </div>
       {filtered.length === 0 ? (
-        <div className="px-3 py-10 text-center">
-          <CheckCircle2 className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
-          <p className="text-sm text-muted-foreground">Пока нет сделок</p>
-          <p className="text-[11px] text-muted-foreground/70 mt-1">
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-2 py-4">
+          <CheckCircle2 className="w-6 h-6 mx-auto text-muted-foreground/40 mb-1" />
+          <p className="text-[11px] text-muted-foreground">Пока нет сделок</p>
+          <p className="text-[10px] text-muted-foreground/70 mt-0.5">
             Создайте ордер в форме выше
           </p>
         </div>
       ) : (
-        <ScrollArea className="max-h-72">
+        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
           <div className="flex flex-col">
             {filtered.map((o) => {
               const isBuy = o.side === 'buy'
               return (
                 <div
                   key={o.id}
-                  className="grid grid-cols-12 gap-2 px-3 py-2 items-center text-xs border-b border-border/60 last:border-0 hover:bg-muted/40"
+                  className="grid grid-cols-12 gap-1 px-2 py-1 items-center text-[11px] border-b border-border/60 last:border-0 hover:bg-muted/40"
                 >
-                  <div className="col-span-3 flex items-center gap-1.5">
+                  <div className="col-span-3 flex items-center gap-1">
                     <Badge
                       className={cn(
-                        'h-5 px-1.5 text-[10px]',
+                        'h-4 px-1 text-[9px]',
                         isBuy ? 'bg-success/20 text-success' : 'bg-destructive/20 text-destructive'
                       )}
                     >
@@ -782,9 +1194,9 @@ function MyTrades({ pair }: { pair: string }) {
               )
             })}
           </div>
-        </ScrollArea>
+        </div>
       )}
-    </Card>
+    </div>
   )
 }
 
@@ -792,14 +1204,16 @@ function MyTrades({ pair }: { pair: string }) {
 export function TradeView() {
   const selectedPair = useAppStore((s) => s.selectedPair)
   const setSelectedPair = useAppStore((s) => s.setSelectedPair)
+  const collapsed = useAppStore((s) => s.sidebarCollapsed)
   const [tickers, setTickers] = useState<CoinTicker[]>([])
   const [livePrice, setLivePrice] = useState<number>(0)
   const [highlight, setHighlight] = useState<'up' | 'down' | null>(null)
 
-  // Live WebSocket market data
-  const { orderBook: liveBook, livePrice: wsPrice, trades: liveTrades, connected } = useLiveMarket(selectedPair)
+  const layout = useTradeLayout()
 
-  // Fetch tickers + poll every 5s
+  const { orderBook: liveBook, livePrice: wsPrice, trades: liveTrades, connected } =
+    useLiveMarket(selectedPair)
+
   useEffect(() => {
     let mounted = true
     const load = async () => {
@@ -815,12 +1229,8 @@ export function TradeView() {
   }, [])
 
   const base = selectedPair.split('/')[0]
-  const ticker = useMemo(
-    () => tickers.find((t) => t.symbol === base) ?? null,
-    [tickers, base]
-  )
+  const ticker = useMemo(() => tickers.find((t) => t.symbol === base) ?? null, [tickers, base])
 
-  // Smooth jitter every 1.2s for the live price ticker feel.
   const tickerSymbol = ticker?.symbol
   const tickerPrice = ticker?.priceRub ?? 0
   const prevPriceRef = useRef(0)
@@ -841,7 +1251,6 @@ export function TradeView() {
     }
   }, [tickerSymbol, tickerPrice])
 
-  // Sync live price from WebSocket (overrides jitter when WS is live)
   useEffect(() => {
     if (connected && wsPrice > 0) {
       setLivePrice((prev) => {
@@ -851,7 +1260,6 @@ export function TradeView() {
     }
   }, [wsPrice, connected])
 
-  // Auto-clear highlight
   useEffect(() => {
     if (!highlight) return
     const t = setTimeout(() => setHighlight(null), 500)
@@ -863,18 +1271,58 @@ export function TradeView() {
   const isUp = change24h >= 0
   const tvSymbol = `BINANCE:${base}USDT`
 
+  const renderBlock = useCallback(
+    (blockId: BlockId, dragHandle: ReactNode): ReactNode => {
+      switch (blockId) {
+        case 'chart':
+          return <ChartBlock dragHandle={dragHandle} symbol={tvSymbol} />
+        case 'trades':
+          return (
+            <RecentTrades
+              dragHandle={dragHandle}
+              price={livePrice}
+              pair={selectedPair}
+              liveTrades={liveTrades}
+              connected={connected}
+            />
+          )
+        case 'book':
+          return (
+            <OrderBook
+              dragHandle={dragHandle}
+              price={livePrice}
+              pair={selectedPair}
+              liveBook={liveBook}
+              connected={connected}
+            />
+          )
+        case 'form':
+          return (
+            <OrderForm dragHandle={dragHandle} price={livePrice} pair={selectedPair} ticker={ticker} />
+          )
+        case 'mytrades':
+          return <MyTrades dragHandle={dragHandle} pair={selectedPair} />
+        default:
+          return null
+      }
+    },
+    [livePrice, selectedPair, liveBook, liveTrades, connected, ticker, tvSymbol]
+  )
+
+  // Right column min: target ~260px. Use a responsive % based on sidebar state.
+  const rightMinSize = collapsed ? 19 : 23
+
   return (
     <div className="flex-1 bg-background">
-      <div className="mx-auto max-w-[1600px] px-3 lg:px-5 py-4">
-        {/* Top pair bar */}
-        <div className="flex flex-wrap items-center gap-3 lg:gap-6 mb-4 p-3 bg-card border border-border rounded-xl">
-          {/* Pair selector */}
+      <div className="mx-auto max-w-[1600px] px-2 lg:px-3 py-2">
+        {/* Top pair bar (compact) */}
+        <div className="flex flex-wrap items-center gap-2 lg:gap-4 mb-2 p-2 bg-card border border-border rounded-lg">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2 h-10 px-3 font-semibold">
-                <CoinIcon symbol={base} size={22} />
+              <Button variant="outline" className="gap-1.5 h-8 px-2.5 font-semibold text-sm">
+                <CoinIcon symbol={base} size={20} />
                 <span>{selectedPair}</span>
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
@@ -885,10 +1333,10 @@ export function TradeView() {
                   <DropdownMenuItem
                     key={p}
                     onClick={() => setSelectedPair(p)}
-                    className="gap-2.5 cursor-pointer py-2"
+                    className="gap-2 cursor-pointer py-1.5"
                   >
-                    <CoinIcon symbol={sym} size={20} />
-                    <span className="flex-1 font-medium">{p}</span>
+                    <CoinIcon symbol={sym} size={18} />
+                    <span className="flex-1 font-medium text-sm">{p}</span>
                     {tk && (
                       <span className="text-xs font-mono text-muted-foreground">
                         {formatPrice(tk.priceRub, 'rub')}
@@ -900,11 +1348,10 @@ export function TradeView() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Live price */}
-          <div className="flex items-baseline gap-3">
+          <div className="flex items-baseline gap-2">
             <span
               className={cn(
-                'inline-block rounded-md px-2 py-0.5 text-2xl lg:text-3xl font-mono font-bold tabular-nums transition-colors',
+                'inline-block rounded-md px-1.5 py-0.5 text-xl lg:text-2xl font-mono font-bold tabular-nums transition-colors',
                 highlight === 'up' && 'flash-up text-success',
                 highlight === 'down' && 'flash-down text-destructive',
                 !highlight && 'text-foreground'
@@ -914,73 +1361,120 @@ export function TradeView() {
                 ? `${livePrice.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽`
                 : '— —'}
             </span>
-            <span className="text-xs text-muted-foreground">≈ {ticker ? formatPrice(ticker.priceUsd, 'usd') : '—'}</span>
+            <span className="text-[11px] text-muted-foreground">
+              ≈ {ticker ? formatPrice(ticker.priceUsd, 'usd') : '—'}
+            </span>
           </div>
 
-          {/* 24h change */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <span
               className={cn(
-                'flex items-center gap-1 text-sm font-semibold px-2 py-1 rounded-md',
+                'flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded-md',
                 isUp ? 'text-success bg-success/10' : 'text-destructive bg-destructive/10'
               )}
             >
-              {isUp ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+              {isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
               {formatPercent(change24h)}
             </span>
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground hidden sm:inline">
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground hidden sm:inline">
               24ч
             </span>
           </div>
 
-          {/* 24h high / low / volume */}
-          <div className="hidden md:flex items-center gap-4 ml-auto text-xs">
+          <div className="hidden md:flex items-center gap-3 ml-auto text-[11px]">
             <div>
-              <span className="text-muted-foreground">Макс 24ч: </span>
+              <span className="text-muted-foreground">Макс: </span>
               <span className="font-mono tabular-nums">
-                {ticker?.high24h ? formatPrice(ticker.high24h * (livePrice / ticker.priceRub || 1), 'rub') : '—'}
+                {ticker?.high24h
+                  ? formatPrice(ticker.high24h * (livePrice / ticker.priceRub || 1), 'rub')
+                  : '—'}
               </span>
             </div>
             <div>
-              <span className="text-muted-foreground">Мин 24ч: </span>
+              <span className="text-muted-foreground">Мин: </span>
               <span className="font-mono tabular-nums">
-                {ticker?.low24h ? formatPrice(ticker.low24h * (livePrice / ticker.priceRub || 1), 'rub') : '—'}
+                {ticker?.low24h
+                  ? formatPrice(ticker.low24h * (livePrice / ticker.priceRub || 1), 'rub')
+                  : '—'}
               </span>
             </div>
             <div>
-              <span className="text-muted-foreground">Объём 24ч: </span>
+              <span className="text-muted-foreground">Объём: </span>
               <span className="font-mono tabular-nums">{formatPrice(volume24h, 'rub')}</span>
             </div>
           </div>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={layout.reset}
+            className="md:ml-0 ml-auto h-8 gap-1.5 text-[11px] text-muted-foreground hover:text-primary"
+            title="Сбросить layout"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Сбросить layout</span>
+          </Button>
         </div>
 
-        {/* Main 3-column layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4">
-          {/* LEFT/CENTER */}
-          <div className="space-y-4 min-w-0">
-            {/* Chart */}
-            <Card className="overflow-hidden bg-black border-border p-0">
-              <div className="h-[400px] w-full">
-                <iframe
-                  title="TradingView Chart"
-                  src={`https://www.tradingview.com/widgetembed/?frameElementId=tv&symbol=${encodeURIComponent(
-                    tvSymbol
-                  )}&interval=5&theme=dark&hide_side_toolbar=false&hide_top_toolbar=false&allow_symbol_change=false&hideideas=true&hide_volume=false`}
-                  className="w-full h-full border-0"
-                  allowFullScreen
-                />
+        {/* Desktop (lg+): resizable + rearrangeable panel grid */}
+        <div className="hidden lg:block h-[calc(100vh-160px)] min-h-[480px]">
+          <PanelGroup direction="horizontal" id="trade-cols" onLayout={layout.onColumnsLayout}>
+            <Panel
+              id="left-col"
+              order={0}
+              defaultSize={layout.columns[0]}
+              minSize={45}
+              className="flex flex-col"
+            >
+              <ColumnPanelGroup
+                columnId="left"
+                order={layout.leftOrder}
+                sizes={layout.leftSizes}
+                minSizes={MIN_SIZES.left}
+                onLayout={layout.onLeftLayout}
+                onReorder={layout.handleLeftReorder}
+                renderBlock={renderBlock}
+              />
+            </Panel>
+            <TradeResizeHandle id="cols-h" orientation="horizontal" />
+            <Panel
+              id="right-col"
+              order={1}
+              defaultSize={layout.columns[1]}
+              minSize={rightMinSize}
+              maxSize={45}
+              className="flex flex-col"
+            >
+              <ColumnPanelGroup
+                columnId="right"
+                order={layout.rightOrder}
+                sizes={layout.rightSizes}
+                minSizes={MIN_SIZES.right}
+                onLayout={layout.onRightLayout}
+                onReorder={layout.handleRightReorder}
+                renderBlock={renderBlock}
+              />
+            </Panel>
+          </PanelGroup>
+        </div>
+
+        {/* Mobile (<lg): stacked blocks, no resize/drag */}
+        <div className="lg:hidden space-y-2">
+          {[...layout.leftOrder, ...layout.rightOrder].map((blockId) => {
+            const height =
+              blockId === 'chart'
+                ? 'h-[360px]'
+                : blockId === 'book'
+                  ? 'h-[440px]'
+                  : blockId === 'form'
+                    ? 'h-[400px]'
+                    : 'h-[260px]'
+            return (
+              <div key={blockId} className={cn(height, 'flex flex-col')}>
+                {renderBlock(blockId, <span aria-hidden />)}
               </div>
-            </Card>
-
-            <RecentTrades price={livePrice} pair={selectedPair} liveTrades={liveTrades} connected={connected} />
-          </div>
-
-          {/* RIGHT */}
-          <div className="space-y-4">
-            <OrderBook price={livePrice} pair={selectedPair} liveBook={liveBook} connected={connected} />
-            <OrderForm price={livePrice} pair={selectedPair} ticker={ticker} />
-            <MyTrades pair={selectedPair} />
-          </div>
+            )
+          })}
         </div>
       </div>
     </div>

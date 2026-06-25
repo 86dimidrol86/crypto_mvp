@@ -13,6 +13,8 @@ import type {
   OrderSide,
   OrderType,
   KycLevel,
+  MarginPosition,
+  MarginSide,
 } from './types'
 
 const uid = () => Math.random().toString(36).slice(2, 11)
@@ -26,10 +28,34 @@ interface PlaceOrderInput {
   quantity: number
 }
 
+interface OpenMarginInput {
+  pair: string
+  side: MarginSide
+  leverage: number
+  margin: number
+  entryPrice: number
+}
+
+const MAINT_MARGIN_RATE = 0.005 // 0.5% поддерживающая маржа
+
+function computeLiquidationPrice(side: MarginSide, entry: number, leverage: number): number {
+  // long: entry * (1 - 1/leverage + maint)
+  // short: entry * (1 + 1/leverage - maint)
+  if (side === 'long') {
+    return entry * (1 - 1 / leverage + MAINT_MARGIN_RATE)
+  }
+  return entry * (1 + 1 / leverage - MAINT_MARGIN_RATE)
+}
+
 interface AppState {
   // navigation
   activeView: ViewId
   setView: (v: ViewId) => void
+
+  // sidebar collapse (desktop)
+  sidebarCollapsed: boolean
+  toggleSidebar: () => void
+  setSidebarCollapsed: (v: boolean) => void
 
   currency: Currency
   setCurrency: (c: Currency) => void
@@ -77,6 +103,13 @@ interface AppState {
   notifications: { id: string; title: string; body: string; time: string; read: boolean }[]
   pushNotification: (title: string, body: string) => void
   markNotificationsRead: () => void
+  // margin trading
+  marginPositions: MarginPosition[]
+  marginAccount: { equity: number; usedMargin: number; availableMargin: number }
+  openMarginPosition: (input: OpenMarginInput) => MarginPosition
+  closeMarginPosition: (id: string, closePrice: number) => void
+  liquidatePosition: (id: string) => void
+  updateMarginPrices: (prices: Record<string, number>) => void
 }
 
 const INITIAL_BALANCES: Balance[] = [
@@ -207,6 +240,10 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       activeView: 'home',
       setView: (v) => set({ activeView: v }),
+
+      sidebarCollapsed: false,
+      toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+      setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
 
       currency: 'rub',
       setCurrency: (c) => set({ currency: c }),
@@ -387,6 +424,170 @@ export const useAppStore = create<AppState>()(
         })),
       markNotificationsRead: () =>
         set((s) => ({ notifications: s.notifications.map((n) => ({ ...n, read: true })) })),
+
+      // ─── Margin trading ──────────────────────────────────────────────────
+      marginPositions: [],
+      marginAccount: { equity: 500000, usedMargin: 0, availableMargin: 500000 },
+      openMarginPosition: (input) => {
+        const { pair, side, leverage, margin, entryPrice } = input
+        if (entryPrice <= 0 || margin <= 0) {
+          throw new Error('Некорректные параметры позиции')
+        }
+        const available = get().marginAccount.availableMargin
+        if (margin > available) {
+          throw new Error('Недостаточно доступной маржи')
+        }
+        const quantity = (margin * leverage) / entryPrice
+        const liquidationPrice = computeLiquidationPrice(side, entryPrice, leverage)
+        const position: MarginPosition = {
+          id: uid(),
+          pair,
+          side,
+          leverage,
+          margin,
+          quantity,
+          entryPrice,
+          liquidationPrice,
+          currentPrice: entryPrice,
+          unrealizedPnl: 0,
+          unrealizedPnlPct: 0,
+          marginRatio: 0,
+          status: 'OPEN',
+          openedAt: new Date().toISOString(),
+        }
+        set((s) => {
+          const usedMargin = s.marginAccount.usedMargin + margin
+          const availableMargin = s.marginAccount.equity - usedMargin
+          return {
+            marginPositions: [position, ...s.marginPositions],
+            marginAccount: { ...s.marginAccount, usedMargin, availableMargin },
+          }
+        })
+        get().pushNotification(
+          'Маржинальная позиция открыта',
+          `${side === 'long' ? 'Long' : 'Short'} ${pair} • ${leverage}x • маржа ${Math.round(margin).toLocaleString('ru-RU')} ₽`
+        )
+        return position
+      },
+      closeMarginPosition: (id, closePrice) => {
+        const pos = get().marginPositions.find((p) => p.id === id)
+        if (!pos || pos.status !== 'OPEN') return
+        const realizedPnl =
+          pos.side === 'long'
+            ? (closePrice - pos.entryPrice) * pos.quantity
+            : (pos.entryPrice - closePrice) * pos.quantity
+        set((s) => {
+          const updated = s.marginPositions.map((p) =>
+            p.id === id
+              ? {
+                  ...p,
+                  status: 'CLOSED' as const,
+                  closePrice,
+                  realizedPnl,
+                  closedAt: new Date().toISOString(),
+                  currentPrice: closePrice,
+                  unrealizedPnl: 0,
+                  unrealizedPnlPct: 0,
+                  marginRatio: 0,
+                }
+              : p
+          )
+          // remove margin from used, add margin + realized back to equity
+          const usedMargin = Math.max(s.marginAccount.usedMargin - pos.margin, 0)
+          const equity = s.marginAccount.equity + realizedPnl
+          const availableMargin = equity - usedMargin
+          return {
+            marginPositions: updated,
+            marginAccount: { equity, usedMargin, availableMargin },
+          }
+        })
+        const sign = realizedPnl >= 0 ? '+' : ''
+        get().pushNotification(
+          'Позиция закрыта',
+          `${pos.side === 'long' ? 'Long' : 'Short'} ${pos.pair} • PnL ${sign}${Math.round(realizedPnl).toLocaleString('ru-RU')} ₽`
+        )
+      },
+      liquidatePosition: (id) => {
+        const pos = get().marginPositions.find((p) => p.id === id)
+        if (!pos || pos.status !== 'OPEN') return
+        const realizedPnl = -pos.margin
+        set((s) => {
+          const updated = s.marginPositions.map((p) =>
+            p.id === id
+              ? {
+                  ...p,
+                  status: 'LIQUIDATED' as const,
+                  realizedPnl,
+                  closePrice: p.currentPrice,
+                  closedAt: new Date().toISOString(),
+                  unrealizedPnl: realizedPnl,
+                  unrealizedPnlPct: -100,
+                  marginRatio: 100,
+                }
+              : p
+          )
+          const usedMargin = Math.max(s.marginAccount.usedMargin - pos.margin, 0)
+          const equity = s.marginAccount.equity + realizedPnl // realized = -margin
+          const availableMargin = equity - usedMargin
+          return {
+            marginPositions: updated,
+            marginAccount: { equity, usedMargin, availableMargin },
+          }
+        })
+        get().pushNotification(
+          'Маржин-колл: позиция ликвидирована',
+          `${pos.side === 'long' ? 'Long' : 'Short'} ${pos.pair} • потеря маржи ${Math.round(pos.margin).toLocaleString('ru-RU')} ₽`
+        )
+      },
+      updateMarginPrices: (prices) => {
+        const open = get().marginPositions.filter((p) => p.status === 'OPEN')
+        if (open.length === 0) return
+        let changed = false
+        const toLiquidate: string[] = []
+        const updatedMap = new Map<string, Partial<MarginPosition>>()
+        for (const p of open) {
+          const price = prices[p.pair]
+          if (typeof price !== 'number' || price <= 0) continue
+          if (price === p.currentPrice) continue
+          changed = true
+          const pnl =
+            p.side === 'long'
+              ? (price - p.entryPrice) * p.quantity
+              : (p.entryPrice - price) * p.quantity
+          const pnlPct = (pnl / p.margin) * 100
+          // margin ratio: if pnl negative, ratio = usedMargin / (usedMargin + pnl) * 100
+          // if pnl positive or zero, ratio stays low (we use the effective equity)
+          let ratio = 0
+          const equityFromPos = p.margin + pnl
+          if (equityFromPos <= 0) {
+            ratio = 100
+          } else if (pnl < 0) {
+            ratio = (p.margin / equityFromPos) * 100
+          } else {
+            ratio = 0
+          }
+          if (ratio >= 100) {
+            toLiquidate.push(p.id)
+          }
+          updatedMap.set(p.id, {
+            currentPrice: price,
+            unrealizedPnl: pnl,
+            unrealizedPnlPct: pnlPct,
+            marginRatio: ratio,
+          })
+        }
+        if (!changed && toLiquidate.length === 0) return
+        set((s) => ({
+          marginPositions: s.marginPositions.map((p) => {
+            const upd = updatedMap.get(p.id)
+            return upd ? { ...p, ...upd } : p
+          }),
+        }))
+        // Liquidate after state update
+        for (const id of toLiquidate) {
+          get().liquidatePosition(id)
+        }
+      },
     }),
     {
       name: 'ruscrypto-store',
@@ -403,6 +604,9 @@ export const useAppStore = create<AppState>()(
         p2pDeals: s.p2pDeals,
         payments: s.payments,
         currency: s.currency,
+        sidebarCollapsed: s.sidebarCollapsed,
+        marginPositions: s.marginPositions,
+        marginAccount: s.marginAccount,
       }),
     }
   )

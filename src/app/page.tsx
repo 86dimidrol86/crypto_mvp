@@ -5,6 +5,7 @@ import {
   Home,
   CandlestickChart,
   LineChart,
+  TrendingUp,
   Users,
   Send,
   Wallet,
@@ -23,12 +24,19 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
   Sheet,
   SheetContent,
   SheetTrigger,
   SheetTitle,
 } from '@/components/ui/sheet'
 import { useState } from 'react'
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { PriceTicker } from '@/components/price-ticker'
 import { NotificationsBell } from '@/components/notifications-bell'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -44,6 +52,7 @@ import { KycView } from '@/components/views/kyc-view'
 import { ComplianceView } from '@/components/views/compliance-view'
 import { ProfileView } from '@/components/views/profile-view'
 import { AuthView } from '@/components/views/auth-view'
+import { MarginView } from '@/components/views/margin-view'
 
 interface NavItem {
   id: ViewId
@@ -56,6 +65,7 @@ const NAV: NavItem[] = [
   { id: 'home', label: 'Главная', icon: Home, group: 'Обзор' },
   { id: 'trade', label: 'Торги', icon: CandlestickChart, group: 'Торговля' },
   { id: 'markets', label: 'Рынки', icon: LineChart, group: 'Торговля' },
+  { id: 'margin', label: 'Маржа', icon: TrendingUp, group: 'Торговля' },
   { id: 'p2p', label: 'P2P', icon: Users, group: 'Торговля' },
   { id: 'payments', label: 'Кросс-бордер', icon: Send, group: 'Торговля' },
   { id: 'wallet', label: 'Кошелёк', icon: Wallet, group: 'Активы' },
@@ -70,6 +80,7 @@ const VIEW_COMPONENTS: Record<ViewId, React.ComponentType> = {
   home: HomeView,
   trade: TradeView,
   markets: MarketsView,
+  margin: MarginView,
   p2p: P2PView,
   payments: PaymentsView,
   wallet: WalletView,
@@ -95,7 +106,7 @@ function Logo() {
   )
 }
 
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarContent({ onNavigate, collapsed }: { onNavigate?: () => void; collapsed?: boolean }) {
   const activeView = useAppStore((s) => s.activeView)
   const setView = useAppStore((s) => s.setView)
   const alerts = useAppStore((s) => s.alerts)
@@ -109,41 +120,66 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   }
 
   return (
-    <nav className="flex flex-col gap-5 p-3">
-      {groups.map((group) => (
-        <div key={group}>
-          <div className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-            {group}
+    <TooltipProvider delayDuration={200}>
+      <nav className={cn('flex flex-col gap-4', collapsed ? 'p-2' : 'p-3')}>
+        {groups.map((group) => (
+          <div key={group}>
+            {!collapsed && (
+              <div className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                {group}
+              </div>
+            )}
+            {collapsed && <div className="h-px mx-2 my-1 bg-border/60" />}
+            <div className="flex flex-col gap-0.5">
+              {NAV.filter((n) => n.group === group).map((item) => {
+                const active = activeView === item.id
+                const btn = (
+                  <button
+                    key={item.id}
+                    onClick={() => handleClick(item.id)}
+                    className={cn(
+                      'flex items-center rounded-xl text-sm font-medium transition-all w-full',
+                      collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5 text-left',
+                      active
+                        ? 'bg-primary/15 text-primary'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                    )}
+                  >
+                    <item.icon className={cn('w-[18px] h-[18px] shrink-0', active && 'text-primary')} />
+                    {!collapsed && <span className="flex-1">{item.label}</span>}
+                    {!collapsed && item.id === 'compliance' && openAlerts > 0 && (
+                      <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">
+                        {openAlerts}
+                      </Badge>
+                    )}
+                    {collapsed && item.id === 'compliance' && openAlerts > 0 && (
+                      <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-destructive" />
+                    )}
+                    {!collapsed && active && <div className="w-1 h-5 rounded-full bg-primary" />}
+                  </button>
+                )
+                if (collapsed) {
+                  return (
+                    <Tooltip key={item.id}>
+                      <TooltipTrigger asChild>
+                        <div className="relative">{btn}</div>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" sideOffset={8}>
+                        {item.label}
+                        {item.id === 'compliance' && openAlerts > 0 && (
+                          <span className="ml-1.5 text-destructive">({openAlerts})</span>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  )
+                }
+                return btn
+              })}
+            </div>
           </div>
-          <div className="flex flex-col gap-0.5">
-            {NAV.filter((n) => n.group === group).map((item) => {
-              const active = activeView === item.id
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleClick(item.id)}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all w-full text-left',
-                    active
-                      ? 'bg-primary/15 text-primary'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
-                  )}
-                >
-                  <item.icon className={cn('w-[18px] h-[18px]', active && 'text-primary')} />
-                  <span className="flex-1">{item.label}</span>
-                  {item.id === 'compliance' && openAlerts > 0 && (
-                    <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">
-                      {openAlerts}
-                    </Badge>
-                  )}
-                  {active && <div className="w-1 h-5 rounded-full bg-primary" />}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      ))}
-    </nav>
+        ))}
+      </nav>
+    </TooltipProvider>
   )
 }
 
@@ -229,6 +265,8 @@ function Footer() {
 
 export default function CryptoExchangeApp() {
   const activeView = useAppStore((s) => s.activeView)
+  const collapsed = useAppStore((s) => s.sidebarCollapsed)
+  const toggleSidebar = useAppStore((s) => s.toggleSidebar)
   const ViewComponent = VIEW_COMPONENTS[activeView] || HomeView
 
   // Прокрутка наверх при смене view
@@ -242,8 +280,25 @@ export default function CryptoExchangeApp() {
     <div className="min-h-screen flex flex-col bg-background">
       <div className="flex flex-1">
         {/* Desktop sidebar */}
-        <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-border bg-sidebar/40 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto scrollbar-thin">
-          <SidebarContent />
+        <aside
+          className={cn(
+            'hidden lg:flex shrink-0 flex-col border-r border-border bg-sidebar/40 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto scrollbar-thin transition-[width] duration-200',
+            collapsed ? 'w-[68px]' : 'w-64'
+          )}
+        >
+          {/* Collapse toggle */}
+          <div className={cn('flex border-b border-border', collapsed ? 'justify-center p-2' : 'justify-end p-2')}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleSidebar}
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
+            >
+              {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+            </Button>
+          </div>
+          <SidebarContent collapsed={collapsed} />
         </aside>
 
         {/* Main */}

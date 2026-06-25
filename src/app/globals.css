@@ -171,6 +171,12 @@
   }
 }
 
+/* Disable iframe pointer events during block drag-reorder so the
+   TradingView chart doesn't steal the cursor from the drag handle. */
+body.trade-dnd-dragging iframe {
+  pointer-events: none !important;
+}
+
 @keyframes flashUp {
   0% { background-color: oklch(0.7 0.17 155 / 0.25); }
   100% { background-color: transparent; }

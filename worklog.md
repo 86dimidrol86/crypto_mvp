@@ -836,3 +836,95 @@ Stage Summary:
   • Portfolio with 3-NDFL CSV export
   • Animations, skeletons, responsive design
 - Scheduled task (every 15 min) will continue: more features, more polish, bug fixes.
+
+---
+Task ID: AUDIT-mock-data
+Agent: Orchestrator
+Task: Audit where mock data exists and plan migration to real/DB data.
+
+Work Log:
+- Searched all views for hardcoded numbers, MOCK_ consts, static stats.
+- Reviewed home-view (now mostly real after 4-B), analytics-view, profile-view, trade-view, markets-view, p2p-view.
+
+Stage Summary — MOCK DATA AUDIT:
+1. analytics-view.tsx — STATS const (volume/users/positions/pnl per period) FULLY hardcoded. PAIR_DIST hardcoded. CORRIDORS hardcoded. → MIGRATE: compute volume from /api/orders trades (sum totals); users/positions from /api/auth + count; pair distribution from trades grouped by pair; corridors from /api/payments.
+2. profile-view.tsx — MOCK_LOGIN_HISTORY (4 entries), MOCK_SESSIONS (3 entries) hardcoded. Referral code "Q49P0M7" hardcoded, invited=12, earned=4800 hardcoded. → MIGRATE: login history/sessions can stay mock (no real session tracking in demo) BUT generate from a seed/API; referral code derive from user.id, stats from /api/auth or store.
+3. trade-view.tsx — RecentTrades mock fallback (acceptable: WS provides live, mock is fallback). Order book mock fallback (acceptable: WS live). volume24h computed from ticker — OK.
+4. home-view.tsx — Hero stats NOW real (4-B: totalVolumeRub from tickers, usdRub, topGainer/Loser). "Активных пользователей 38450" in MarketGrid hero card still static — minor.
+5. p2p-view.tsx — offers from /api/p2p (seeded 18) + store fallback. Good.
+6. payments-view.tsx — corridors static config (acceptable: real config). Payments from /api/payments. Good.
+7. portfolio-view.tsx — performance chart mock 30-day data. Risk metrics computed from balances (OK). 3-NDFL from store.orders (OK). → MIGRATE: performance chart from trade history PnL over time (or keep mock with note).
+
+PRIORITY MIGRATIONS:
+- analytics-view: replace STATS with computed-from-DB values via new /api/analytics endpoint. (HIGH)
+- profile-view: referral code from user.id; login history mock→API or keep as clearly-labeled demo. (MEDIUM)
+- home-view: "активных пользователей" → derive from trades count or keep as platform stat. (LOW)
+
+---
+Task ID: MARGIN
+Agent: full-stack-developer
+Task: Build complete MARGIN TRADING feature for РусКрипто crypto exchange SPA — full margin terminal with leverage, PnL, liquidation, live updates, persistence.
+
+Work Log:
+- Read worklog.md, store.ts, types.ts, market.ts, format.ts, trade-view.tsx, home-view.tsx, page.tsx, use-live-market.ts, globals.css, ui/switch.tsx, ui/slider.tsx, ui/progress.tsx to align with existing patterns (gold+dark-navy theme, framer-motion, sonner toasts, shadcn/ui, Russian UI, `useLiveMarket` hook, flash-up/flash-down CSS animations).
+- types.ts: Added `MarginSide = 'long' | 'short'`, `MarginPositionStatus = 'OPEN' | 'CLOSED' | 'LIQUIDATED'`, `MarginPosition` interface (12 fields incl. entry/current/liquidation price, unrealizedPnl/Pct, marginRatio, status, openedAt/closedAt/realizedPnl), `MarginAccount` interface, and `'margin'` to `ViewId` union.
+- store.ts: Added `OpenMarginInput` interface + `computeLiquidationPrice(side, entry, leverage)` helper (long: `entry*(1-1/lev+0.005)`, short: `entry*(1+1/lev-0.005)`, 0.5% maint margin). Added 5 new state slices/actions to AppState interface + initializer: `marginPositions: []`, `marginAccount: {equity:500000, usedMargin:0, availableMargin:500000}` (RUB), `openMarginPosition(input)` (validates, computes `quantity=(margin*leverage)/entryPrice` + liquidation price, deducts margin from available, pushNotification, returns position), `closeMarginPosition(id, closePrice)` (computes realizedPnl side-aware, adds margin+realized back to equity, marks CLOSED, pushNotification), `liquidatePosition(id)` (realizedPnl=-margin, marks LIQUIDATED, pushNotification), `updateMarginPrices(prices)` (recomputes unrealizedPnl (long: (cur-entry)*qty; short: (entry-cur)*qty), unrealizedPnlPct, marginRatio (0 if pnl≥0; `margin/(margin+pnl)*100` if pnl<0; 100 if equityFromPos≤0); auto-liquidates when ratio≥100%). Added `marginPositions` + `marginAccount` to persist `partialize`.
+- margin-view.tsx (NEW, ~620 lines): Full margin trading terminal. Layout: top pair bar + risk-warning banner + 2-column grid (lg:[1fr_340px]) with TradingView iframe chart + OpenPositions table + PositionHistory on the left, and AccountSummary card + OpenPositionForm + RiskMetrics card on the right.
+  • Top bar: pair selector dropdown (8 pairs BTC/ETH/XRP/SOL/BNB/DOGE/ADA/AVAX /RUB, bound to LOCAL `selectedPair` state defaulting to 'BTC/RUB'), large mono live price (flash-up/down on tick), 24h change badge (green/red), LIVE indicator when WS connected, "Маржа активна" switch toggle (default on).
+  • Live updates: `useLiveMarket(selectedPair)` for WS price (overrides 1.2s jitter fallback); `updateMarginPrices({[selectedPair]: livePrice})` on every price tick to recompute PnL/margin ratio for OPEN positions of that pair; secondary 5s poll of `fetchTickers()` to refresh prices for any OPEN positions on other pairs. Auto-liquidation triggers when any position's marginRatio hits 100%.
+  • TradingView iframe (5m, dark theme, BINANCE:{base}USDT symbol — same pattern as trade-view).
+  • OpenPositionsTable: 12-col grid (Pair/Side badge w/ leverage | Size | Entry | Current | PnL (₽ signed + % colored) | Margin | Liquidation (warning color) | Margin-call progress bar (green<50/yellow<80/red≥80) + Close button). Empty state. Per-row PnL flash animation on change. ScrollArea capped at 420px.
+  • PositionHistory: closed/liquidated positions list — Pair/Side badge, realized PnL (signed colored), entry→close price arrow, status badge (Closed/Liquidation), close time.
+  • AccountSummaryCard: Equity (with unrealized PnL folded in), Unrealized PnL (colored, signed), Used margin, Available margin (gold), account-level Margin Level progress bar (green<50/yellow<80/red≥80) with critical warning when ≥80%.
+  • OpenPositionForm: Long/Short toggle (green/red), 5 preset leverage buttons (1/2/5/10/20x) + 1-20x slider, margin input (RUB) with MAX button, computed preview card (position size = margin*leverage, quantity = size/price, entry price, liquidation price, taker fee 0.06%), "Открыть Long/Short {pair}" button (validates margin ≤ availableMargin, calls openMarginPosition, toast feedback, resets input).
+  • RiskMetricsCard: maintenance margin rate 0.5%, initial margin (1/leverage), taker fee 0.06%, max leverage 20x, liquidation formula (long/short), auto-liquidation explainer.
+  • When margin switch is off, shows a centered deactivation card with a re-activate button.
+- page.tsx: Added `import { MarginView } from '@/components/views/margin-view'`, `TrendingUp` icon import (note: `Leverage` icon does not exist in this lucide-react version, so used `TrendingUp` per task's allowed alternatives), added `{ id: 'margin', label: 'Маржа', icon: TrendingUp, group: 'Торговля' }` to NAV after `'markets'`, and `margin: MarginView,` to VIEW_COMPONENTS map.
+- Verification: `curl -s http://localhost:3000 -o /dev/null -w "%{http_code}"` → 200. `bun run lint` → clean (no errors/warnings). dev.log shows successful compiles with no runtime errors after the changes (only expected Fast Refresh full reloads when editing page.tsx/store.ts).
+
+Summary of delivered UX:
+- Open Long/Short on any of 8 RUB pairs with 1-20x leverage using real Binance prices via WS.
+- See live PnL and margin-ratio progress bars update every ~1.2s; positions auto-liquidate at 100% margin ratio with toast + notification feed entry.
+- Close any open position at market with one click.
+- Margin account (equity, used, available, unrealized PnL, margin level) persisted across reloads (zustand persist) — initial demo equity 500,000 ₽.
+- Risk warnings (banner + critical-bar message + risk-metrics card with formulas) visible at all times.
+
+---
+Task ID: TRADE-REBUILD
+Agent: full-stack-developer
+Task: Rebuild the trade-view layout of the РусКрипто crypto exchange SPA — COMPACT + RESIZABLE + REARRANGEABLE with persisted user layout. Next.js 16, single `/` route. Gold (#F0B90B/primary) + dark navy theme (dark default).
+
+Work Log:
+- Read worklog.md (last 3 entries: prior margin feature, mock-data audit, stages 1-4 completion).
+- Read /home/z/my-project/src/components/views/trade-view.tsx FULLY (1472 lines). Found the file was already substantially rebuilt with the target architecture in place: `useTradeLayout()` hook, `SortableBlock` wrapper, `ColumnPanelGroup` (DndContext + SortableContext + react-resizable-panels), `TradeResizeHandle`, `ChartBlock`, `OrderBook` (with `DepthChart` + `BookRow`), `RecentTrades`, `OrderForm`, `MyTrades`, and the main `TradeView`. All sub-component logic (live WS data, flash animations, depth chart, place-order flow, pair selector, LIVE badges) preserved.
+- Verified store.ts exports `useAppStore` with `selectedPair`, `setSelectedPair`, `placeOrder`, `sidebarCollapsed`; use-live-market.ts exports `useLiveMarket(pair)` returning `{ orderBook, livePrice, trades, connected }`.
+- Verified globals.css has `.scrollbar-thin`, `.flash-up`/`.flash-down` keyframes, and `body.trade-dnd-dragging iframe { pointer-events: none }` (so the TradingView iframe can't steal the cursor during block drag-reorder).
+
+FIX APPLIED — per-key debounced localStorage save:
+- The `useTradeLayout()` hook previously used a SINGLE shared `saveTimer` ref for the debounced save. When the three PanelGroups (cols + left + right) all fired `onLayout` in quick succession on mount, only the last save survived (the others' timers got cleared). This meant only `trade-layout-sizes-right` got persisted on a fresh load.
+- Refactored to a `useRef<Map<string, setTimeout-return>>` so each localStorage key has its own independent debounce timer. Now all three size keys (`trade-layout-sizes-cols`, `trade-layout-sizes-left`, `trade-layout-sizes-right`) persist independently on mount and on every resize. Reorder saves (`handleLeftReorder`/`handleRightReorder`) remain immediate (non-debounced).
+
+VERIFICATION (agent-browser end-to-end test on http://localhost:3000):
+1. `curl -s http://localhost:3000 -o /dev/null -w "%{http_code}"` → **200** ✓
+2. Navigated to Торги (trade) view — rendered with 0 console errors / 0 page errors ✓
+3. Confirmed all 5 blocks present with drag handles: График (chart), Сделки (trades), Стакан (book), Ордер (form), Мои сделки (mytrades) ✓
+4. Confirmed 4 resize handles present (`left-h-1`, `cols-h`, `right-h-1`, `right-h-2`) via `data-panel-resize-handle-id` ✓
+5. RESIZE test: dragged `cols-h` handle left → column sizes changed from [70,30] to [55,45] → `localStorage.getItem('trade-layout-sizes-cols')` = `"[55,45]"` ✓
+6. REORDER test: dragged Ордер (form) grip handle above Стакан (book) → right column order changed from [book,form,mytrades] to [form,book,mytrades] → `localStorage.getItem('trade-layout-order-right')` = `["form","book","mytrades"]` ✓
+7. RESET test: clicked "Сбросить layout" button → sonner toast "Layout сброшен к значениям по умолчанию" appeared → all `trade-layout-*` localStorage keys cleared → blocks returned to default order [chart,trades] | [book,form,mytrades] ✓
+8. After clearing localStorage + reload + navigating to trade view, all 3 size keys auto-persisted on mount (per-key debounce fix confirmed) ✓
+9. `bun run lint` → **0 errors, 0 warnings** ✓
+10. `tail dev.log` → only clean "✓ Compiled" + "GET / 200" lines, no runtime/compile errors ✓
+
+Summary of delivered UX:
+- Trade view uses a 2-column resizable layout: LEFT (chart top + recent trades bottom), RIGHT (order book + order form + my trades stacked).
+- Every block boundary has a draggable resize handle (thin bar that highlights gold on hover).
+- Every block header has a grip handle (GripVertical icon) — drag within a column to reorder. The TradingView iframe is neutralized during drag via `body.trade-dnd-dragging iframe { pointer-events: none }`.
+- All layout state (column split, per-column block sizes, per-column block order) persists to localStorage across reloads.
+- "Сбросить layout" button in the top bar restores all defaults with a confirmation toast.
+- Compact density: outer `px-2 lg:px-3 py-2`, column `gap-2`, top bar `p-2`, block headers `px-2 py-1`, font-mono tabular-nums throughout.
+- Mobile (<lg) falls back to a stacked non-resizable/non-draggable layout with sensible fixed heights per block.
+- All existing functionality preserved: pair selector dropdown (8 RUB pairs), live price with flash-up/flash-down, 24h change badge, LIVE indicator, depth chart, order book flash rows, order form (buy/sell, limit/market, % slider, place order → store.placeOrder + sonner toast), my trades history from store.orders.
+
+Files modified:
+- /home/z/my-project/src/components/views/trade-view.tsx — refactored `debouncedSave` in `useTradeLayout()` from single-timer to per-key-timer Map (lines ~159-173). No other changes needed; the rest of the rebuild was already in place and verified working.

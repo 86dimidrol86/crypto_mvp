@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   BarChart3,
   Users,
@@ -11,6 +11,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Globe2,
+  Database,
 } from 'lucide-react'
 import {
   BarChart,
@@ -41,56 +42,14 @@ const PERIODS: { id: Period; label: string }[] = [
   { id: '30d', label: '30д' },
 ]
 
-const STATS: Record<Period, { volume: number; users: number; positions: number; pnl: number; volumeDelta: number; usersDelta: number; positionsDelta: number; pnlDelta: number }> = {
-  '1h': { volume: 12_400_000, users: 4_240, positions: 8_420, pnl: 0.42, volumeDelta: 3.4, usersDelta: 1.8, positionsDelta: 0.9, pnlDelta: 0.12 },
-  '24h': { volume: 184_200_000, users: 38_450, positions: 24_680, pnl: 2.18, volumeDelta: 12.4, usersDelta: 8.7, positionsDelta: 4.2, pnlDelta: 0.84 },
-  '7d': { volume: 1_240_000_000, users: 142_840, positions: 42_840, pnl: 5.74, volumeDelta: 28.4, usersDelta: 14.2, positionsDelta: 11.8, pnlDelta: 1.92 },
-  '30d': { volume: 5_640_000_000, users: 480_280, positions: 68_240, pnl: 12.86, volumeDelta: 64.2, usersDelta: 32.1, positionsDelta: 24.8, pnlDelta: 4.18 },
-}
-
-const PAIR_DIST = [
-  { name: 'BTC', value: 40, color: '#F0B90B' },
-  { name: 'ETH', value: 25, color: '#38bdf8' },
-  { name: 'SOL', value: 15, color: '#a78bfa' },
-  { name: 'USDT', value: 12, color: '#22c55e' },
-  { name: 'Другие', value: 8, color: '#94a3b8' },
-]
-
-const CORRIDORS = [
-  { corridor: 'RU → CN', volume: 84_200_000, change: 18.4 },
-  { corridor: 'RU → AE', volume: 62_400_000, change: 12.8 },
-  { corridor: 'RU → TR', volume: 48_600_000, change: 8.2 },
-  { corridor: 'RU → IN', volume: 32_100_000, change: -2.4 },
-  { corridor: 'RU → KZ', volume: 18_400_000, change: 4.6 },
-  { corridor: 'RU → UZ', volume: 9_800_000, change: 22.1 },
-]
-
-function generateVolumeBars(period: Period): { label: string; volume: number }[] {
-  const baseVolume = STATS[period].volume / 12
-  const labelsByPeriod: Record<Period, string[]> = {
-    '1h': ['08:00', '08:05', '08:10', '08:15', '08:20', '08:25', '08:30', '08:35', '08:40', '08:45', '08:50', '08:55'],
-    '24h': ['00', '02', '04', '06', '08', '10', '12', '14', '16', '18', '20', '22'],
-    '7d': ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт'],
-    '30d': ['1', '3', '5', '7', '9', '11', '13', '15', '17', '19', '21', '23'],
-  }
-  return labelsByPeriod[period].map((label, i) => ({
-    label,
-    volume: Math.round(baseVolume * (0.7 + Math.sin(i * 0.7) * 0.25 + Math.random() * 0.2)),
-  }))
-}
-
-function generateUsersLine(period: Period): { label: string; users: number }[] {
-  const baseUsers = STATS[period].users / 12
-  const labelsByPeriod: Record<Period, string[]> = {
-    '1h': ['08:00', '08:05', '08:10', '08:15', '08:20', '08:25', '08:30', '08:35', '08:40', '08:45', '08:50', '08:55'],
-    '24h': ['00', '02', '04', '06', '08', '10', '12', '14', '16', '18', '20', '22'],
-    '7d': ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт'],
-    '30d': ['1', '3', '5', '7', '9', '11', '13', '15', '17', '19', '21', '23'],
-  }
-  return labelsByPeriod[period].map((label, i) => ({
-    label,
-    users: Math.round(baseUsers * (0.5 + (i / 12) * 0.6 + Math.sin(i * 0.5) * 0.15 + Math.random() * 0.1)),
-  }))
+interface AnalyticsData {
+  periods: Record<Period, { volume: number; users: number; positions: number; pnl: number; volumeDelta: number; usersDelta: number; positionsDelta: number; pnlDelta: number }>
+  pairDistribution: { name: string; value: number; color: string; volume: number }[]
+  corridors: { corridor: string; volume: number; count: number; change: number }[]
+  volumeSeries: { label: string; volume: number }[]
+  usersSeries: { label: string; users: number }[]
+  summary: { totalVolume: number; volume24h: number; totalFees: number; totalTrades: number; totalUsers: number; totalPayments: number; openAlerts: number; p2pDeals: number }
+  market: { usdRub: number; topGainer: any; topLoser: any }
 }
 
 const tooltipStyle = {
@@ -138,9 +97,41 @@ function StatCard({ title, value, delta, icon: Icon, color, positive = true }: S
 
 export function AnalyticsView() {
   const [period, setPeriod] = useState<Period>('24h')
-  const stats = STATS[period]
-  const volumeData = generateVolumeBars(period)
-  const usersData = generateUsersLine(period)
+  const [data, setData] = useState<AnalyticsData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let mounted = true
+    const load = async () => {
+      try {
+        const res = await fetch('/api/analytics')
+        if (res.ok) {
+          const json = await res.json()
+          if (mounted) {
+            setData(json)
+            setLoading(false)
+          }
+        }
+      } catch {
+        if (mounted) setLoading(false)
+      }
+    }
+    load()
+    const interval = setInterval(load, 15000)
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
+  }, [])
+
+  const stats = data?.periods[period] || {
+    volume: 0, users: 0, positions: 0, pnl: 0,
+    volumeDelta: 0, usersDelta: 0, positionsDelta: 0, pnlDelta: 0,
+  }
+  const pairDist = data?.pairDistribution ?? []
+  const corridors = data?.corridors ?? []
+  const volumeData = data?.volumeSeries ?? []
+  const usersData = data?.usersSeries ?? []
 
   return (
     <div className="flex-1">
@@ -152,8 +143,9 @@ export function AnalyticsView() {
               <BarChart3 className="w-7 h-7 text-primary" />
               Аналитика
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Метрики платформы в реальном времени
+            <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+              <Database className="w-3.5 h-3.5 text-success" />
+              Метрики из БД платформы {data && <span className="text-success">• обновлено {new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>}
             </p>
           </div>
           <div className="flex gap-1 bg-muted/60 p-1 rounded-xl">
@@ -173,6 +165,20 @@ export function AnalyticsView() {
             ))}
           </div>
         </div>
+
+        {/* Real data summary banner */}
+        {data && (
+          <Card className="p-3 mb-6 bg-success/5 border-success/20">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-xs">
+              <span className="text-muted-foreground">Источник данных: <span className="text-success font-medium">Prisma + Binance API</span></span>
+              <span className="text-muted-foreground">Сделок в БД: <span className="font-mono text-foreground">{data.summary.totalTrades}</span></span>
+              <span className="text-muted-foreground">Пользователей: <span className="font-mono text-foreground">{data.summary.totalUsers}</span></span>
+              <span className="text-muted-foreground">Платежей: <span className="font-mono text-foreground">{data.summary.totalPayments}</span></span>
+              <span className="text-muted-foreground">P2P сделок: <span className="font-mono text-foreground">{data.summary.p2pDeals}</span></span>
+              <span className="text-muted-foreground">Комиссий собрано: <span className="font-mono text-primary">{formatPrice(data.summary.totalFees, 'rub')}</span></span>
+            </div>
+          </Card>
+        )}
 
         {/* Stats row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -241,7 +247,7 @@ export function AnalyticsView() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={PAIR_DIST}
+                    data={pairDist}
                     dataKey="value"
                     nameKey="name"
                     innerRadius={48}
@@ -249,7 +255,7 @@ export function AnalyticsView() {
                     paddingAngle={2}
                     stroke="none"
                   >
-                    {PAIR_DIST.map((d) => (
+                    {pairDist.map((d) => (
                       <Cell key={d.name} fill={d.color} />
                     ))}
                   </Pie>
@@ -258,7 +264,7 @@ export function AnalyticsView() {
               </ResponsiveContainer>
             </div>
             <div className="mt-4 space-y-2">
-              {PAIR_DIST.map((p) => (
+              {pairDist.map((p) => (
                 <div key={p.name} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-sm" style={{ background: p.color }} />
@@ -384,7 +390,7 @@ export function AnalyticsView() {
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={CORRIDORS}
+                data={corridors}
                 layout="vertical"
                 margin={{ top: 8, right: 16, left: 8, bottom: 0 }}
               >
@@ -411,7 +417,7 @@ export function AnalyticsView() {
                   formatter={(v: number) => [formatPrice(v, 'rub'), 'Объём']}
                 />
                 <Bar dataKey="volume" radius={[0, 4, 4, 0]} maxBarSize={26}>
-                  {CORRIDORS.map((c) => (
+                  {corridors.map((c) => (
                     <Cell key={c.corridor} fill={c.change >= 0 ? '#F0B90B' : '#ef4444'} />
                   ))}
                 </Bar>
@@ -419,7 +425,7 @@ export function AnalyticsView() {
             </ResponsiveContainer>
           </div>
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {CORRIDORS.map((c) => (
+            {corridors.map((c) => (
               <div key={c.corridor} className="rounded-xl bg-muted/40 p-3">
                 <div className="text-xs text-muted-foreground">{c.corridor}</div>
                 <div className="font-bold text-sm mt-1 tabular-nums">
@@ -444,9 +450,9 @@ export function AnalyticsView() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-              Данные обновляются каждые 5 секунд
+              Данные из БД обновляются каждые 15 секунд
             </div>
-            <div>Источник: внутренний matching engine • Binance API для котировок</div>
+            <div>Источник: Prisma (SQLite) • Binance API для котировок • ЦБ РФ для USD/RUB</div>
           </div>
         </Card>
       </div>

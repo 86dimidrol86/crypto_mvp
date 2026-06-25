@@ -4,6 +4,7 @@ export type ViewId =
   | 'home'
   | 'trade'
   | 'markets'
+  | 'margin'
   | 'p2p'
   | 'payments'
   | 'wallet'
@@ -178,4 +179,36 @@ export interface ComplianceAlert {
   ruleId?: string
   createdAt: string
   shap?: { feature: string; contribution: number }[]
+}
+
+// ─── Margin Trading ─────────────────────────────────────────────────────────
+export type MarginSide = 'long' | 'short'
+export type MarginPositionStatus = 'OPEN' | 'CLOSED' | 'LIQUIDATED'
+
+export interface MarginPosition {
+  id: string
+  pair: string
+  side: MarginSide
+  leverage: number
+  margin: number
+  quantity: number
+  entryPrice: number
+  liquidationPrice: number
+  currentPrice: number
+  unrealizedPnl: number
+  unrealizedPnlPct: number
+  marginRatio: number
+  status: MarginPositionStatus
+  openedAt: string
+  closedAt?: string
+  closePrice?: number
+  realizedPnl?: number
+}
+
+export interface MarginAccount {
+  equity: number
+  usedMargin: number
+  availableMargin: number
+  marginRatio: number
+  unrealizedPnl: number
 }
