@@ -147,6 +147,7 @@ function priceDecimals(price: number): number {
 
 // ─── useTradeLayout: persist block order + panel sizes ──────────────────────
 function useTradeLayout() {
+  const { t } = useI18n()
   const [leftOrder, setLeftOrder] = useState<BlockId[]>(() => {
     const saved = loadJSON<unknown>(LS_KEYS.leftOrder, DEFAULT_LEFT_ORDER)
     return isValidOrder(saved, DEFAULT_LEFT_ORDER) ? saved : DEFAULT_LEFT_ORDER
@@ -241,7 +242,7 @@ function useTradeLayout() {
     setRightSizes(DEFAULT_SIZES.right)
     setColumns(DEFAULT_SIZES.columns)
     toast.success(t('trade.reset.toast'))
-  }, [])
+  }, [t])
 
   return {
     leftOrder,
@@ -1215,6 +1216,7 @@ function downloadTradesCsv(trades: Trade[]) {
 
 function MyTrades({ pair, dragHandle }: { pair: string; dragHandle: ReactNode }) {
   const orders = useAppStore((s) => s.orders)
+  const { t } = useI18n()
   const [sideFilter, setSideFilter] = useState<SideFilter>('all')
   const [dateFilter, setDateFilter] = useState<DateFilter>('all')
 
