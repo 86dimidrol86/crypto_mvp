@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import {
   Home,
+  Newspaper,
   CandlestickChart,
   LineChart,
   TrendingUp,
@@ -21,6 +22,7 @@ import {
 import { useAppStore } from '@/lib/store'
 import type { ViewId } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { timeAgo } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -53,6 +55,7 @@ import { ComplianceView } from '@/components/views/compliance-view'
 import { ProfileView } from '@/components/views/profile-view'
 import { AuthView } from '@/components/views/auth-view'
 import { MarginView } from '@/components/views/margin-view'
+import { NewsView } from '@/components/views/news-view'
 
 interface NavItem {
   id: ViewId
@@ -63,6 +66,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { id: 'home', label: 'Главная', icon: Home, group: 'Обзор' },
+  { id: 'news', label: 'Новости', icon: Newspaper, group: 'Обзор' },
   { id: 'trade', label: 'Торги', icon: CandlestickChart, group: 'Торговля' },
   { id: 'markets', label: 'Рынки', icon: LineChart, group: 'Торговля' },
   { id: 'margin', label: 'Маржа', icon: TrendingUp, group: 'Торговля' },
@@ -78,6 +82,7 @@ const NAV: NavItem[] = [
 
 const VIEW_COMPONENTS: Record<ViewId, React.ComponentType> = {
   home: HomeView,
+  news: NewsView,
   trade: TradeView,
   markets: MarketsView,
   margin: MarginView,
@@ -183,11 +188,62 @@ function SidebarContent({ onNavigate, collapsed }: { onNavigate?: () => void; co
   )
 }
 
+function NewsTicker() {
+  const newsItems = useAppStore((s) => s.newsItems)
+  const setView = useAppStore((s) => s.setView)
+  const headlines = newsItems.slice(0, 4)
+  if (headlines.length === 0) return null
+  const items = [...headlines, ...headlines, ...headlines] // loop 3x for smooth marquee
+  return (
+    <div className="hidden md:block border-b border-border bg-card/40 overflow-hidden">
+      <div className="flex items-center">
+        <div className="shrink-0 px-3 py-1 bg-primary/15 text-primary text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 border-r border-border">
+          <Newspaper className="w-3 h-3" />
+          Новости
+        </div>
+        <div className="relative flex-1 overflow-hidden">
+          <div
+            className="flex gap-8 whitespace-nowrap py-1 will-change-transform"
+            style={{
+              animation: 'news-marquee 48s linear infinite',
+            }}
+          >
+            {items.map((n, i) => (
+              <button
+                key={`${n.id}-${i}`}
+                onClick={() => setView('news')}
+                className="text-xs text-muted-foreground hover:text-primary transition-colors shrink-0 inline-flex items-center gap-1.5"
+                title={n.title}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+                <span className="font-medium text-foreground/80">{n.source.split(' • ')[0]}:</span>
+                <span className="truncate max-w-[420px]">{n.title}</span>
+                <span className="text-[10px] text-muted-foreground/60 ml-1">
+                  {timeAgo(n.publishedAt)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <style jsx>{`
+        @keyframes news-marquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-33.333%); }
+        }
+      `}</style>
+    </div>
+  )
+}
+
 function Header() {
   const isAuthed = useAppStore((s) => s.isAuthed)
   const userName = useAppStore((s) => s.userName)
   const setView = useAppStore((s) => s.setView)
+  const priceAlerts = useAppStore((s) => s.priceAlerts)
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  const activeAlerts = priceAlerts.filter((a) => a.active && !a.triggered).length
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
@@ -221,6 +277,21 @@ function Header() {
 
         <div className="flex items-center gap-1">
           <ThemeToggle />
+          {/* Price alerts indicator */}
+          {activeAlerts > 0 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative"
+              onClick={() => setView('markets')}
+              title={`Активных алертов: ${activeAlerts}`}
+            >
+              <Bell className="w-5 h-5" />
+              <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center">
+                {activeAlerts > 9 ? '9+' : activeAlerts}
+              </span>
+            </Button>
+          )}
           <NotificationsBell />
           {isAuthed ? (
             <Button
@@ -243,6 +314,7 @@ function Header() {
           )}
         </div>
       </div>
+      <NewsTicker />
     </header>
   )
 }
@@ -282,7 +354,7 @@ export default function CryptoExchangeApp() {
         {/* Desktop sidebar */}
         <aside
           className={cn(
-            'hidden lg:flex shrink-0 flex-col border-r border-border bg-sidebar/40 sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto scrollbar-thin transition-[width] duration-200',
+            'hidden lg:flex shrink-0 flex-col border-r border-border bg-sidebar/40 sticky top-[88px] h-[calc(100vh-88px)] overflow-y-auto scrollbar-thin transition-[width] duration-200',
             collapsed ? 'w-[68px]' : 'w-64'
           )}
         >

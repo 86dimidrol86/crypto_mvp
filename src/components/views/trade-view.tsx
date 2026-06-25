@@ -20,10 +20,12 @@ import {
   ChevronDown,
   TrendingUp,
   TrendingDown,
-  CheckCircle2,
   ArrowDownRight,
   GripVertical,
   RotateCcw,
+  CandlestickChart,
+  Info,
+  Download,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { fetchTickers, jitterPrice } from '@/lib/market'
@@ -42,6 +44,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from '@/components/ui/tooltip'
 import { toast } from 'sonner'
 
 const PAIRS = [
@@ -497,24 +505,24 @@ function BookRow({ price, amount, maxAmount, side, decimals }: BookRowProps) {
   const total = price * amount
   const wPct = (amount / (maxAmount || 1)) * 100
   const colorClass = side === 'ask' ? 'text-destructive' : 'text-success'
-  const barClass = side === 'ask' ? 'bg-destructive/15' : 'bg-success/15'
+  const barClass = side === 'ask' ? 'bg-destructive/20' : 'bg-success/20'
 
   return (
     <div
       className={cn(
-        'relative grid grid-cols-3 px-2 py-[2px] text-[11px] font-mono tabular-nums transition-colors',
+        'relative grid grid-cols-3 px-2 py-[2px] text-[13px] font-mono tabular-nums transition-colors',
         flash === 'up' && 'flash-up',
         flash === 'down' && 'flash-down'
       )}
     >
       <div className={cn('absolute inset-y-0 right-0', barClass)} style={{ width: `${wPct}%` }} aria-hidden />
-      <span className={cn('relative', colorClass)}>
+      <span className={cn('relative font-semibold', colorClass)}>
         {price.toLocaleString('ru-RU', {
           minimumFractionDigits: decimals,
           maximumFractionDigits: decimals,
         })}
       </span>
-      <span className="relative text-right text-foreground/90">
+      <span className="relative text-right text-foreground/90 font-medium">
         {amount.toLocaleString('ru-RU', { maximumFractionDigits: 4 })}
       </span>
       <span className="relative text-right text-muted-foreground">
@@ -1106,6 +1114,17 @@ function OrderForm({
       </div>
 
       <div className="px-2 pb-2 pt-1 shrink-0 border-t border-border space-y-1">
+        <div className="flex justify-between items-start text-[11px]">
+          <span className="text-muted-foreground pt-0.5">Объём</span>
+          <div className="text-right">
+            <div className="font-mono tabular-nums">
+              {formatNumber(qty, 6)} {base}
+            </div>
+            <div className="text-[9px] font-mono text-muted-foreground tabular-nums">
+              ≈ {formatNumber(total)} {quote}
+            </div>
+          </div>
+        </div>
         <div className="flex justify-between text-[11px]">
           <span className="text-muted-foreground">Итого</span>
           <span className="font-mono tabular-nums">
@@ -1113,8 +1132,18 @@ function OrderForm({
           </span>
         </div>
         <div className="flex justify-between text-[11px]">
-          <span className="text-muted-foreground">Комиссия 0.2%</span>
-          <span className="font-mono tabular-nums text-muted-foreground">
+          <span className="flex items-center gap-1 text-foreground/70">
+            Комиссия 0.2%
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="w-3 h-3 cursor-help text-muted-foreground hover:text-primary transition" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs max-w-[220px]">
+                Taker-комиссия 0.2% от суммы сделки. Для maker-ордеров (ликвидность) — 0.06%.
+              </TooltipContent>
+            </Tooltip>
+          </span>
+          <span className="font-mono tabular-nums text-foreground/70">
             {formatNumber(fee)} {quote}
           </span>
         </div>
@@ -1138,9 +1167,100 @@ function OrderForm({
 }
 
 // ─── Block: MyTrades (history from store.orders) ───────────────────────────
+type SideFilter = 'all' | 'buy' | 'sell'
+type DateFilter = 'today' | '7d' | 'all'
+
+function downloadTradesCsv(trades: Trade[]) {
+  const headers = ['time', 'pair', 'side', 'type', 'price', 'quantity', 'total', 'fee']
+  const escape = (v: string | number) => {
+    const s = String(v)
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+      return `"${s.replace(/"/g, '""')}"`
+    }
+    return s
+  }
+  const rows = trades.map((t) =>
+    [
+      t.createdAt ? new Date(t.createdAt).toLocaleString('ru-RU') : t.time,
+      t.pair,
+      t.side,
+      t.type,
+      t.price,
+      t.quantity,
+      t.total,
+      t.fee,
+    ]
+      .map(escape)
+      .join(',')
+  )
+  const csv = [headers.join(','), ...rows].join('\n')
+  // Add BOM so Excel reads UTF-8 Cyrillic correctly
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `ruscrypto-trades-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 function MyTrades({ pair, dragHandle }: { pair: string; dragHandle: ReactNode }) {
   const orders = useAppStore((s) => s.orders)
-  const filtered = orders.filter((o) => o.pair === pair)
+  const [sideFilter, setSideFilter] = useState<SideFilter>('all')
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all')
+
+  const pairOrders = useMemo(() => orders.filter((o) => o.pair === pair), [orders, pair])
+
+  const filtered = useMemo(() => {
+    let r = pairOrders
+    if (sideFilter !== 'all') r = r.filter((o) => o.side === sideFilter)
+    if (dateFilter !== 'all') {
+      const now = Date.now()
+      const cutoff =
+        dateFilter === 'today' ? now - 24 * 60 * 60 * 1000 : now - 7 * 24 * 60 * 60 * 1000
+      r = r.filter((o) => {
+        const ts = o.createdAt ? new Date(o.createdAt).getTime() : now
+        return ts >= cutoff
+      })
+    }
+    return r
+  }, [pairOrders, sideFilter, dateFilter])
+
+  const totalCount = filtered.length
+  const totalVolume = filtered.reduce((s, o) => s + o.total, 0)
+
+  const handleCsv = () => {
+    if (orders.length === 0) {
+      toast.error('Нет сделок для экспорта')
+      return
+    }
+    downloadTradesCsv(orders)
+    toast.success(`Экспортировано ${orders.length} сделок в CSV`)
+  }
+
+  const FilterBtn = ({
+    active,
+    onClick,
+    children,
+  }: {
+    active: boolean
+    onClick: () => void
+    children: ReactNode
+  }) => (
+    <button
+      onClick={onClick}
+      className={cn(
+        'px-1.5 py-0.5 rounded text-[10px] font-medium transition',
+        active
+          ? 'bg-primary/15 text-primary'
+          : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+      )}
+    >
+      {children}
+    </button>
+  )
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-card border border-border rounded-md overflow-hidden">
@@ -1149,19 +1269,73 @@ function MyTrades({ pair, dragHandle }: { pair: string; dragHandle: ReactNode })
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Мои сделки
         </span>
-        {filtered.length > 0 && (
-          <span className="ml-auto text-[10px] text-muted-foreground font-mono">
-            {filtered.length}
-          </span>
-        )}
+        <span className="text-[10px] text-muted-foreground/70 font-mono">{pair}</span>
+        <div className="ml-auto flex items-center gap-1">
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleCsv}
+                  className="p-1 rounded hover:bg-muted/60 text-muted-foreground hover:text-primary transition disabled:opacity-40"
+                  aria-label="Скачать CSV"
+                  disabled={orders.length === 0}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                Скачать CSV (все сделки: {orders.length})
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </div>
+
+      {/* Compact filter toolbar */}
+      <div className="px-2 py-1 border-b border-border/60 flex items-center gap-2 shrink-0 flex-wrap">
+        <div className="flex items-center gap-0.5">
+          <FilterBtn active={sideFilter === 'all'} onClick={() => setSideFilter('all')}>
+            Все
+          </FilterBtn>
+          <FilterBtn active={sideFilter === 'buy'} onClick={() => setSideFilter('buy')}>
+            Покупки
+          </FilterBtn>
+          <FilterBtn active={sideFilter === 'sell'} onClick={() => setSideFilter('sell')}>
+            Продажи
+          </FilterBtn>
+        </div>
+        <span className="w-px h-3 bg-border" />
+        <div className="flex items-center gap-0.5">
+          <FilterBtn active={dateFilter === 'today'} onClick={() => setDateFilter('today')}>
+            Сегодня
+          </FilterBtn>
+          <FilterBtn active={dateFilter === '7d'} onClick={() => setDateFilter('7d')}>
+            7д
+          </FilterBtn>
+          <FilterBtn active={dateFilter === 'all'} onClick={() => setDateFilter('all')}>
+            Всё
+          </FilterBtn>
+        </div>
+        <div className="ml-auto text-[10px] text-muted-foreground font-mono tabular-nums">
+          {totalCount} • {formatNumber(totalVolume)} ₽
+        </div>
+      </div>
+
       {filtered.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center px-2 py-4">
-          <CheckCircle2 className="w-6 h-6 mx-auto text-muted-foreground/40 mb-1" />
-          <p className="text-[11px] text-muted-foreground">Пока нет сделок</p>
-          <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-            Создайте ордер в форме выше
-          </p>
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-3 py-6 min-h-[160px]">
+          <div className="w-full max-w-[200px] border border-dashed border-border/80 rounded-lg py-5 px-3 flex flex-col items-center gap-2 bg-muted/20">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <CandlestickChart className="w-5 h-5 text-primary" />
+            </div>
+            <p className="text-[11px] font-semibold text-foreground/80">
+              {pairOrders.length === 0 ? 'Пока нет сделок' : 'Ничего не найдено'}
+            </p>
+            <p className="text-[10px] text-muted-foreground leading-snug">
+              {pairOrders.length === 0
+                ? 'Создайте ордер в форме выше, чтобы увидеть историю здесь'
+                : 'Измените фильтры, чтобы увидеть больше записей'}
+            </p>
+          </div>
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
@@ -1348,7 +1522,8 @@ export function TradeView() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-center gap-2">
+            {connected && <LiveBadge />}
             <span
               className={cn(
                 'inline-block rounded-md px-1.5 py-0.5 text-xl lg:text-2xl font-mono font-bold tabular-nums transition-colors',

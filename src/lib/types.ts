@@ -2,6 +2,7 @@
 
 export type ViewId =
   | 'home'
+  | 'news'
   | 'trade'
   | 'markets'
   | 'margin'
@@ -14,6 +15,36 @@ export type ViewId =
   | 'compliance'
   | 'profile'
   | 'auth'
+
+// ─── News & Announcements ───────────────────────────────────────────────────
+export type NewsCategory = 'Регуляторика' | 'Рынок' | 'Платформа' | 'Партнёрство'
+
+export interface NewsItem {
+  id: string
+  category: NewsCategory
+  title: string
+  summary: string
+  body?: string
+  source: string
+  publishedAt: string // ISO string
+  pinned?: boolean
+  url?: string
+}
+
+// ─── Price Alerts ───────────────────────────────────────────────────────────
+export type PriceAlertCondition = 'above' | 'below'
+
+export interface PriceAlert {
+  id: string
+  symbol: string // e.g. 'BTC'
+  condition: PriceAlertCondition
+  targetPrice: number
+  note?: string
+  active: boolean
+  triggered: boolean
+  createdAt: string // ISO string
+  triggeredAt?: string
+}
 
 export type Currency = 'rub' | 'usd'
 
@@ -67,11 +98,13 @@ export interface Trade {
   id: string
   pair: string
   side: OrderSide
+  type: OrderType
   price: number
   quantity: number
   total: number
   fee: number
   time: string
+  createdAt?: string // ISO timestamp (for date filtering); legacy entries may omit
 }
 
 export type TxType = 'deposit' | 'withdrawal' | 'trade' | 'fee' | 'payment'

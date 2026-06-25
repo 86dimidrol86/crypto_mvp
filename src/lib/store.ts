@@ -15,6 +15,9 @@ import type {
   KycLevel,
   MarginPosition,
   MarginSide,
+  PriceAlert,
+  PriceAlertCondition,
+  NewsItem,
 } from './types'
 
 const uid = () => Math.random().toString(36).slice(2, 11)
@@ -34,6 +37,13 @@ interface OpenMarginInput {
   leverage: number
   margin: number
   entryPrice: number
+}
+
+interface AddPriceAlertInput {
+  symbol: string
+  condition: PriceAlertCondition
+  targetPrice: number
+  note?: string
 }
 
 const MAINT_MARGIN_RATE = 0.005 // 0.5% поддерживающая маржа
@@ -110,6 +120,14 @@ interface AppState {
   closeMarginPosition: (id: string, closePrice: number) => void
   liquidatePosition: (id: string) => void
   updateMarginPrices: (prices: Record<string, number>) => void
+  // price alerts
+  priceAlerts: PriceAlert[]
+  addPriceAlert: (input: AddPriceAlertInput) => void
+  removePriceAlert: (id: string) => void
+  togglePriceAlert: (id: string) => void
+  markPriceAlertTriggered: (id: string) => void
+  // news feed (static seed, no API)
+  newsItems: NewsItem[]
 }
 
 const INITIAL_BALANCES: Balance[] = [
@@ -235,6 +253,155 @@ const INITIAL_ALERTS: ComplianceAlert[] = [
   },
 ]
 
+// ─── News seed (static, no API) ─────────────────────────────────────────────
+// Timestamps are computed relative to "now" so the feed always feels fresh.
+const MIN = 60_000
+const HOUR = 60 * MIN
+const DAY = 24 * HOUR
+
+const NEWS_SEED: NewsItem[] = [
+  {
+    id: 'n-1',
+    category: 'Регуляторика',
+    title: 'ЦБ РФ выдал первую лицензию криптобирже в экспериментальном режиме',
+    summary:
+      'Банк России зарегистрировал первую организацию, получившую право оказывать услуги обмена цифровых валют в рамках правового sandbox. Документ предусматривает обязательный комплаенс по 115-ФЗ и хранение средств на segregated-счетах.',
+    body: 'Лицензия выдана на 12 месяцев в экспериментальном правовом режиме (ЭПР). Требования: уставной капитал от 100 млн ₽, собственный ML-стек AML, ежедневная отчётность в ЦБ. РусКрипто стала одной из 3 площадок, подавших заявку на участие.',
+    source: 'ЦБ РФ • Пресс-релиз',
+    publishedAt: new Date(Date.now() - 2 * HOUR).toISOString(),
+    pinned: true,
+  },
+  {
+    id: 'n-2',
+    category: 'Регуляторика',
+    title: 'ФЗ-1194918-8 «О цифровых финансовых активах» вступил в силу',
+    summary:
+      'Опубликован федеральный закон, регулирующий выпуск и обращение ЦФА в РФ. Закон определяет статус цифровых валют, операторов обмена и обязанности по идентификации клиентов (KYC/AML).',
+    body: 'Ключевые нормы: обязательная верификация всех пользователей, лимиты на операции без идентификации отменены, биржи обязаны передавать данные в Росфинмониторинг. Штрафы за нарушения — до 1% оборота.',
+    source: 'Гарант • Документ',
+    publishedAt: new Date(Date.now() - 5 * HOUR).toISOString(),
+  },
+  {
+    id: 'n-3',
+    category: 'Платформа',
+    title: 'РусКрипто подключил коридор RU-CN для расчётов в цифровых юанях',
+    summary:
+      'Запущен пилотный платёжный коридор Россия — Китай с расчётами в CBDC. Время перевода сокращено с 3 дней до 8 секунд, комиссии — до 0,3%.',
+    body: 'Коридор интегрирован с системой mBridge (BIS). Первый пилотный платёж — 1,2 млн ₽ в эквиваленте e-CNY — проведён за 8 секунд. К концу 2026 года ожидается подключение ещё 12 банков-партнёров.',
+    source: 'РусКрипто • Блог',
+    publishedAt: new Date(Date.now() - 35 * MIN).toISOString(),
+  },
+  {
+    id: 'n-4',
+    category: 'Рынок',
+    title: 'Объём торгов на РусКрипто превысил 184 млн ₽ за сутки',
+    summary:
+      'Суточный оборот биржи обновил максимум с момента запуска, превысив 184 млн ₽. Лидерами торгов стали пары BTC/RUB и ETH/RUB.',
+    source: 'РусКрипто • Аналитика',
+    publishedAt: new Date(Date.now() - 12 * MIN).toISOString(),
+  },
+  {
+    id: 'n-5',
+    category: 'Партнёрство',
+    title: 'РусКрипто и Сбер заключили соглашение о ликвидности',
+    summary:
+      'Сбербанк предоставит банковскую инфраструктуру для обеспечения фиатной ликвидности. Соглашение включает интеграцию со СБП и кастодиальные услуги для институциональных клиентов.',
+    source: 'ТАСС',
+    publishedAt: new Date(Date.now() - 90 * MIN).toISOString(),
+  },
+  {
+    id: 'n-6',
+    category: 'Регуляторика',
+    title: 'Минфин РФ опубликовал методические указания по налогообложению ЦФА',
+    summary:
+      'Министерство финансов разъяснило порядок расчёта НДФЛ при операциях с цифровыми финансовыми активами. Ставка — 13/15%, налоговая база определяется по цене сделки.',
+    body: 'Указания касаются сделок купли-продажи, обмена и погашения ЦФА. Биржи выступают налоговыми агентами при выводе фиата. Документ вступает в силу с 1 января следующего года.',
+    source: 'Минфин РФ',
+    publishedAt: new Date(Date.now() - 8 * HOUR).toISOString(),
+  },
+  {
+    id: 'n-7',
+    category: 'Платформа',
+    title: 'Запущена маржинальная торговля с плечом до 20x',
+    summary:
+      'РусКрипто открыл маржинальный терминал для верифицированных пользователей с уровнем KYC 2. Поддерживаются 8 пар к рублю, автоматический margin call и изоляция маржи по позициям.',
+    source: 'РусКрипто • Обновления',
+    publishedAt: new Date(Date.now() - 3 * HOUR - 20 * MIN).toISOString(),
+  },
+  {
+    id: 'n-8',
+    category: 'Рынок',
+    title: 'Биткоин обновил локальный максимум на фоне притока в спотовые ETF',
+    summary:
+      'BTC вырос на 4,2% за сутки, обновив максимум месяца. Аналитики связывают рост с притоком $847 млн в спотовые биткоин-ETF и смягчением риторики ФРС США.',
+    source: 'Bloomberg',
+    publishedAt: new Date(Date.now() - 6 * HOUR).toISOString(),
+  },
+  {
+    id: 'n-9',
+    category: 'Партнёрство',
+    title: 'Интеграция с Тинькофф для мгновенных пополнений через СБП',
+    summary:
+      'Пользователи РусКрипто могут пополнять счёт с карт Тинькофф через СБП без комиссии. Лимит одной операции — 600 000 ₽, зачисление — мгновенно.',
+    source: 'РусКрипто • Блог',
+    publishedAt: new Date(Date.now() - 22 * HOUR).toISOString(),
+  },
+  {
+    id: 'n-10',
+    category: 'Платформа',
+    title: 'Обновлённый P2P-маркетплейс: 24 новых способа оплаты',
+    summary:
+      'Добавлены способы оплаты: СБП всех банков РФ, карты Мир, Visa, Mastercard российских банков, а также наличные в 8 городах. Расширена система арбитража и escrow.',
+    source: 'РусКрипто • Обновления',
+    publishedAt: new Date(Date.now() - 1 * DAY - 3 * HOUR).toISOString(),
+  },
+  {
+    id: 'n-11',
+    category: 'Регуляторика',
+    title: 'Росфинмониторинг обновил список идентификаторов для контроля',
+    summary:
+      'Внесены дополнения в перечень оснований для мер по замораживанию активов. Биржи обязаны обновить AML-правила в течение 30 дней и провести ретроспективную проверку клиентов.',
+    source: 'Росфинмониторинг',
+    publishedAt: new Date(Date.now() - 1 * DAY - 6 * HOUR).toISOString(),
+  },
+  {
+    id: 'n-12',
+    category: 'Рынок',
+    title: 'Эфириум вырос на фоне ожидаемого апгрейда сети Pectra',
+    summary:
+      'ETH прибавил 6,8% за неделю на ожиданиях активации обновления Pectra, которое повысит пропускную способность сети и снизит комиссии в L2-рулерах.',
+    source: 'CoinDesk',
+    publishedAt: new Date(Date.now() - 1 * DAY - 9 * HOUR).toISOString(),
+  },
+  {
+    id: 'n-13',
+    category: 'Платформа',
+    title: 'РусКрипто внедрил ML-скоринг транзакций в реальном времени',
+    summary:
+      'Запущена модель градиентного бустинга с SHAP-объяснениями для оценки риска каждой операции. Скоринг работает за 120 мс, покрывает 100% транзакций.',
+    source: 'РусКрипто • Технологии',
+    publishedAt: new Date(Date.now() - 2 * DAY - 4 * HOUR).toISOString(),
+  },
+  {
+    id: 'n-14',
+    category: 'Партнёрство',
+    title: 'Совместный пилот с ВТБ по токенизации коммерческих векселей',
+    summary:
+      'РусКрипто и банк ВТБ запустили пилот по выпуску цифровых коммерческих векселей на блокчейне. Первый выпуск — 50 млн ₽ для корпоративного клиента.',
+    source: 'Ведомости',
+    publishedAt: new Date(Date.now() - 2 * DAY - 11 * HOUR).toISOString(),
+  },
+  {
+    id: 'n-15',
+    category: 'Рынок',
+    title: 'Объём стейблкоинов на российских биржах вырос на 38% за квартал',
+    summary:
+      'Доля USDT в общем обороте легальных криптоплощадок РФ достигла 41%. Аналитики отмечают рост спроса на стейблкоины как инструмент хеджирования рублевой волатильности.',
+    source: 'РБК Crypto',
+    publishedAt: new Date(Date.now() - 3 * DAY).toISOString(),
+  },
+]
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -272,11 +439,13 @@ export const useAppStore = create<AppState>()(
           id: uid(),
           pair: o.pair,
           side: o.side,
+          type: o.type,
           price: o.price,
           quantity: o.quantity,
           total,
           fee,
           time: now(),
+          createdAt: new Date().toISOString(),
         }
         set((s) => {
           const [base, quote] = o.pair.split('/')
@@ -588,6 +757,48 @@ export const useAppStore = create<AppState>()(
           get().liquidatePosition(id)
         }
       },
+
+      // ─── Price alerts ────────────────────────────────────────────────────
+      priceAlerts: [],
+      addPriceAlert: (input) => {
+        if (!input.symbol || input.targetPrice <= 0) return
+        const alert: PriceAlert = {
+          id: uid(),
+          symbol: input.symbol.toUpperCase(),
+          condition: input.condition,
+          targetPrice: input.targetPrice,
+          note: input.note?.trim() || undefined,
+          active: true,
+          triggered: false,
+          createdAt: new Date().toISOString(),
+        }
+        set((s) => ({ priceAlerts: [alert, ...s.priceAlerts] }))
+        get().pushNotification(
+          'Создан алерт по цене',
+          `${alert.symbol} ${alert.condition === 'above' ? '≥' : '≤'} ${alert.targetPrice.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽`
+        )
+      },
+      removePriceAlert: (id) =>
+        set((s) => ({ priceAlerts: s.priceAlerts.filter((a) => a.id !== id) })),
+      togglePriceAlert: (id) =>
+        set((s) => ({
+          priceAlerts: s.priceAlerts.map((a) =>
+            a.id === id
+              ? { ...a, active: !a.active, triggered: a.active ? a.triggered : false }
+              : a
+          ),
+        })),
+      markPriceAlertTriggered: (id) =>
+        set((s) => ({
+          priceAlerts: s.priceAlerts.map((a) =>
+            a.id === id
+              ? { ...a, triggered: true, triggeredAt: new Date().toISOString(), active: false }
+              : a
+          ),
+        })),
+
+      // ─── News feed (static seed) ─────────────────────────────────────────
+      newsItems: NEWS_SEED,
     }),
     {
       name: 'ruscrypto-store',
@@ -607,6 +818,7 @@ export const useAppStore = create<AppState>()(
         sidebarCollapsed: s.sidebarCollapsed,
         marginPositions: s.marginPositions,
         marginAccount: s.marginAccount,
+        priceAlerts: s.priceAlerts,
       }),
     }
   )

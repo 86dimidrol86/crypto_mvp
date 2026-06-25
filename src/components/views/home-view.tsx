@@ -12,6 +12,7 @@ import {
   Building2,
   CheckCircle2,
   Scale,
+  Landmark,
 } from 'lucide-react'
 import { motion, useSpring, useTransform } from 'framer-motion'
 import { useAppStore } from '@/lib/store'
@@ -99,11 +100,10 @@ function Hero() {
               ЛЕГАЛЬНАЯ ПЛАТФОРМА РФ • ЗАПУСК 01.07.2026
             </Badge>
             <h1 className="text-4xl lg:text-6xl font-bold tracking-tight leading-[1.05]">
-              Российская криптобиржа
-              <br />
-              <span className="text-primary">по закону РФ</span>
+              Российская криптобиржа{' '}
+              <span className="text-primary whitespace-nowrap">по закону РФ</span>
             </h1>
-            <p className="mt-6 text-lg text-muted-foreground max-w-xl">
+            <p className="mt-4 text-lg text-muted-foreground max-w-xl">
               Спот-торги, P2P, кросс-бордер платежи и кастодия в единой
               экосистеме. Полное соответствие ФЗ-1194918-8, AML и валютному
               контролю.
@@ -446,6 +446,277 @@ function Features() {
   )
 }
 
+// ─── Top Movers (gainers + losers) — fills empty space after MarketGrid ──────
+function MoversSection() {
+  const setView = useAppStore((s) => s.setView)
+  const setSelectedPair = useAppStore((s) => s.setSelectedPair)
+  const [tickers, setTickers] = useState<CoinTicker[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let mounted = true
+    const load = async () => {
+      const t = await fetchTickers()
+      if (mounted) {
+        setTickers(t)
+        setLoading(false)
+      }
+    }
+    load()
+    const interval = setInterval(load, 15000)
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
+  }, [])
+
+  const { gainers, losers } = useMemo(() => {
+    const sorted = [...tickers].sort((a, b) => b.change24h - a.change24h)
+    return {
+      gainers: sorted.slice(0, 3),
+      losers: sorted.slice(-3).reverse(),
+    }
+  }, [tickers])
+
+  const goTrade = (symbol: string) => {
+    setSelectedPair(`${symbol}/RUB`)
+    setView('trade')
+  }
+
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.08, delayChildren: 0.05 },
+    },
+  }
+  const item = {
+    hidden: { opacity: 0, y: 12 },
+    show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 240, damping: 22 } },
+  }
+
+  return (
+    <section className="border-b border-border py-14">
+      <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
+        <div className="flex items-end justify-between mb-8 flex-wrap gap-4">
+          <div>
+            <h2 className="text-2xl lg:text-3xl font-bold">Топ роста / Топ падения</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Лидеры и аутсайдеры за 24 часа • обновление каждые 15 сек
+            </p>
+          </div>
+          <Badge variant="outline" className="border-primary/30 text-primary gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+            LIVE • BINANCE
+          </Badge>
+        </div>
+
+        {loading ? (
+          <div className="grid md:grid-cols-2 gap-6">
+            <Card className="p-6 h-48 animate-pulse bg-muted/30" />
+            <Card className="p-6 h-48 animate-pulse bg-muted/30" />
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Gainers */}
+            <Card className="p-6 border-success/20 bg-gradient-to-br from-success/5 to-transparent">
+              <div className="flex items-center gap-2 mb-5">
+                <div className="w-9 h-9 rounded-xl bg-success/15 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-success" />
+                </div>
+                <div>
+                  <div className="font-semibold text-base">Топ роста 24ч</div>
+                  <div className="text-[11px] text-muted-foreground">Лидеры рынка</div>
+                </div>
+              </div>
+              <motion.div
+                variants={container}
+                initial="hidden"
+                animate="show"
+                className="flex flex-col divide-y divide-border/60"
+              >
+                {gainers.map((c) => (
+                  <motion.button
+                    key={c.id}
+                    variants={item}
+                    onClick={() => goTrade(c.symbol)}
+                    className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 text-left hover:bg-success/5 -mx-2 px-2 rounded-lg transition group"
+                  >
+                    <CoinIcon symbol={c.symbol} size={32} />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm">{c.symbol}</div>
+                      <div className="text-[11px] text-muted-foreground truncate">{c.name}</div>
+                    </div>
+                    <Sparkline data={generateSpark(c.change24h)} width={72} height={24} />
+                    <div className="text-right shrink-0 min-w-[90px]">
+                      <div className="text-sm font-mono font-bold tabular-nums">
+                        {formatPrice(c.priceRub, 'rub')}
+                      </div>
+                      <div className="text-[11px] font-mono text-success font-semibold tabular-nums">
+                        {formatPercent(c.change24h)}
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-success group-hover:translate-x-0.5 transition shrink-0" />
+                  </motion.button>
+                ))}
+              </motion.div>
+            </Card>
+
+            {/* Losers */}
+            <Card className="p-6 border-destructive/20 bg-gradient-to-br from-destructive/5 to-transparent">
+              <div className="flex items-center gap-2 mb-5">
+                <div className="w-9 h-9 rounded-xl bg-destructive/15 flex items-center justify-center">
+                  <TrendingDown className="w-5 h-5 text-destructive" />
+                </div>
+                <div>
+                  <div className="font-semibold text-base">Топ падения 24ч</div>
+                  <div className="text-[11px] text-muted-foreground">Аутсайдеры рынка</div>
+                </div>
+              </div>
+              <motion.div
+                variants={container}
+                initial="hidden"
+                animate="show"
+                className="flex flex-col divide-y divide-border/60"
+              >
+                {losers.map((c) => (
+                  <motion.button
+                    key={c.id}
+                    variants={item}
+                    onClick={() => goTrade(c.symbol)}
+                    className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 text-left hover:bg-destructive/5 -mx-2 px-2 rounded-lg transition group"
+                  >
+                    <CoinIcon symbol={c.symbol} size={32} />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm">{c.symbol}</div>
+                      <div className="text-[11px] text-muted-foreground truncate">{c.name}</div>
+                    </div>
+                    <Sparkline data={generateSpark(c.change24h)} width={72} height={24} />
+                    <div className="text-right shrink-0 min-w-[90px]">
+                      <div className="text-sm font-mono font-bold tabular-nums">
+                        {formatPrice(c.priceRub, 'rub')}
+                      </div>
+                      <div className="text-[11px] font-mono text-destructive font-semibold tabular-nums">
+                        {formatPercent(c.change24h)}
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-destructive group-hover:translate-x-0.5 transition shrink-0" />
+                  </motion.button>
+                ))}
+              </motion.div>
+            </Card>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+// ─── Asset Security (3 mini-cards) ───────────────────────────────────────────
+const SECURITY_FEATURES = [
+  {
+    icon: Lock,
+    title: 'Холодное хранение 80%',
+    desc: 'Мультисиг 3-of-5, географическое распределение ключей, air-gapped подпись.',
+    accent: 'text-primary',
+    bg: 'bg-primary/10',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'HSM FSTEC-сертифицирован',
+    desc: 'Аппаратные модули Thales Luna 7, соответствие приказу ФСТЭК №21.',
+    accent: 'text-success',
+    bg: 'bg-success/10',
+  },
+  {
+    icon: Landmark,
+    title: 'Страхование $100M',
+    desc: 'Покрытие Marsh застраховано через Lloyd’s syndicate. Защита от hot-wallet взлома.',
+    accent: 'text-warning',
+    bg: 'bg-warning/10',
+  },
+]
+
+function AssetSecurity() {
+  return (
+    <section className="border-b border-border py-14 bg-sidebar/20">
+      <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
+        <div className="text-center mb-10">
+          <Badge variant="outline" className="mb-3 border-primary/30 text-primary gap-1.5">
+            <ShieldCheck className="w-3 h-3" />
+            БЕЗОПАСНОСТЬ АКТИВОВ
+          </Badge>
+          <h2 className="text-2xl lg:text-3xl font-bold">Защита клиентских средств</h2>
+          <p className="text-muted-foreground mt-2 max-w-2xl mx-auto text-sm">
+            Институциональный уровень защиты: холодное хранение, сертифицированные HSM,
+            страховое покрытие.
+          </p>
+        </div>
+        <div className="grid md:grid-cols-3 gap-5">
+          {SECURITY_FEATURES.map((f) => (
+            <Card key={f.title} className="p-6 hover:border-primary/30 transition group">
+              <div
+                className={cn(
+                  'w-12 h-12 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition',
+                  f.bg,
+                  f.accent
+                )}
+              >
+                <f.icon className="w-6 h-6" />
+              </div>
+              <h3 className="font-semibold text-base mb-2">{f.title}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ─── Partners & Regulators trust band ────────────────────────────────────────
+const PARTNERS = [
+  { name: 'Банк России', subtitle: 'Регулятор' },
+  { name: 'Росфинмониторинг', subtitle: 'Финразведка' },
+  { name: 'ЦФА-Реестр', subtitle: 'Блокчейн-реестр' },
+  { name: 'СБП', subtitle: 'Платёжная система' },
+  { name: 'Visa', subtitle: 'Карты' },
+  { name: 'Mastercard', subtitle: 'Карты' },
+  { name: 'Chainalysis', subtitle: 'AML-аналитика' },
+]
+
+function PartnersBand() {
+  return (
+    <section className="border-b border-border py-12">
+      <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
+        <div className="text-center mb-8">
+          <h2 className="text-xl lg:text-2xl font-bold">Поднадзорность и партнёры</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Платформа работает в правовом поле РФ и интегрирована с ключевыми
+            финансовыми и комплаенс-инфраструктурами
+          </p>
+        </div>
+        <Card className="p-6 lg:p-8 bg-card/60 backdrop-blur">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+            {PARTNERS.map((p) => (
+              <div
+                key={p.name}
+                className="flex flex-col items-center justify-center text-center px-3 py-4 rounded-xl border border-border/60 bg-muted/30 hover:border-primary/40 hover:bg-primary/5 transition group"
+              >
+                <Building2 className="w-5 h-5 text-muted-foreground group-hover:text-primary transition mb-2" />
+                <div className="text-xs font-semibold leading-tight">{p.name}</div>
+                <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                  {p.subtitle}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </section>
+  )
+}
+
 function CtaBand() {
   const setView = useAppStore((s) => s.setView)
   return (
@@ -489,7 +760,10 @@ export function HomeView() {
     <div>
       <Hero />
       <MarketGrid />
+      <MoversSection />
       <Features />
+      <AssetSecurity />
+      <PartnersBand />
       <CtaBand />
     </div>
   )

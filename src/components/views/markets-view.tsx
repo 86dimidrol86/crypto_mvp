@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Search,
   Star,
@@ -8,11 +8,18 @@ import {
   TrendingDown,
   ArrowRight,
   LineChart,
+  Bell,
+  BellRing,
+  Trash2,
+  Plus,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '@/lib/store'
 import { fetchTickers, jitterPrice } from '@/lib/market'
-import type { CoinTicker } from '@/lib/types'
-import { formatPrice, formatNumber, formatPercent } from '@/lib/format'
+import type { CoinTicker, PriceAlertCondition } from '@/lib/types'
+import { formatPrice, formatNumber, formatPercent, timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { CoinIcon } from '@/components/coin-icon'
 import { Sparkline } from '@/components/sparkline'
@@ -20,7 +27,17 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { TableSkeleton } from '@/components/page-skeleton'
 import { toast } from 'sonner'
 
@@ -81,9 +98,394 @@ function Volume24h({ rub }: { rub: number }) {
   return <>{rub.toFixed(0)} ₽</>
 }
 
+// ─── Price alert dialog (one per row) ────────────────────────────────────────
+function PriceAlertDialog({
+  symbol,
+  currentPrice,
+}: {
+  symbol: string
+  currentPrice: number
+}) {
+  const priceAlerts = useAppStore((s) => s.priceAlerts)
+  const addPriceAlert = useAppStore((s) => s.addPriceAlert)
+  const removePriceAlert = useAppStore((s) => s.removePriceAlert)
+  const togglePriceAlert = useAppStore((s) => s.togglePriceAlert)
+
+  const [open, setOpen] = useState(false)
+  const [condition, setCondition] = useState<PriceAlertCondition>('above')
+  const [targetPrice, setTargetPrice] = useState<string>(currentPrice > 0 ? currentPrice.toFixed(2) : '')
+  const [note, setNote] = useState('')
+
+  const symbolAlerts = priceAlerts.filter((a) => a.symbol === symbol)
+
+  // Pre-fill target price when dialog opens with fresh price
+  useEffect(() => {
+    if (open && currentPrice > 0) {
+      setTargetPrice(currentPrice.toFixed(2))
+      setCondition('above')
+      setNote('')
+    }
+  }, [open, currentPrice])
+
+  const handleAdd = () => {
+    const price = parseFloat(targetPrice.replace(',', '.'))
+    if (!price || price <= 0) {
+      toast.error('Укажите корректную цену')
+      return
+    }
+    addPriceAlert({
+      symbol,
+      condition,
+      targetPrice: price,
+      note: note.trim() || undefined,
+    })
+    toast.success(`Алерт создан: ${symbol} ${condition === 'above' ? '≥' : '≤'} ${price.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽`)
+    setNote('')
+    setOpen(false)
+  }
+
+  const activeCount = symbolAlerts.filter((a) => a.active && !a.triggered).length
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="relative h-7 w-7"
+        onClick={() => setOpen(true)}
+        title={`Алерты по ${symbol}`}
+      >
+        {activeCount > 0 ? (
+          <BellRing className="w-3.5 h-3.5 text-primary" />
+        ) : (
+          <Bell className="w-3.5 h-3.5 text-muted-foreground" />
+        )}
+        {symbolAlerts.length > 0 && (
+          <span className="absolute top-0.5 right-0.5 min-w-3.5 h-3.5 px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center">
+            {symbolAlerts.length}
+          </span>
+        )}
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BellRing className="w-5 h-5 text-primary" />
+              Алерт по {symbol}/RUB
+            </DialogTitle>
+            <DialogDescription>
+              Уведомим, когда цена пересечет заданный порог. Текущая цена:{' '}
+              <span className="font-mono tabular-nums text-foreground">
+                {currentPrice > 0
+                  ? `${currentPrice.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽`
+                  : '—'}
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Existing alerts for this symbol */}
+          {symbolAlerts.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                Текущие алерты ({symbolAlerts.length})
+              </div>
+              <div className="max-h-32 overflow-y-auto scrollbar-thin space-y-1.5">
+                {symbolAlerts.map((a) => (
+                  <div
+                    key={a.id}
+                    className={cn(
+                      'flex items-center gap-2 p-2 rounded-md border text-xs',
+                      a.triggered
+                        ? 'border-destructive/40 bg-destructive/5'
+                        : a.active
+                          ? 'border-primary/30 bg-primary/5'
+                          : 'border-border bg-muted/40 opacity-60'
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded font-mono font-semibold',
+                        a.condition === 'above'
+                          ? 'text-success bg-success/10'
+                          : 'text-destructive bg-destructive/10'
+                      )}
+                    >
+                      {a.condition === 'above' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+                      {a.condition === 'above' ? '≥' : '≤'}
+                    </span>
+                    <span className="font-mono tabular-nums font-semibold">
+                      {a.targetPrice.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽
+                    </span>
+                    {a.triggered ? (
+                      <Badge variant="outline" className="h-4 px-1 text-[9px] text-destructive border-destructive/40">
+                        сработал
+                      </Badge>
+                    ) : a.active ? (
+                      <Badge variant="outline" className="h-4 px-1 text-[9px] text-success border-success/40">
+                        активен
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="h-4 px-1 text-[9px] text-muted-foreground">
+                        пауза
+                      </Badge>
+                    )}
+                    <div className="ml-auto flex items-center gap-2">
+                      <Switch
+                        checked={a.active}
+                        onCheckedChange={() => togglePriceAlert(a.id)}
+                        className="scale-75"
+                        title={a.active ? 'Поставить на паузу' : 'Возобновить'}
+                      />
+                      <button
+                        onClick={() => {
+                          removePriceAlert(a.id)
+                          toast(`Алерт удалён: ${a.symbol} ${a.condition === 'above' ? '≥' : '≤'} ${a.targetPrice} ₽`)
+                        }}
+                        className="text-muted-foreground hover:text-destructive"
+                        title="Удалить"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* New alert form */}
+          <div className="space-y-3 pt-2 border-t border-border">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              Новый алерт
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setCondition('above')}
+                className={cn(
+                  'flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg border transition',
+                  condition === 'above'
+                    ? 'border-success bg-success/10 text-success'
+                    : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                )}
+              >
+                <ArrowUp className="w-4 h-4" />
+                <span className="text-xs font-semibold">Цена выше</span>
+                <span className="text-[10px] opacity-70">уведомить при росте</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCondition('below')}
+                className={cn(
+                  'flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg border transition',
+                  condition === 'below'
+                    ? 'border-destructive bg-destructive/10 text-destructive'
+                    : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                )}
+              >
+                <ArrowDown className="w-4 h-4" />
+                <span className="text-xs font-semibold">Цена ниже</span>
+                <span className="text-[10px] opacity-70">уведомить при падении</span>
+              </button>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="alert-price" className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                Целевая цена (₽)
+              </Label>
+              <Input
+                id="alert-price"
+                type="number"
+                inputMode="decimal"
+                value={targetPrice}
+                onChange={(e) => setTargetPrice(e.target.value)}
+                placeholder="0.00"
+                className="font-mono tabular-nums"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="alert-note" className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                Заметка (необязательно)
+              </Label>
+              <Input
+                id="alert-note"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="например: длинная позиция, стоп-лосс…"
+                maxLength={80}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Отмена
+            </Button>
+            <Button onClick={handleAdd} className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90">
+              <Plus className="w-4 h-4" />
+              Создать алерт
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+// ─── My alerts section ──────────────────────────────────────────────────────
+function MyAlertsSection({ tickers }: { tickers: CoinTicker[] }) {
+  const priceAlerts = useAppStore((s) => s.priceAlerts)
+  const removePriceAlert = useAppStore((s) => s.removePriceAlert)
+  const togglePriceAlert = useAppStore((s) => s.togglePriceAlert)
+
+  if (priceAlerts.length === 0) {
+    return (
+      <Card className="p-6 mt-5">
+        <div className="flex flex-col items-center text-center">
+          <div className="w-12 h-12 rounded-full bg-muted/60 flex items-center justify-center mb-2">
+            <Bell className="w-5 h-5 text-muted-foreground" />
+          </div>
+          <h3 className="font-semibold text-sm">Алерты по цене</h3>
+          <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+            Нажмите на колокольчик у любой пары выше, чтобы создать уведомление о достижении ценой заданного уровня.
+          </p>
+        </div>
+      </Card>
+    )
+  }
+
+  const active = priceAlerts.filter((a) => a.active && !a.triggered)
+  const triggeredAlerts = priceAlerts.filter((a) => a.triggered)
+  const paused = priceAlerts.filter((a) => !a.active && !a.triggered)
+
+  const priceFor = (symbol: string): number => {
+    const t = tickers.find((x) => x.symbol === symbol)
+    return t?.priceRub ?? 0
+  }
+
+  return (
+    <Card className="p-4 mt-5">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <BellRing className="w-4 h-4 text-primary" />
+          <h3 className="font-semibold text-sm">Мои алерты</h3>
+          <Badge variant="outline" className="text-[10px] text-muted-foreground">
+            {priceAlerts.length}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary" /> активных: {active.length}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-destructive" /> сработавших: {triggeredAlerts.length}
+          </span>
+          {paused.length > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" /> пауза: {paused.length}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="max-h-96 overflow-y-auto scrollbar-thin">
+        <div className="grid gap-1.5">
+          <AnimatePresence initial={false}>
+            {priceAlerts.map((a) => {
+              const cur = priceFor(a.symbol)
+              const distance = cur > 0 ? ((a.targetPrice - cur) / cur) * 100 : 0
+              const isTriggered = a.triggered
+              return (
+                <motion.div
+                  key={a.id}
+                  layout
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2 rounded-lg border text-sm',
+                    isTriggered
+                      ? 'border-destructive/40 bg-destructive/5 animate-pulse'
+                      : a.active
+                        ? 'border-border hover:bg-muted/40'
+                        : 'border-border opacity-60'
+                  )}
+                >
+                  <div className="flex items-center gap-2 shrink-0">
+                    <CoinIcon symbol={a.symbol} size={22} />
+                    <span className="font-semibold text-sm">{a.symbol}</span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold',
+                        a.condition === 'above'
+                          ? 'text-success bg-success/10'
+                          : 'text-destructive bg-destructive/10'
+                      )}
+                    >
+                      {a.condition === 'above' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+                      {a.condition === 'above' ? '≥' : '≤'}
+                    </span>
+                    <span className="font-mono tabular-nums font-semibold">
+                      {a.targetPrice.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground shrink-0">
+                    {cur > 0 ? (
+                      <>
+                        тек. <span className="font-mono tabular-nums">{cur.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽</span>
+                        <span className={cn('ml-1', Math.abs(distance) < 1 ? 'text-warning' : 'text-muted-foreground/70')}>
+                          ({distance >= 0 ? '+' : ''}{distance.toFixed(1)}%)
+                        </span>
+                      </>
+                    ) : (
+                      '—'
+                    )}
+                  </div>
+                  {a.note && (
+                    <span className="text-[11px] text-muted-foreground italic truncate max-w-[160px]">
+                      «{a.note}»
+                    </span>
+                  )}
+                  <div className="ml-auto flex items-center gap-2 shrink-0">
+                    {isTriggered ? (
+                      <Badge variant="outline" className="text-[10px] text-destructive border-destructive/40">
+                        сработал {a.triggeredAt ? timeAgo(a.triggeredAt) : ''}
+                      </Badge>
+                    ) : (
+                      <Switch
+                        checked={a.active}
+                        onCheckedChange={() => togglePriceAlert(a.id)}
+                        title={a.active ? 'Поставить на паузу' : 'Возобновить'}
+                      />
+                    )}
+                    <button
+                      onClick={() => {
+                        removePriceAlert(a.id)
+                        toast(`Алерт удалён: ${a.symbol}`)
+                      }}
+                      className="text-muted-foreground hover:text-destructive transition"
+                      title="Удалить"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </motion.div>
+              )
+            })}
+          </AnimatePresence>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
 export function MarketsView() {
   const setView = useAppStore((s) => s.setView)
   const setSelectedPair = useAppStore((s) => s.setSelectedPair)
+  const priceAlerts = useAppStore((s) => s.priceAlerts)
+  const markPriceAlertTriggered = useAppStore((s) => s.markPriceAlertTriggered)
+  const pushNotification = useAppStore((s) => s.pushNotification)
 
   const [tickers, setTickers] = useState<CoinTicker[]>([])
   const [query, setQuery] = useState('')
@@ -126,6 +528,44 @@ export function MarketsView() {
     }, 3500)
     return () => clearInterval(interval)
   }, [tickers.length])
+
+  // Background price-alert checker: compare live tickers vs active alerts.
+  // Uses a ref to keep the latest alerts/prices without re-running on every tick.
+  const alertsRef = useRef(priceAlerts)
+  const tickersRef = useRef<CoinTicker[]>(tickers)
+  useEffect(() => {
+    alertsRef.current = priceAlerts
+  }, [priceAlerts])
+  useEffect(() => {
+    tickersRef.current = tickers
+  }, [tickers])
+
+  useEffect(() => {
+    const check = () => {
+      const currentAlerts = alertsRef.current
+      const currentTickers = tickersRef.current
+      if (currentAlerts.length === 0 || currentTickers.length === 0) return
+      const activeAlerts = currentAlerts.filter((a) => a.active && !a.triggered)
+      if (activeAlerts.length === 0) return
+      for (const alert of activeAlerts) {
+        const t = currentTickers.find((x) => x.symbol === alert.symbol)
+        if (!t || t.priceRub <= 0) continue
+        const crossed =
+          (alert.condition === 'above' && t.priceRub >= alert.targetPrice) ||
+          (alert.condition === 'below' && t.priceRub <= alert.targetPrice)
+        if (crossed) {
+          markPriceAlertTriggered(alert.id)
+          const dir = alert.condition === 'above' ? 'достигла' : 'опустилась до'
+          const msg = `${alert.symbol} ${dir} ${alert.targetPrice.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽ (тек. ${t.priceRub.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽)`
+          toast.warning(`🔔 Алерт: ${alert.symbol}`, { description: msg })
+          pushNotification(`Алерт по ${alert.symbol}`, msg)
+        }
+      }
+    }
+    // Run on every 12s ticker refresh (poll interval) and every 3.5s jitter
+    const interval = setInterval(check, 3500)
+    return () => clearInterval(interval)
+  }, [markPriceAlertTriggered, pushNotification])
 
   const toggleFav = (symbol: string) => {
     setFavorites((prev) => {
@@ -315,7 +755,7 @@ export function MarketsView() {
         {/* Desktop table */}
         <Card className="overflow-hidden hidden lg:block">
           {/* Header */}
-          <div className="grid grid-cols-[1.6fr_1fr_0.8fr_0.8fr_0.8fr_1fr_0.7fr] gap-3 px-3 py-2.5 border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
+          <div className="grid grid-cols-[1.6fr_1fr_0.8fr_0.8fr_0.8fr_1fr_0.5fr_0.7fr] gap-3 px-3 py-2.5 border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
             <button onClick={() => toggleSort('name')} className="flex items-center gap-1 text-left">
               Пара {sortKey === 'name' && <span>{sortDir === 'asc' ? '▲' : '▼'}</span>}
             </button>
@@ -330,6 +770,7 @@ export function MarketsView() {
             <button onClick={() => toggleSort('volume')} className="flex items-center gap-1 text-right justify-end">
               Объём 24ч {sortKey === 'volume' && <span>{sortDir === 'asc' ? '▲' : '▼'}</span>}
             </button>
+            <span className="text-center">Алерты</span>
             <span className="text-right">Действие</span>
           </div>
 
@@ -347,7 +788,7 @@ export function MarketsView() {
                 return (
                   <div
                     key={r.symbol}
-                    className="grid grid-cols-[1.6fr_1fr_0.8fr_0.8fr_0.8fr_1fr_0.7fr] gap-3 px-3 py-2.5 items-center border-b border-border/60 last:border-0 hover:bg-muted/40 transition group"
+                    className="grid grid-cols-[1.6fr_1fr_0.8fr_0.8fr_0.8fr_1fr_0.5fr_0.7fr] gap-3 px-3 py-2.5 items-center border-b border-border/60 last:border-0 hover:bg-muted/40 transition group"
                   >
                     {/* Pair + fav star */}
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -410,6 +851,10 @@ export function MarketsView() {
                       <div className="text-right text-xs font-mono tabular-nums">
                         <Volume24h rub={r.volume24hRub} />
                       </div>
+                    </div>
+                    {/* Alert bell */}
+                    <div className="flex justify-center">
+                      <PriceAlertDialog symbol={r.symbol} currentPrice={r.priceRub} />
                     </div>
                     {/* Action */}
                     <div className="text-right">
@@ -506,23 +951,33 @@ export function MarketsView() {
                     </div>
                   </div>
 
-                  <Button
-                    onClick={() => goTrade(r.pair)}
-                    className="w-full h-9 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 text-sm"
-                  >
-                    Торговать {r.symbol}
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => goTrade(r.pair)}
+                      className="flex-1 h-9 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 text-sm"
+                    >
+                      Торговать {r.symbol}
+                      <ArrowRight className="w-4 h-4" />
+                    </Button>
+                    <PriceAlertDialog symbol={r.symbol} currentPrice={r.priceRub} />
+                  </div>
                 </Card>
               )
             })
           )}
         </div>
 
+        {/* My alerts section */}
+        <MyAlertsSection tickers={tickers} />
+
         {/* Footer hint */}
         <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
           <Badge variant="outline" className="border-border text-muted-foreground">
             <Star className="w-3 h-3 mr-1 fill-primary text-primary" /> Фавориты хранятся локально
+          </Badge>
+          <span>•</span>
+          <Badge variant="outline" className="border-border text-muted-foreground">
+            <Bell className="w-3 h-3 mr-1 text-primary" /> Алерты проверяются каждые 3.5 сек
           </Badge>
           <span>•</span>
           <span>Котировки: Binance 24hr ticker · USD/RUB: exchangerate-api</span>
