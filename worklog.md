@@ -1434,3 +1434,31 @@ Summary of delivered UX:
 - Profile → Security → "Активные сессии": real sessions derived from last-24h successful logins grouped by device. "Текущая" badge, mounted-guarded timeAgo, "Завершить" button preserved. Loading skeleton + empty state.
 - Profile → Referrals: real code (RU-CMQTEI) + link (ruscrypto.ru/r/RU-CMQTEI) from User.referralCode, copy button copies real code. Stats: invited=3, active=3, earned=2 500 ₽. NEW "Ваши приглашённые" list shows all 3 seeded referrals with email, reward (+500/+800/+1 200 ₽ in green mono), status badge, timeAgo.
 - All other tabs preserved. Hydration-safe (mounted-guarded timeAgo per FIX-hydration pattern). Dark navy + gold #F0B90B primary theme, no indigo/blue primary introduced.
+
+---
+Task ID: USER+PLANNED-2 (10 tasks)
+Agent: Orchestrator + 6 full-stack-developer subagents (V3-MARGIN, V2-PADDING, M3-ADMIN, M2-PORTFOLIO, M1-PROFILE, M5-SKELETONS)
+Task: Execute 5 user-requested tasks + 5 planned tasks.
+
+Work Log:
+USER TASKS (V1-V5):
+- V1 (orchestrator): Created SVG logo (hexagonal shield + ₽ + candles, gold gradient). Extended COINS to top-20 (added TRX/LINK/DOT/MATIC/LTC/BCH/ATOM/UNI/NEAR/APT/FIL/ARB + fallback prices). Rewrote PriceTicker as full-width marquee (rc-ticker 80s loop, 60 items = 20×3, RUB/USD tabs from store). Rewrote Header: compact h-12, logo left (desktop+mobile), ticker full-width, LanguageSwitcher+ThemeToggle+alerts+bell+auth right. NewsTicker compacted (h-6). Sidebar offset updated to top-[72px].
+- V2 (subagent): Compacted padding on 12 views (home/markets/p2p/payments/wallet/portfolio/analytics/kyc/compliance/profile/news/auth) — py-8→py-4, p-6→p-4, gap-6→gap-3, text-3xl→text-xl titles. Trade+margin untouched.
+- V3 (subagent): Rebuilt margin-view with resize+rearrange (useMarginLayout hook, margin-layout-* localStorage, SortableBlock+GripVertical, ColumnPanelGroup, MarginResizeHandle, 6 blocks in 2 columns, Сбросить layout button, compact padding). Renamed nav to "Марж. торговля".
+- V4 (orchestrator): Fixed TradingView chart in analytics — switched from broken embed-chart.html to widgetembed URL (same as trade-view), renamed to "BTCUSDT".
+- V5 (orchestrator): Fixed unreadable chart labels — hsl(var(--X)) → var(--X) (oklch vars don't work in hsl wrapper), added color: var(--foreground) to tooltipStyle in analytics+portfolio.
+
+PLANNED TASKS (M1-M5):
+- M2 (subagent): /api/portfolio/history — real equity curve from trades+transactions (backward undo + forward replay, current-price valuation). Updated portfolio-view to useApi, ChartSkeleton, disclaimer, real PnL summary.
+- M3 (subagent): /api/admin/stats (18 Prisma queries) + admin-view (KPI cards, recent trades/users/payments tables, KYC donut, top pairs bar, alerts table, 20s auto-refresh). Added 'admin' to NAV + VIEW_COMPONENTS.
+- M1 (subagent): Prisma LoginEvent + Referral models + referralCode on User. Seed 8 login events + 3 referrals. 3 API endpoints (login-history, referral, sessions). Rewrote profile-view security+referral tabs with real API data.
+- M5 (subagent): 8 new skeletons (BalanceCard/TxRow/OfferRow/AlertCard/KpiCard/Chart/Step/PositionRow). Applied skeleton states to 9 views. framer-motion stagger on lists, AnimatedNumber in StatCard.
+- M4 (orchestrator): i18n infrastructure — i18n.ts (RU/EN dicts, 60 keys), useI18n hook, LanguageSwitcher component (Globe + dropdown), locale in store+persist. Applied to nav labels (i18n keys), header (login/alerts), footer, auth-view (all strings). Core views translated; others remain RU (pragmatic scope).
+
+QA: agent-browser — all 14 views (incl new admin + renamed margin) render with 0 errors. Logo SVG (2 instances), ticker marquee (60 items = 20 coins ×3), admin panel ("Доступ: Compliance Officer"), margin resize (5 handles/6 grips), TradingView BTCUSDT live iframe. Lint clean. VLM confirmed logo + compact header.
+
+Stage Summary:
+- ALL 10 TASKS COMPLETE (5 user + 5 planned).
+- 14 views total (added admin). Real Prisma data in analytics, portfolio, profile, admin. i18n RU/EN infrastructure. Skeletons + animations. Compact density throughout. Resizable margin terminal. Fixed TradingView + chart labels.
+- Git: commit 849e221 pushed to origin/spa-mvp (spa-mvp ff'd from main).
+- NEXT: i18n can be extended to remaining views (trade/wallet/p2p/etc) — currently core only. Portfolio historical prices are current-price-approximated (no historical feed). Admin nav not role-gated (visible to all in demo).
