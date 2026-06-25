@@ -339,31 +339,33 @@ function MarketGrid() {
                   <Card
                     key={coin.id}
                     className={cn(
-                      'p-2.5 cursor-pointer transition-all hover:border-primary/40 hover:-translate-y-0.5 group flex items-center gap-2.5',
+                      'p-2.5 cursor-pointer transition-all hover:border-primary/40 hover:-translate-y-0.5 group flex flex-row items-stretch gap-2 py-2.5',
                       status === 'up' && 'ring-1 ring-success/40',
                       status === 'down' && 'ring-1 ring-destructive/40'
                     )}
                     onClick={() => goTrade(coin.symbol)}
                   >
-                    <CoinIcon symbol={coin.symbol} size={28} className="shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-semibold text-sm">{coin.symbol}</span>
-                        <span
-                          className={cn(
-                            'flex items-center gap-0.5 text-[10px] font-medium px-1 py-0.5 rounded',
-                            up ? 'text-success bg-success/10' : 'text-destructive bg-destructive/10'
-                          )}
-                        >
-                          {up ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-                          {formatPercent(coin.change24h)}
-                        </span>
-                      </div>
-                      <div className="text-sm font-mono font-bold tabular-nums truncate">
+                    {/* Left column: icon + name+% + price */}
+                    <div className="flex flex-col items-center justify-center shrink-0 w-[60px]">
+                      <CoinIcon symbol={coin.symbol} size={32} />
+                      <span className="font-semibold text-xs mt-1">{coin.symbol}</span>
+                      <span
+                        className={cn(
+                          'flex items-center gap-0.5 text-[10px] font-medium px-1 py-0.5 rounded mt-0.5',
+                          up ? 'text-success bg-success/10' : 'text-destructive bg-destructive/10'
+                        )}
+                      >
+                        {up ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+                        {formatPercent(coin.change24h)}
+                      </span>
+                      <div className="text-xs font-mono font-bold tabular-nums mt-0.5 text-center leading-tight">
                         {formatPrice(price, currency)}
                       </div>
                     </div>
-                    <Sparkline data={generateSpark(coin.change24h)} width={48} height={24} />
+                    {/* Right: larger sparkline filling remaining space */}
+                    <div className="flex-1 min-w-0 flex items-center justify-center overflow-hidden">
+                      <Sparkline data={generateSpark(coin.change24h)} width={140} height={60} />
+                    </div>
                   </Card>
                 )
               })}

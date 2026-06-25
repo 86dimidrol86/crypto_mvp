@@ -202,11 +202,11 @@ export function HelpChatWidget() {
         onClick={() => setOpen((v) => !v)}
         aria-label={locale === 'ru' ? 'Открыть чат с помощником' : 'Open AI assistant'}
         className={cn(
-          'fixed bottom-4 right-4 lg:bottom-6 lg:right-6 z-50',
-          'w-12 h-12 lg:w-14 lg:h-14 rounded-full',
-          'bg-primary text-primary-foreground shadow-lg shadow-primary/30',
+          'fixed bottom-3 right-3 lg:bottom-4 lg:right-4 z-50',
+          'w-9 h-9 lg:w-10 lg:h-10 rounded-full',
+          'bg-primary text-primary-foreground shadow-md shadow-primary/20',
           'flex items-center justify-center',
-          'ring-2 ring-primary/20 hover:ring-primary/40 transition-all'
+          'ring-1 ring-primary/20 hover:ring-primary/40 transition-all'
         )}
       >
         <AnimatePresence mode="wait" initial={false}>
@@ -218,7 +218,7 @@ export function HelpChatWidget() {
               exit={{ rotate: 90, opacity: 0 }}
               transition={{ duration: 0.15 }}
             >
-              <X className="w-5 h-5 lg:w-6 lg:h-6" />
+              <X className="w-4 h-4 lg:w-[18px] lg:h-[18px]" />
             </motion.span>
           ) : (
             <motion.span
@@ -228,7 +228,7 @@ export function HelpChatWidget() {
               exit={{ rotate: -90, opacity: 0 }}
               transition={{ duration: 0.15 }}
             >
-              <HelpCircle className="w-5 h-5 lg:w-6 lg:h-6" />
+              <HelpCircle className="w-4 h-4 lg:w-[18px] lg:h-[18px]" />
             </motion.span>
           )}
         </AnimatePresence>

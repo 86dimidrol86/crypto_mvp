@@ -311,12 +311,12 @@ export function ProfileView() {
         <div className="grid lg:grid-cols-[220px_1fr] gap-4">
           {/* Sidebar */}
           <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0">
-            {TABS.map((t) => {
-              const active = tab === t.id
+            {TABS.map((tabItem) => {
+              const active = tab === tabItem.id
               return (
                 <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
+                  key={tabItem.id}
+                  onClick={() => setTab(tabItem.id)}
                   className={cn(
                     'flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap shrink-0 lg:w-full',
                     active
@@ -324,8 +324,8 @@ export function ProfileView() {
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
                   )}
                 >
-                  <t.icon className={cn('w-[18px] h-[18px]', active && 'text-primary')} />
-                  <span className="flex-1 text-left">{t(t.labelKey)}</span>
+                  <tabItem.icon className={cn('w-[18px] h-[18px]', active && 'text-primary')} />
+                  <span className="flex-1 text-left">{t(tabItem.labelKey)}</span>
                   {active && <div className="hidden lg:block w-1 h-5 rounded-full bg-primary" />}
                 </button>
               )

@@ -348,11 +348,18 @@ function Footer() {
 
 export default function CryptoExchangeApp() {
   const activeView = useAppStore((s) => s.activeView)
+  const setView = useAppStore((s) => s.setView)
   const collapsed = useAppStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useAppStore((s) => s.toggleSidebar)
   const userRole = useAppStore((s) => s.userRole)
   const isAdmin = userRole === 'ADMIN' || userRole === 'COMPLIANCE'
   const ViewComponent = VIEW_COMPONENTS[activeView] || HomeView
+
+  // Лого: переход на главную + toggle свернуть/развернуть
+  const handleLogoClick = () => {
+    setView('home')
+    toggleSidebar()
+  }
 
   // Прокрутка наверх при смене view
   useEffect(() => {
@@ -367,47 +374,41 @@ export default function CryptoExchangeApp() {
         {/* Desktop sidebar */}
         <aside
           className={cn(
-            'hidden lg:flex shrink-0 flex-col border-r border-border bg-sidebar/40 sticky top-[72px] h-[calc(100vh-72px)] overflow-y-auto scrollbar-thin transition-[width] duration-200',
+            'hidden lg:flex shrink-0 flex-col border-r border-border bg-sidebar/40 sticky top-[72px] h-[calc(100vh-72px)] overflow-hidden transition-[width] duration-200',
             collapsed ? 'w-[68px]' : 'w-64'
           )}
         >
-          {/* Logo in sidebar */}
-          <div className={cn('border-b border-border', collapsed ? 'p-2 flex justify-center' : 'px-3 py-2.5 flex items-center justify-between gap-2')}>
-            {collapsed ? (
-              <button onClick={() => setView('home')} aria-label="РусКрипто — на главную">
-                <Logo size={32} showText={false} />
-              </button>
-            ) : (
-              <button onClick={() => setView('home')} className="hover:opacity-80 transition">
-                <Logo size={30} />
-              </button>
+          {/* Logo at top — click toggles sidebar + goes home */}
+          <button
+            onClick={handleLogoClick}
+            className={cn(
+              'shrink-0 border-b border-border hover:bg-muted/40 transition',
+              collapsed ? 'p-2 flex justify-center' : 'px-3 py-2.5 flex items-center gap-2.5'
             )}
-            {!collapsed && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleSidebar}
-                className="h-7 w-7 text-muted-foreground hover:text-foreground shrink-0"
-                aria-label="Свернуть меню"
-              >
-                <PanelLeftClose className="w-4 h-4" />
-              </Button>
-            )}
+            aria-label="РусКрипто — на главную / свернуть меню"
+            title={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
+          >
+            <Logo size={collapsed ? 30 : 30} showText={!collapsed} />
+          </button>
+
+          {/* Nav content (scrollable) */}
+          <div className="flex-1 overflow-y-auto scrollbar-thin">
+            <SidebarContent collapsed={collapsed} />
           </div>
-          {collapsed && (
-            <div className="flex justify-center p-2 border-b border-border">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleSidebar}
-                className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                aria-label="Развернуть меню"
-              >
-                <PanelLeftOpen className="w-4 h-4" />
-              </Button>
-            </div>
-          )}
-          <SidebarContent collapsed={collapsed} />
+
+          {/* Collapse toggle at bottom (duplicates logo click) */}
+          <div className={cn('shrink-0 border-t border-border', collapsed ? 'p-2 flex justify-center' : 'p-2 flex justify-end')}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleSidebar}
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
+              title={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
+            >
+              {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+            </Button>
+          </div>
         </aside>
 
         {/* Main */}

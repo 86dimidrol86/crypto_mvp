@@ -28,7 +28,7 @@ export function Sparkline({ data, color, width = 120, height = 36 }: SparklinePr
   const areaPoints = `0,${height} ${points} ${width},${height}`
   const gradId = `sg-${Math.random().toString(36).slice(2, 8)}`
   return (
-    <svg width={width} height={height} className="overflow-visible">
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="overflow-visible shrink-0 max-w-full" style={{ width, height }}>
       <defs>
         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={stroke} stopOpacity="0.3" />
