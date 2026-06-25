@@ -1,9 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
+// РусКрипто — схема БД криптобиржи (SQLite для демо)
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,19 +9,158 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  phone        String?
+  passwordHash String?
+  kycLevel     Int      @default(0) // 0=guest, 1=L1 doc, 2=L2 full
+  kycStatus    String   @default("UNINITIATED") // UNINITIATED|PHONE_VERIFIED|DOC_VERIFIED|SELFIE_VERIFIED|ACTIVE
+  qualified    Boolean  @default(false) // квалифицированный инвестор
+  role         String   @default("USER") // USER|COMPLIANCE|ADMIN
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  balances     Balance[]
+  orders       Order[]
+  trades       Trade[]
+  transactions Transaction[]
+  p2pOffers    P2POffer[]
+  p2pDeals     P2PDeal[]   @relation("dealBuyer")
+  payments     CrossBorderPayment[]
+  alerts       ComplianceAlert[]  @relation("alertReviewer")
 }
 
-model Post {
+model Balance {
+  id      String @id @default(cuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  asset   String // RUB, USDT, BTC, ETH...
+  amount  Float @default(0)
+  locked  Float @default(0) // зарезервировано в ордерах
+
+  @@unique([userId, asset])
+}
+
+model Order {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pair          String   // BTC/RUB
+  side          String   // buy|sell
+  type          String   // limit|market
+  price         Float?
+  quantity      Float
+  filledQty     Float    @default(0)
+  status        String   @default("OPEN") // OPEN|FILLED|CANCELLED|PARTIAL
+  clientOrderId String?  // idempotency key
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  trades        Trade[]
+}
+
+model Trade {
   id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pair      String
+  side      String
+  price     Float
+  quantity  Float
+  total     Float
+  fee       Float    @default(0)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+}
+
+model Transaction {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // deposit|withdrawal|trade|fee
+  asset     String
+  amount    Float
+  status    String   @default("COMPLETED") // PENDING|COMPLETED|FAILED
+  address   String?
+  txHash    String?
+  createdAt DateTime @default(now())
+}
+
+model P2POffer {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // buy|sell
+  asset     String   // USDT
+  fiat      String   @default("RUB")
+  price     Float
+  amount    Float
+  method    String   // СБП|Тинькофф|Сбер
+  minLimit  Float    @default(1000)
+  maxLimit  Float    @default(200000)
+  completed Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  deals     P2PDeal[]
+}
+
+model P2PDeal {
+  id            String   @id @default(cuid())
+  offerId       String
+  offer         P2POffer @relation(fields: [offerId], references: [id])
+  buyerId       String
+  buyer         User     @relation("dealBuyer", fields: [buyerId], references: [id])
+  asset         String
+  amount        Float
+  price         Float
+  total         Float
+  paymentMethod String
+  status        String   @default("PENDING") // PENDING|PAID|COMPLETED|CANCELLED|DISPUTE
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model CrossBorderPayment {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  corridor    String   // RU-CN|RU-AE|RU-TR|RU-IN
+  fromCurrency String  // RUB
+  toCurrency   String  // CNY
+  amount       Float
+  receiveAmount Float
+  fee          Float
+  rate         Float
+  beneficiary  String
+  purpose      String
+  status       String   @default("INITIATED") // INITIATED|CC_PENDING|LIQUIDITY|CONVERTING|SENDING|SETTLED|FAILED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ComplianceAlert {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation("alertReviewer", fields: [userId], references: [id])
+  type        String   // VELOCITY|THRESHOLD|SANCTION|PATTERN|STRUCTURING
+  severity    String   @default("MEDIUM") // LOW|MEDIUM|HIGH|CRITICAL
+  riskScore   Float    @default(0)
+  description String
+  entityType  String   // transaction|withdrawal|deposit|user
+  entityId    String?
+  status      String   @default("OPEN") // OPEN|REVIEWING|APPROVED|REJECTED|ESCALATED|SAR
+  reviewerId  String?
+  reviewedAt  DateTime?
+  ruleId      String?
+  createdAt   DateTime @default(now())
+}
+
+model KycDocument {
+  id        String   @id @default(cuid())
+  userId    String
+  docType   String   // passport|driver_license|id_card
+  status    String   @default("PENDING") // PENDING|VERIFIED|REJECTED
+  createdAt DateTime @default(now())
 }
