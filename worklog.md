@@ -928,3 +928,23 @@ Summary of delivered UX:
 
 Files modified:
 - /home/z/my-project/src/components/views/trade-view.tsx — refactored `debouncedSave` in `useTradeLayout()` from single-timer to per-key-timer Map (lines ~159-173). No other changes needed; the rest of the rebuild was already in place and verified working.
+
+---
+Task ID: USER-REQ-2 (4 features)
+Agent: Orchestrator + 2 full-stack-developer subagents (MARGIN, TRADE-REBUILD)
+Task: Implement margin trading, collapsible sidebar, compact+resizable trade-view, mock→real analytics migration.
+
+Work Log:
+- AUDIT: Identified mock data hotspots — analytics-view (STATS/PAIR_DIST/CORRIDORS hardcoded), profile-view (MOCK_LOGIN_HISTORY/SESSIONS, referral), home hero stats. Logged audit to worklog.
+- Collapsible sidebar (orchestrator): added sidebarCollapsed/toggleSidebar to store (+persist), rebuilt SidebarContent with collapsed mode (icons-only + TooltipProvider tooltips, dot indicator for compliance alerts), collapse toggle button (PanelLeftClose/Open) in sidebar header, transition-[width]. Mobile Sheet unchanged.
+- MARGIN (subagent): added MarginPosition/MarginAccount types + store actions (openMarginPosition, closeMarginPosition, liquidatePosition, updateMarginPrices with auto-liquidation). Created margin-view.tsx (~620 lines): pair selector + live WS price, leverage 1-20x slider+buttons, Long/Short form with margin/qty/liquidation preview, account summary (equity/used/available/margin level bar), open positions table with live PnL flash + margin-ratio progress + close button, position history, risk warnings. Registered 'margin' in page.tsx NAV.
+- TRADE-REBUILD (subagent): rebuilt trade-view layout — react-resizable-panels (2 columns, resize dividers), @dnd-kit drag-reorder within columns (GripVertical handles), useTradeLayout hook persisting sizes+order to localStorage, 'Сбросить layout' button, compact padding throughout. Fixed debounce per-key bug.
+- Mock→real analytics (orchestrator): created /api/analytics endpoint computing real metrics from Prisma (totalVolume/volume24h/totalFees from trades, pairDistribution grouped by pair, corridors from payments, volume/users time series, periods aggregation). Updated analytics-view to useApi('/api/analytics') with 15s refresh, real-data summary banner, Database icon indicator.
+
+Stage Summary:
+- ALL 4 USER REQUESTS COMPLETE.
+- Margin trading: full feature with leverage, liquidation, risk control, live PnL.
+- Collapsible sidebar: w-64↔w-68px, tooltips, persisted.
+- Trade-view: compact + resizable (4 handles) + draggable (10 grips) + persisted layout + reset.
+- Analytics: 100% real data from Prisma + Binance + ЦБ РФ (no more hardcoded STATS).
+- QA: agent-browser verified collapse, margin, trade resize/drag, analytics real data. Lint clean. Git: fa4269a pushed to spa-mvp.
