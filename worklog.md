@@ -1678,3 +1678,25 @@ Stage Summary:
 - Brand names ("РусКрипто", "Госуслуги", "СБП", "Tinkoff", "Binance", "Gazprombank"), currency codes/symbols (₽, $, BTC, USDT, ETH, RUB, USD, CNY, AED, TRY, INR, KZT, AMD), technical acronyms (KYC, AML, SAR, SHAP, WORM, OCR, ESIA, EU/CC/saga), and universal tech names (Bitcoin Network, Ethereum ERC-20, BNB Smart Chain, Bitcoin, Ethereum, Tether USD, Telegram, WhatsApp, Email, Push, SMS) kept untranslated as instructed.
 - Profile-view language switcher now actually changes the app locale (calls setLocale(language)) — was previously only updating local state.
 - Lint clean, dev server clean (no errors/warnings), curl 200, all Cyrillic removed from 6 views.
+
+---
+Task ID: USER-BATCH-3 (8 tasks)
+Agent: Orchestrator + 3 full-stack-developer subagents (HELP-CENTER, I18N-FULL partial, I18N-REMAINING)
+Task: Execute 8 user-requested tasks.
+
+Work Log:
+1. Trade+Margin full-width: removed max-w-[1600px] mx-auto containers → px-2 lg:px-3 py-2 (full available width).
+2. Home MarketGrid compact: rewrote widgets to horizontal layout (CoinIcon + symbol+change + price + sparkline in one row, p-2.5). 2 rows (8 coins) default, "Показать все 20 монет" expand button → 5 rows (20 coins). ChevronUp/ChevronDown icons.
+3. Logo in sidebar: added Logo block at top of sidebar (collapsed=logo only 32px, expanded=logo 30px + "РусКрипто" + collapse button). Removed desktop logo from header (mobile keeps compact logo).
+4. Extended seed (prisma/seed-extended.ts): 29 users (user/admin/compliance/gosuslugi + 25 random), 60 trades over 30 days, 8 compliance alerts, 3 cross-border payments, 8 login events, 3 referrals, 18 P2P offers, balances for 10 users.
+5. Demo accounts + role-gating: 3 quick-login buttons in auth-view (Пользователь/Администратор/Комплаенс). store: userRole + userId added (+persist). /api/auth GET?email= + POST accepts any email. NAV admin item filtered by isAdmin (ADMIN/COMPLIANCE only). handleSubmit/handleQuickLogin call API + login(email,name,role,id).
+6. i18n full EN: i18n.ts extended to ~500 keys (nav, header, footer, auth, home, trade, markets, margin, p2p, payments, wallet, portfolio, analytics, kyc, compliance, profile, news, admin, help, common). ALL 16 views use useI18n + t(). Helper functions take t as param (rules-of-hooks safe). LanguageSwitcher fully toggles RU/EN across entire app.
+7. Favicon: created public/favicon.svg (golden hexagonal shield + ₽ + candles, same as logo). Updated layout.tsx metadata.icons → /favicon.svg.
+8. Help Center + AI bot: help-content.ts (14 bilingual articles by section + 6 popular Q&A + 12 section summaries). help-view (search, 11 section tabs, expandable article cards with Definition/How-To/FAQ). /api/help/chat (z-ai-web-dev-sdk LLM, bilingual system prompt, history, markdown response). HelpChatWidget (floating gold ? button bottom-right on all views except help, chat panel 380×540 with suggestion chips, typing indicator, markdown render). 'help' added to NAV + VIEW_COMPONENTS.
+
+QA: agent-browser — login as user (Админка hidden ✓), EN locale (home hero "Russian crypto exchange under RF law" ✓), favicon /favicon.svg ✓, market grid 8→20 coins expand ✓, help center opens ✓, AI bot chat panel opens + API returns markdown answer ✓. Lint clean. Fixed: nav.help key was missing from i18n dict (added RU/EN), DealStatusBadge renamed (rules-of-hooks).
+
+Stage Summary:
+- ALL 8 TASKS COMPLETE.
+- 16 views (added help). Full-width trade/margin. Compact home market grid with expand. Logo in sidebar. 29 DB users + 60 trades. 3 demo accounts with role-gating. 100% i18n RU/EN. RusCrypto favicon. Help center + AI chatbot (z-ai-web-dev-sdk LLM).
+- Git: commit 94b5fce pushed to origin/spa-mvp.
