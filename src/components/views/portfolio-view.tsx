@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useApi } from '@/lib/use-api'
 import {
   PieChart as PieChartIcon,
   TrendingUp,
@@ -19,8 +20,6 @@ import {
   Pie,
   Cell,
   ResponsiveContainer,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   Tooltip,
@@ -75,17 +74,48 @@ interface Holding {
   allocation: number
 }
 
-function generatePortfolioHistory(currentValue: number): { day: string; value: number }[] {
-  const startValue = currentValue * 0.82
-  return Array.from({ length: 30 }, (_, i) => {
-    const progress = (i + 1) / 30
-    const base = startValue + (currentValue - startValue) * progress
-    const noise = (Math.sin(i * 1.3) * 0.5 + (Math.random() - 0.5)) * currentValue * 0.025
-    return {
-      day: `${i + 1}`,
-      value: Math.round(base + noise),
-    }
-  })
+interface PortfolioPoint {
+  timestamp: number
+  label: string
+  value: number
+  pnl: number
+  pnlPct: number
+}
+
+interface PortfolioHistory {
+  series: PortfolioPoint[]
+  summary: {
+    startValue: number
+    currentValue: number
+    totalPnl: number
+    totalPnlPct: number
+    tradeCount: number
+    txCount: number
+    feesPaid: number
+  }
+}
+
+function ChartSkeleton() {
+  return (
+    <Card className="p-4 mb-3">
+      <div className="flex items-center justify-between mb-3">
+        <div className="space-y-1.5">
+          <div className="h-4 w-36 bg-muted rounded animate-pulse" />
+          <div className="h-3 w-24 bg-muted/70 rounded animate-pulse" />
+        </div>
+        <div className="h-6 w-20 bg-muted rounded animate-pulse" />
+      </div>
+      <div className="h-[200px] flex items-end gap-1.5">
+        {Array.from({ length: 18 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex-1 bg-primary/15 rounded-t animate-pulse"
+            style={{ height: `${30 + Math.abs(Math.sin(i * 0.7)) * 50 + 10}%` }}
+          />
+        ))}
+      </div>
+    </Card>
+  )
 }
 
 function downloadCSV(filename: string, content: string) {
@@ -172,14 +202,18 @@ export function PortfolioView() {
       color: ALLOC_COLORS[h.asset] || DEFAULT_COLOR,
     }))
 
-  // Performance chart data
-  const historyData = useMemo(() => generatePortfolioHistory(totalRub || 1_000_000), [totalRub])
+  // Real portfolio equity curve from API (trades + transactions)
+  const { data: history, loading: historyLoading } = useApi<PortfolioHistory>(
+    '/api/portfolio/history',
+    { refresh: 30000 }
+  )
 
-  // Tax summary
-  const totalFees = orders.reduce((s, o) => s + o.fee, 0)
-  const tradesCount = orders.length
-  // Mock realized PnL — based on fees captured as proxy of activity
-  const realizedPnL = tradesCount > 0 ? totalFees * 9 + 18_420 : 18_420
+  // Tax summary — real values from API when available, fallback to store
+  const totalFees = history?.summary.feesPaid ?? orders.reduce((s, o) => s + o.fee, 0)
+  const tradesCount = history?.summary.tradeCount ?? orders.length
+  const realizedPnL =
+    history?.summary.totalPnl ?? (tradesCount > 0 ? totalFees * 9 + 18_420 : 18_420)
+  const totalPnlPct = history?.summary.totalPnlPct ?? 0
 
   // Risk metrics
   const largestPosition = holdings.length > 0 ? holdings[0] : null
@@ -229,15 +263,15 @@ export function PortfolioView() {
 
   return (
     <div className="flex-1">
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-8 py-8">
+      <div className="max-w-[1400px] mx-auto px-3 lg:px-5 py-4">
         {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
           <div>
-            <h1 className="text-2xl lg:text-3xl font-bold flex items-center gap-2.5">
-              <PieChartIcon className="w-7 h-7 text-primary" />
+            <h1 className="text-xl lg:text-2xl font-bold flex items-center gap-2.5">
+              <PieChartIcon className="w-6 h-6 text-primary" />
               Портфель
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Обзор активов, доходности и налоговой отчётности
             </p>
           </div>
@@ -251,38 +285,38 @@ export function PortfolioView() {
         </div>
 
         {/* Total value + PnL */}
-        <Card className="relative overflow-hidden p-6 lg:p-8 mb-6 bg-gradient-to-br from-primary/10 via-card to-card border-primary/20">
+        <Card className="relative overflow-hidden p-4 lg:p-5 mb-3 bg-gradient-to-br from-primary/10 via-card to-card border-primary/20">
           <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-primary/10 blur-3xl" aria-hidden />
-          <div className="relative grid lg:grid-cols-3 gap-6 items-center">
+          <div className="relative grid lg:grid-cols-3 gap-4 items-center">
             <div>
               <div className="text-xs text-muted-foreground uppercase tracking-wider">Общая стоимость портфеля</div>
-              <div className="text-4xl lg:text-5xl font-bold mt-2 tabular-nums">
+              <div className="text-3xl lg:text-4xl font-bold mt-1.5 tabular-nums">
                 {formatPrice(totalRub, 'rub')}
               </div>
-              <div className="text-sm text-muted-foreground mt-1.5">
+              <div className="text-xs text-muted-foreground mt-1">
                 ≈ {formatPrice(totalUsd, 'usd')}
               </div>
             </div>
-            <div className="lg:border-l lg:border-border lg:pl-6">
+            <div className="lg:border-l lg:border-border lg:pl-4">
               <div className="text-xs text-muted-foreground uppercase tracking-wider">Доходность 24ч</div>
               <div
                 className={cn(
-                  'text-3xl font-bold mt-2 flex items-center gap-2 tabular-nums',
+                  'text-2xl font-bold mt-1.5 flex items-center gap-2 tabular-nums',
                   pnlUp ? 'text-success' : 'text-destructive'
                 )}
               >
-                {pnlUp ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
+                {pnlUp ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
                 {formatPercent(pnl24hPct)}
               </div>
-              <div className="text-sm text-muted-foreground mt-1.5">
+              <div className="text-xs text-muted-foreground mt-1">
                 {pnlUp ? '+' : ''}
                 {formatPrice((totalRub * pnl24hPct) / 100, 'rub')} за день
               </div>
             </div>
-            <div className="lg:border-l lg:border-border lg:pl-6">
+            <div className="lg:border-l lg:border-border lg:pl-4">
               <div className="text-xs text-muted-foreground uppercase tracking-wider">Активы в портфеле</div>
-              <div className="text-3xl font-bold mt-2 tabular-nums">{distinctAssets}</div>
-              <div className="text-sm text-muted-foreground mt-1.5">
+              <div className="text-2xl font-bold mt-1.5 tabular-nums">{distinctAssets}</div>
+              <div className="text-xs text-muted-foreground mt-1">
                 {holdings.filter((h) => h.change24h >= 0).length} растут •{' '}
                 {holdings.filter((h) => h.change24h < 0).length} падают
               </div>
@@ -291,47 +325,47 @@ export function PortfolioView() {
         </Card>
 
         {/* Risk metrics row */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <Card className="p-5">
-            <div className="flex items-center justify-between mb-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-2">
               <div className="text-xs text-muted-foreground">Диверсификация</div>
               <Layers className="w-4 h-4 text-primary" />
             </div>
-            <div className="text-2xl font-bold tabular-nums">{Math.round(diversificationScore)}<span className="text-base text-muted-foreground">/100</span></div>
-            <Progress value={diversificationScore} className="mt-3 h-1.5" />
+            <div className="text-xl font-bold tabular-nums">{Math.round(diversificationScore)}<span className="text-sm text-muted-foreground">/100</span></div>
+            <Progress value={diversificationScore} className="mt-2 h-1.5" />
           </Card>
-          <Card className="p-5">
-            <div className="flex items-center justify-between mb-3">
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-2">
               <div className="text-xs text-muted-foreground">Крупнейшая позиция</div>
               <Activity className="w-4 h-4 text-warning" />
             </div>
-            <div className="text-2xl font-bold tabular-nums">{largestPct.toFixed(1)}%</div>
-            <div className="text-xs text-muted-foreground mt-3">
+            <div className="text-xl font-bold tabular-nums">{largestPct.toFixed(1)}%</div>
+            <div className="text-xs text-muted-foreground mt-2">
               {largestPosition?.asset || '—'} • {largestPosition ? formatPrice(largestPosition.valueRub, 'rub') : '—'}
             </div>
           </Card>
-          <Card className="p-5">
-            <div className="flex items-center justify-between mb-3">
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-2">
               <div className="text-xs text-muted-foreground">Стейблкоины</div>
               <ShieldAlert className="w-4 h-4 text-success" />
             </div>
-            <div className="text-2xl font-bold tabular-nums text-success">{stablePct.toFixed(1)}%</div>
-            <div className="text-xs text-muted-foreground mt-3">Защитная подушка</div>
+            <div className="text-xl font-bold tabular-nums text-success">{stablePct.toFixed(1)}%</div>
+            <div className="text-xs text-muted-foreground mt-2">Защитная подушка</div>
           </Card>
-          <Card className="p-5">
-            <div className="flex items-center justify-between mb-3">
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-2">
               <div className="text-xs text-muted-foreground">Крипто-экспозиция</div>
               <Coins className="w-4 h-4 text-violet-400" />
             </div>
-            <div className="text-2xl font-bold tabular-nums">{cryptoPct.toFixed(1)}%</div>
-            <div className="text-xs text-muted-foreground mt-3">Волатильные активы</div>
+            <div className="text-xl font-bold tabular-nums">{cryptoPct.toFixed(1)}%</div>
+            <div className="text-xs text-muted-foreground mt-2">Волатильные активы</div>
           </Card>
         </div>
 
         {/* Allocation + Holdings table */}
-        <div className="grid lg:grid-cols-5 gap-6 mb-6">
-          <Card className="lg:col-span-2 p-6">
-            <div className="flex items-center justify-between mb-4">
+        <div className="grid lg:grid-cols-5 gap-3 mb-3">
+          <Card className="lg:col-span-2 p-4">
+            <div className="flex items-center justify-between mb-3">
               <h2 className="font-semibold">Распределение активов</h2>
               <PieChartIcon className="w-4 h-4 text-muted-foreground" />
             </div>
@@ -353,10 +387,11 @@ export function PortfolioView() {
                   </Pie>
                   <Tooltip
                     contentStyle={{
-                      background: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
+                      background: 'var(--card)',
+                      border: '1px solid var(--border)',
                       borderRadius: 8,
                       fontSize: 12,
+                      color: 'var(--foreground)',
                     }}
                     formatter={(v: number) => formatPrice(v, 'rub')}
                   />
@@ -367,7 +402,7 @@ export function PortfolioView() {
                 <div className="text-lg font-bold tabular-nums">{formatPrice(totalRub, 'rub')}</div>
               </div>
             </div>
-            <div className="mt-5 space-y-2.5">
+            <div className="mt-4 space-y-2">
               {donutData.map((d) => (
                 <div key={d.name} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2.5">
@@ -384,7 +419,7 @@ export function PortfolioView() {
           </Card>
 
           <Card className="lg:col-span-3 p-0 overflow-hidden">
-            <div className="p-6 pb-4 flex items-center justify-between">
+            <div className="p-4 pb-3 flex items-center justify-between">
               <h2 className="font-semibold">Активы</h2>
               <Button variant="ghost" size="sm" onClick={() => setView('wallet')} className="text-primary">
                 В кошелёк
@@ -394,11 +429,11 @@ export function PortfolioView() {
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-border">
-                    <TableHead className="pl-6">Актив</TableHead>
+                    <TableHead className="pl-4">Актив</TableHead>
                     <TableHead className="text-right">Кол-во</TableHead>
                     <TableHead className="text-right">≈ ₽</TableHead>
                     <TableHead className="text-right">24ч</TableHead>
-                    <TableHead className="text-right pr-6">Доля</TableHead>
+                    <TableHead className="text-right pr-4">Доля</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -406,9 +441,9 @@ export function PortfolioView() {
                     const up = h.change24h >= 0
                     return (
                       <TableRow key={h.asset} className="border-border">
-                        <TableCell className="pl-6">
-                          <div className="flex items-center gap-2.5">
-                            <CoinIcon symbol={h.asset} size={28} />
+                        <TableCell className="pl-4">
+                          <div className="flex items-center gap-2">
+                            <CoinIcon symbol={h.asset} size={24} />
                             <span className="font-semibold">{h.asset}</span>
                           </div>
                         </TableCell>
@@ -428,7 +463,7 @@ export function PortfolioView() {
                             {formatPercent(h.change24h)}
                           </span>
                         </TableCell>
-                        <TableCell className="pr-6 text-right">
+                        <TableCell className="pr-4 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
                               <div
@@ -453,104 +488,122 @@ export function PortfolioView() {
           </Card>
         </div>
 
-        {/* Performance chart */}
-        <Card className="p-6 mb-6">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="font-semibold">Доходность портфеля</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Последние 30 дней</p>
+        {/* Performance chart — real equity curve from trades + transactions */}
+        {historyLoading || !history ? (
+          <ChartSkeleton />
+        ) : (
+          <Card className="p-4 mb-3">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="font-semibold">Доходность портфеля</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  На основе {history.summary.tradeCount} сделок и {history.summary.txCount} транзакций
+                </p>
+              </div>
+              <Badge
+                variant="outline"
+                className={cn(
+                  'gap-1.5',
+                  totalPnlPct >= 0
+                    ? 'border-success/30 text-success bg-success/5'
+                    : 'border-destructive/30 text-destructive bg-destructive/5'
+                )}
+              >
+                {totalPnlPct >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                {formatPercent(totalPnlPct)}
+              </Badge>
             </div>
-            <Badge variant="outline" className="gap-1.5 border-success/30 text-success bg-success/5">
-              <TrendingUp className="w-3 h-3" />
-              +{((totalRub - historyData[0]?.value) / Math.max(historyData[0]?.value || 1, 1) * 100).toFixed(2)}%
-            </Badge>
-          </div>
-          <div className="h-[280px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={historyData} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="portGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#F0B90B" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#F0B90B" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.4} vertical={false} />
-                <XAxis
-                  dataKey="day"
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                  interval={4}
-                />
-                <YAxis
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => formatNumber(v / 1000, 0) + 'K'}
-                  width={56}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                  formatter={(v: number) => [formatPrice(v, 'rub'), 'Стоимость']}
-                  labelFormatter={(l) => `День ${l}`}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke="#F0B90B"
-                  strokeWidth={2.5}
-                  fill="url(#portGrad)"
-                  dot={false}
-                  activeDot={{ r: 4, fill: '#F0B90B' }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
+            <div className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={history.series} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="portGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#F0B90B" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="#F0B90B" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.4} vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    stroke="var(--muted-foreground)"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                    interval={history.series.length > 8 ? Math.floor(history.series.length / 8) : 0}
+                    minTickGap={16}
+                  />
+                  <YAxis
+                    stroke="var(--muted-foreground)"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => formatNumber(v / 1000, 0) + 'K'}
+                    width={56}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: 'var(--card)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                    formatter={(v: number) => [formatPrice(v, 'rub'), 'Стоимость']}
+                    labelFormatter={(l) => `${l}`}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#F0B90B"
+                    strokeWidth={2.5}
+                    fill="url(#portGrad)"
+                    dot={false}
+                    activeDot={{ r: 4, fill: '#F0B90B' }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-xs text-muted-foreground mt-3">
+              Стоимость активов рассчитывается по текущим курсам (исторические котировки недоступны в демо).
+            </p>
+          </Card>
+        )}
 
         {/* Tax report */}
-        <Card className="p-6 lg:p-8 bg-card relative overflow-hidden">
+        <Card className="p-4 lg:p-5 bg-card relative overflow-hidden">
           <div className="absolute -bottom-16 -right-16 w-56 h-56 rounded-full bg-primary/5 blur-3xl" aria-hidden />
-          <div className="relative grid lg:grid-cols-3 gap-6">
+          <div className="relative grid lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2">
-              <div className="flex items-center gap-2.5 mb-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center">
                   <FileText className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h2 className="font-semibold text-lg">Налоговый отчёт 3-НДФЛ</h2>
+                  <h2 className="font-semibold text-base">Налоговый отчёт 3-НДФЛ</h2>
                   <p className="text-xs text-muted-foreground">Автоматическое формирование для ФНС</p>
                 </div>
               </div>
-              <p className="text-sm text-muted-foreground leading-relaxed mb-5">
+              <p className="text-xs text-muted-foreground leading-relaxed mb-4">
                 Платформа автоматически формирует декларацию 3-НДФЛ по сделкам с криптовалютами
                 в соответствии с ФЗ-1194918-8 ст.7. Все реализованные прибыли/убытки,
                 комиссии и транзакции учитываются. Данные можно выгрузить в CSV для импорта
                 в личный кабинет налогоплательщика.
               </p>
-              <div className="grid grid-cols-3 gap-4 mb-5">
-                <div className="rounded-xl bg-muted/50 p-4">
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="rounded-xl bg-muted/50 p-3">
                   <div className="text-xs text-muted-foreground">Реализованный PnL</div>
-                  <div className="text-lg font-bold mt-1 tabular-nums text-success">
+                  <div className="text-base font-bold mt-1 tabular-nums text-success">
                     +{formatNumber(realizedPnL, 0)} ₽
                   </div>
                 </div>
-                <div className="rounded-xl bg-muted/50 p-4">
+                <div className="rounded-xl bg-muted/50 p-3">
                   <div className="text-xs text-muted-foreground">Комиссии уплачено</div>
-                  <div className="text-lg font-bold mt-1 tabular-nums">
+                  <div className="text-base font-bold mt-1 tabular-nums">
                     {formatNumber(totalFees, 2)} ₽
                   </div>
                 </div>
-                <div className="rounded-xl bg-muted/50 p-4">
+                <div className="rounded-xl bg-muted/50 p-3">
                   <div className="text-xs text-muted-foreground">Сделок совершено</div>
-                  <div className="text-lg font-bold mt-1 tabular-nums">{tradesCount}</div>
+                  <div className="text-base font-bold mt-1 tabular-nums">{tradesCount}</div>
                 </div>
               </div>
               <Button
@@ -561,12 +614,12 @@ export function PortfolioView() {
                 Скачать 3-НДФЛ (CSV)
               </Button>
             </div>
-            <div className="lg:border-l lg:border-border lg:pl-6 flex flex-col justify-between gap-4">
+            <div className="lg:border-l lg:border-border lg:pl-4 flex flex-col justify-between gap-3">
               <div>
-                <div className="text-xs text-muted-foreground uppercase tracking-wider mb-3">
+                <div className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
                   Регуляторная база
                 </div>
-                <div className="space-y-2.5">
+                <div className="space-y-2">
                   <div className="flex items-start gap-2 text-sm">
                     <CircleDollarSign className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                     <span>ФЗ-1194918-8 ст.7 — налогообложение</span>
@@ -581,7 +634,7 @@ export function PortfolioView() {
                   </div>
                 </div>
               </div>
-              <div className="rounded-xl bg-success/5 border border-success/20 p-3 text-xs text-success">
+              <div className="rounded-xl bg-success/5 border border-success/20 p-2.5 text-xs text-success">
                 Отчёт формируется на основе данных за текущий налоговый период (календарный год).
               </div>
             </div>

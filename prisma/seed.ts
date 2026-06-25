@@ -17,7 +17,14 @@ async function main() {
       role: 'USER',
     },
   })
-  console.log(`  ✓ User: ${user.email} (KYC Lv.${user.kycLevel})`)
+
+  // Устанавливаем реферальный код (RU- + первые 6 символов id)
+  const referralCode = `RU-${user.id.slice(0, 6).toUpperCase()}`
+  await db.user.update({
+    where: { id: user.id },
+    data: { referralCode },
+  })
+  console.log(`  ✓ User: ${user.email} (KYC Lv.${user.kycLevel}) referralCode=${referralCode}`)
 
   // Compliance officer
   const officer = await db.user.upsert({
@@ -235,6 +242,35 @@ async function main() {
     },
   })
   console.log(`  ✓ 2 cross-border payments created`)
+
+  // События входа (LoginEvent) — реалистичная активность за последние 7 дней
+  const now = Date.now()
+  const minutesAgo = (m: number) => new Date(now - m * 60 * 1000)
+  const loginEvents = [
+    { ip: '85.140.12.84', device: 'iPhone 15 Pro', browser: 'Safari Mobile', location: 'Москва, РФ', success: true, createdAt: minutesAgo(35) },
+    { ip: '85.140.12.84', device: 'Windows 11', browser: 'Chrome 121', location: 'Москва, РФ', success: true, createdAt: minutesAgo(180) },
+    { ip: '178.66.24.12', device: 'Android 14', browser: 'РусКрипто App', location: 'Санкт-Петербург, РФ', success: true, createdAt: minutesAgo(1500) },
+    { ip: '95.153.132.8', device: 'macOS Sonoma', browser: 'Firefox 122', location: 'Казань, РФ', success: true, createdAt: minutesAgo(2880) },
+    { ip: '203.0.113.42', device: 'Unknown', browser: 'Unknown', location: 'Неизвестно', success: false, createdAt: minutesAgo(4200) },
+    { ip: '198.51.100.7', device: 'Unknown', browser: 'curl/8.5', location: 'Неизвестно', success: false, createdAt: minutesAgo(4320) },
+    { ip: '85.140.12.84', device: 'iPhone 15 Pro', browser: 'Safari Mobile', location: 'Москва, РФ', success: true, createdAt: minutesAgo(5760) },
+    { ip: '85.140.12.84', device: 'Windows 11', browser: 'Edge 121', location: 'Москва, РФ', success: true, createdAt: minutesAgo(8640) },
+  ]
+  for (const e of loginEvents) {
+    await db.loginEvent.create({ data: { ...e, userId: user.id } })
+  }
+  console.log(`  ✓ ${loginEvents.length} login events created`)
+
+  // Рефералы
+  const referrals = [
+    { code: referralCode, referrerId: user.id, referredEmail: 'alex.smirnov@gmail.com', reward: 1200, status: 'REWARDED', createdAt: minutesAgo(7200) },
+    { code: referralCode, referrerId: user.id, referredEmail: 'maria.kozlova@yandex.ru', reward: 800, status: 'REWARDED', createdAt: minutesAgo(5400) },
+    { code: referralCode, referrerId: user.id, referredEmail: 'dmitry.volkov@mail.ru', reward: 500, status: 'VERIFIED', createdAt: minutesAgo(2160) },
+  ]
+  for (const r of referrals) {
+    await db.referral.create({ data: r })
+  }
+  console.log(`  ✓ ${referrals.length} referrals created (total reward ${referrals.reduce((s, r) => s + r.reward, 0)} ₽)`)
 
   console.log('\n✅ Seed complete!')
   console.log(`   Demo user: ${user.email}`)

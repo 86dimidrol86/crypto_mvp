@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import {
   Wallet as WalletIcon,
   ArrowDownToLine,
@@ -39,6 +40,7 @@ import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { toast } from 'sonner'
+import { BalanceCardSkeleton, TxRowSkeleton } from '@/components/page-skeleton'
 
 const ASSETS = ['USDT', 'BTC', 'ETH', 'RUB'] as const
 type Asset = (typeof ASSETS)[number]
@@ -137,18 +139,18 @@ function TotalBalanceCard({ balances }: { balances: Balance[] }) {
   const totalUsd = totalRub / (usdRub || 1)
 
   return (
-    <Card className="relative overflow-hidden p-6 bg-gradient-to-br from-primary/10 via-card to-card border-primary/20">
+    <Card className="relative overflow-hidden p-4 lg:p-5 bg-gradient-to-br from-primary/10 via-card to-card border-primary/20">
       <div className="absolute -bottom-16 -right-16 w-56 h-56 rounded-full bg-primary/10 blur-3xl" />
-      <div className="relative flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+      <div className="relative flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider mb-2">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider mb-1.5">
             <WalletIcon className="w-3.5 h-3.5 text-primary" />
             Общая стоимость портфеля
           </div>
-          <div className="text-4xl font-mono font-bold tabular-nums">
+          <div className="text-3xl font-mono font-bold tabular-nums">
             {formatPrice(totalRub, 'rub')}
           </div>
-          <div className="text-sm text-muted-foreground mt-1 font-mono tabular-nums">
+          <div className="text-xs text-muted-foreground mt-1 font-mono tabular-nums">
             ≈ {formatPrice(totalUsd, 'usd')}
           </div>
         </div>
@@ -207,7 +209,7 @@ function AssetsTab({ balances }: { balances: Balance[] }) {
   return (
     <Card className="overflow-hidden">
       <ScrollArea className="max-h-[640px]">
-        <div className="grid grid-cols-12 px-4 py-3 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border bg-muted/30">
+        <div className="grid grid-cols-12 px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border bg-muted/30">
           <span className="col-span-4">Актив</span>
           <span className="col-span-3 text-right">Доступно</span>
           <span className="col-span-3 text-right">≈ RUB</span>
@@ -219,10 +221,10 @@ function AssetsTab({ balances }: { balances: Balance[] }) {
           return (
             <div
               key={b.asset}
-              className="grid grid-cols-12 px-4 py-3.5 items-center border-b border-border/60 last:border-0 hover:bg-muted/40 transition"
+              className="grid grid-cols-12 px-3 py-3 items-center border-b border-border/60 last:border-0 hover:bg-muted/40 transition"
             >
-              <div className="col-span-4 flex items-center gap-3">
-                <CoinIcon symbol={b.asset} size={32} />
+              <div className="col-span-4 flex items-center gap-2.5">
+                <CoinIcon symbol={b.asset} size={28} />
                 <div>
                   <div className="font-semibold text-sm">{b.asset}</div>
                   <div className="text-[11px] text-muted-foreground">
@@ -307,9 +309,9 @@ function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
   const isRub = asset === 'RUB'
 
   return (
-    <div className="grid lg:grid-cols-2 gap-4">
-      <Card className="p-5 space-y-5">
-        <div className="space-y-2">
+    <div className="grid lg:grid-cols-2 gap-3">
+      <Card className="p-4 space-y-4">
+        <div className="space-y-1.5">
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">
             Актив для пополнения
           </Label>
@@ -319,20 +321,20 @@ function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
                 key={a}
                 onClick={() => handleAssetChange(a)}
                 className={cn(
-                  'flex flex-col items-center gap-1.5 py-3 rounded-lg border transition',
+                  'flex flex-col items-center gap-1 py-2.5 rounded-lg border transition',
                   asset === a
                     ? 'border-primary bg-primary/10 text-primary'
                     : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted/60'
                 )}
               >
-                <CoinIcon symbol={a} size={24} />
+                <CoinIcon symbol={a} size={22} />
                 <span className="text-xs font-medium">{a}</span>
               </button>
             ))}
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">
             Сеть
           </Label>
@@ -342,7 +344,7 @@ function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
                 key={n.id}
                 onClick={() => setNetwork(n.id)}
                 className={cn(
-                  'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg border transition text-left',
+                  'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg border transition text-left',
                   network === n.id
                     ? 'border-primary bg-primary/10'
                     : 'border-border bg-muted/30 hover:bg-muted/60'
@@ -375,7 +377,7 @@ function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
         </Button>
       </Card>
 
-      <Card className="p-5 space-y-4">
+      <Card className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">
             Адрес пополнения
@@ -388,8 +390,8 @@ function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
         </div>
 
         {!depositAddress ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <QrCode className="w-10 h-10 text-muted-foreground/40 mb-3" />
+          <div className="flex flex-col items-center justify-center py-10 text-center">
+            <QrCode className="w-9 h-9 text-muted-foreground/40 mb-2.5" />
             <p className="text-sm text-muted-foreground">
               Нажмите «Сгенерировать адрес»
             </p>
@@ -412,7 +414,7 @@ function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
               </Button>
             </div>
 
-            <div className="flex justify-center py-2">
+            <div className="flex justify-center py-1">
               <img
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
                   isRub ? 'TINKOFF:' + depositAddress : depositAddress
@@ -426,7 +428,7 @@ function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
 
             <Separator />
 
-            <div className="space-y-2 text-xs">
+            <div className="space-y-1.5 text-xs">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Актив</span>
                 <span className="font-medium">{asset}</span>
@@ -451,7 +453,7 @@ function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
               )}
             </div>
 
-            <div className="rounded-lg bg-warning/10 border border-warning/30 px-3 py-2.5 text-[11px] text-warning flex gap-2">
+            <div className="rounded-lg bg-warning/10 border border-warning/30 px-3 py-2 text-[11px] text-warning flex gap-2">
               <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
               <span>
                 Отправляйте только {asset} по сети {network}. Отправка других активов
@@ -564,9 +566,9 @@ function WithdrawTab({
   }
 
   return (
-    <div className="grid lg:grid-cols-[1fr_360px] gap-4">
-      <Card className="p-5 space-y-5">
-        <div className="space-y-2">
+    <div className="grid lg:grid-cols-[1fr_360px] gap-3">
+      <Card className="p-4 space-y-4">
+        <div className="space-y-1.5">
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">
             Актив для вывода
           </Label>
@@ -576,20 +578,20 @@ function WithdrawTab({
                 key={a}
                 onClick={() => handleAssetChange(a)}
                 className={cn(
-                  'flex flex-col items-center gap-1.5 py-3 rounded-lg border transition',
+                  'flex flex-col items-center gap-1 py-2.5 rounded-lg border transition',
                   asset === a
                     ? 'border-primary bg-primary/10 text-primary'
                     : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted/60'
                 )}
               >
-                <CoinIcon symbol={a} size={24} />
+                <CoinIcon symbol={a} size={22} />
                 <span className="text-xs font-medium">{a}</span>
               </button>
             ))}
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">
             Сеть вывода
           </Label>
@@ -620,7 +622,7 @@ function WithdrawTab({
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">
               Адрес получателя
@@ -637,7 +639,7 @@ function WithdrawTab({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">
               Сумма вывода
@@ -675,7 +677,7 @@ function WithdrawTab({
           )}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">
             2FA-код (Google Authenticator)
           </Label>
@@ -688,7 +690,7 @@ function WithdrawTab({
           />
         </div>
 
-        <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+        <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
           <div className="flex items-center gap-2">
             <Switch checked={whitelist} onCheckedChange={setWhitelist} />
             <span className="text-xs">Белый список адресов</span>
@@ -707,11 +709,11 @@ function WithdrawTab({
         </Button>
       </Card>
 
-      <Card className="p-5 space-y-4 h-fit">
+      <Card className="p-4 space-y-3 h-fit">
         <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Сводка вывода
         </div>
-        <div className="space-y-3">
+        <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Сумма</span>
             <span className="font-mono tabular-nums">{formatAmount(amountNum, asset)}</span>
@@ -749,8 +751,8 @@ function WithdrawTab({
 function HistoryTab({ transactions }: { transactions: Transaction[] }) {
   if (transactions.length === 0) {
     return (
-      <Card className="p-12 text-center">
-        <History className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
+      <Card className="p-10 text-center">
+        <History className="w-9 h-9 mx-auto text-muted-foreground/40 mb-2.5" />
         <p className="text-sm text-muted-foreground">История операций пуста</p>
         <p className="text-[11px] text-muted-foreground/70 mt-1">
           Пополните кошелёк или совершите сделку, чтобы увидеть записи
@@ -762,14 +764,17 @@ function HistoryTab({ transactions }: { transactions: Transaction[] }) {
   return (
     <Card className="overflow-hidden">
       <ScrollArea className="max-h-[640px]">
-        {transactions.map((tx) => {
+        {transactions.map((tx, i) => {
           const isPositive = tx.amount > 0
           return (
-            <div
+            <motion.div
               key={tx.id}
-              className="flex items-center gap-3 px-4 py-3 border-b border-border/60 last:border-0 hover:bg-muted/40"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, delay: Math.min(i * 0.03, 0.4), ease: 'easeOut' }}
+              className="flex items-center gap-3 px-3 py-2.5 border-b border-border/60 last:border-0 hover:bg-muted/40"
             >
-              <div className="w-9 h-9 rounded-full bg-muted/60 flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-full bg-muted/60 flex items-center justify-center shrink-0">
                 {txIcon(tx.type)}
               </div>
               <div className="flex-1 min-w-0">
@@ -809,7 +814,7 @@ function HistoryTab({ transactions }: { transactions: Transaction[] }) {
                 </div>
                 <div className="text-[10px] text-muted-foreground">{tx.time}</div>
               </div>
-            </div>
+            </motion.div>
           )
         })}
       </ScrollArea>
@@ -822,7 +827,7 @@ export function WalletView() {
   // Refresh trigger — bump to force a re-fetch from /api/wallet
   const [refreshKey, setRefreshKey] = useState(0)
   const walletUrl = refreshKey ? `/api/wallet?t=${refreshKey}` : '/api/wallet'
-  const { data } = useApi<{ balances: Balance[]; transactions: Transaction[] }>(
+  const { data, loading } = useApi<{ balances: Balance[]; transactions: Transaction[] }>(
     walletUrl,
     { refresh: 0 }
   )
@@ -845,15 +850,50 @@ export function WalletView() {
 
   const refresh = () => setRefreshKey((k) => k + 1)
 
+  // First-paint skeleton: API still loading and no data yet
+  if (loading && !data) {
+    return (
+      <div className="flex-1 bg-background">
+        <div className="mx-auto max-w-[1400px] px-3 lg:px-5 py-4 space-y-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
+              <WalletIcon className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">Кошелёк</h1>
+              <p className="text-xs text-muted-foreground">
+                Кастодия активов • hot/warm/cold 5/15/80
+              </p>
+            </div>
+          </div>
+          <BalanceCardSkeleton />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <BalanceCardSkeleton key={i} />
+            ))}
+          </div>
+          <Card className="overflow-hidden">
+            <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border bg-muted/30">
+              Последние операции
+            </div>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <TxRowSkeleton key={i} />
+            ))}
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex-1 bg-background">
-      <div className="mx-auto max-w-[1400px] px-4 lg:px-6 py-6 space-y-6">
-        <div className="flex items-center gap-3">
+      <div className="mx-auto max-w-[1400px] px-3 lg:px-5 py-4 space-y-4">
+        <div className="flex items-center gap-2.5">
           <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
             <WalletIcon className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Кошелёк</h1>
+            <h1 className="text-xl font-bold tracking-tight">Кошелёк</h1>
             <p className="text-xs text-muted-foreground">
               Кастодия активов • hot/warm/cold 5/15/80
             </p>
@@ -863,7 +903,7 @@ export function WalletView() {
         <TotalBalanceCard balances={balances} />
 
         <Tabs defaultValue="assets" className="w-full">
-          <TabsList className="h-10 bg-muted/60 p-1">
+          <TabsList className="h-9 bg-muted/60 p-1">
             <TabsTrigger value="assets" className="gap-1.5">
               <WalletIcon className="w-3.5 h-3.5" />
               Активы
@@ -881,16 +921,16 @@ export function WalletView() {
               История
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="assets" className="mt-4">
+          <TabsContent value="assets" className="mt-3">
             <AssetsTab balances={balances} />
           </TabsContent>
-          <TabsContent value="deposit" className="mt-4">
+          <TabsContent value="deposit" className="mt-3">
             <DepositTab onDeposited={refresh} />
           </TabsContent>
-          <TabsContent value="withdraw" className="mt-4">
+          <TabsContent value="withdraw" className="mt-3">
             <WithdrawTab balances={balances} onWithdrawn={refresh} />
           </TabsContent>
-          <TabsContent value="history" className="mt-4">
+          <TabsContent value="history" className="mt-3">
             <HistoryTab transactions={transactions} />
           </TabsContent>
         </Tabs>

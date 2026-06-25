@@ -89,30 +89,30 @@ function Hero() {
         className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-primary/10 blur-3xl"
         aria-hidden
       />
-      <div className="relative max-w-[1400px] mx-auto px-4 lg:px-8 py-16 lg:py-24">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+      <div className="relative max-w-[1400px] mx-auto px-3 lg:px-5 py-8 lg:py-12">
+        <div className="grid lg:grid-cols-2 gap-6 items-center">
           <div>
             <Badge
               variant="outline"
-              className="mb-6 gap-1.5 border-primary/30 bg-primary/5 text-primary"
+              className="mb-4 gap-1.5 border-primary/30 bg-primary/5 text-primary"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
               ЛЕГАЛЬНАЯ ПЛАТФОРМА РФ • ЗАПУСК 01.07.2026
             </Badge>
-            <h1 className="text-4xl lg:text-6xl font-bold tracking-tight leading-[1.05]">
+            <h1 className="text-3xl lg:text-5xl font-bold tracking-tight leading-[1.05]">
               Российская криптобиржа{' '}
               <span className="text-primary whitespace-nowrap">по закону РФ</span>
             </h1>
-            <p className="mt-4 text-lg text-muted-foreground max-w-xl">
+            <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-xl">
               Спот-торги, P2P, кросс-бордер платежи и кастодия в единой
               экосистеме. Полное соответствие ФЗ-1194918-8, AML и валютному
               контролю.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-5 flex flex-wrap gap-3">
               <Button
                 size="lg"
                 onClick={() => setView(isAuthed ? 'trade' : 'auth')}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 h-12 px-7 text-base"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 h-11 px-6 text-base"
               >
                 {isAuthed ? 'Начать торговать' : 'Создать аккаунт'}
                 <ArrowRight className="w-4 h-4" />
@@ -121,12 +121,12 @@ function Hero() {
                 size="lg"
                 variant="outline"
                 onClick={() => setView('payments')}
-                className="h-12 px-7 text-base"
+                className="h-11 px-6 text-base"
               >
                 Кросс-бордер платежи
               </Button>
             </div>
-            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
+            <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-success" /> Адрес-идентификаторы
               </span>
@@ -139,15 +139,15 @@ function Hero() {
             </div>
           </div>
 
-          <Card className="p-6 lg:p-8 bg-card/60 backdrop-blur border-border">
+          <Card className="p-4 lg:p-5 bg-card/60 backdrop-blur border-border">
             {loading ? (
               <StatsSkeleton />
             ) : (
               <>
-                <div className="grid grid-cols-2 gap-5">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <div className="text-xs text-muted-foreground">Объём 24ч</div>
-                    <div className="text-2xl font-bold mt-1 font-mono tabular-nums">
+                    <div className="text-xl font-bold mt-1 font-mono tabular-nums">
                       <AnimatedNumber
                         value={totalVolumeRub}
                         format={(n) =>
@@ -166,7 +166,7 @@ function Hero() {
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground">USD/RUB</div>
-                    <div className="text-2xl font-bold mt-1 font-mono tabular-nums">
+                    <div className="text-xl font-bold mt-1 font-mono tabular-nums">
                       <AnimatedNumber
                         value={usdRub}
                         format={(n) => `${n.toFixed(2)} ₽`}
@@ -176,7 +176,7 @@ function Hero() {
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground">Топ роста 24ч</div>
-                    <div className="text-2xl font-bold mt-1 flex items-center gap-2">
+                    <div className="text-xl font-bold mt-1 flex items-center gap-2">
                       {topGainer ? (
                         <>
                           <span className="text-success">{topGainer.symbol}</span>
@@ -194,7 +194,7 @@ function Hero() {
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground">Топ падения 24ч</div>
-                    <div className="text-2xl font-bold mt-1 flex items-center gap-2">
+                    <div className="text-xl font-bold mt-1 flex items-center gap-2">
                       {topLoser ? (
                         <>
                           <span className="text-destructive">{topLoser.symbol}</span>
@@ -211,17 +211,17 @@ function Hero() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-6 pt-6 border-t border-border grid grid-cols-3 gap-4 text-center">
+                <div className="mt-4 pt-4 border-t border-border grid grid-cols-3 gap-3 text-center">
                   <div>
-                    <div className="text-lg font-bold text-primary">&lt;10 мс</div>
+                    <div className="text-base font-bold text-primary">&lt;10 мс</div>
                     <div className="text-[10px] text-muted-foreground">matching latency</div>
                   </div>
                   <div>
-                    <div className="text-lg font-bold text-primary">99.95%</div>
+                    <div className="text-base font-bold text-primary">99.95%</div>
                     <div className="text-[10px] text-muted-foreground">SLA</div>
                   </div>
                   <div>
-                    <div className="text-lg font-bold text-primary">100K TPS</div>
+                    <div className="text-base font-bold text-primary">100K TPS</div>
                     <div className="text-[10px] text-muted-foreground">пропускная</div>
                   </div>
                 </div>
@@ -288,12 +288,12 @@ function MarketGrid() {
   }
 
   return (
-    <section className="border-b border-border py-14">
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
-        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+    <section className="border-b border-border py-8">
+      <div className="max-w-[1400px] mx-auto px-3 lg:px-5">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <div>
-            <h2 className="text-2xl lg:text-3xl font-bold">Рыночные данные</h2>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h2 className="text-xl lg:text-2xl font-bold">Рыночные данные</h2>
+            <p className="text-xs text-muted-foreground mt-1">
               Реальные котировки Binance • обновление каждые 12 сек
             </p>
           </div>
@@ -322,7 +322,7 @@ function MarketGrid() {
         {tickers.length === 0 ? (
           <MarketGridSkeleton count={8} />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {tickers.map((coin) => {
               const status = highlight[coin.id]
               const price = currency === 'rub' ? coin.priceRub : coin.priceUsd
@@ -331,13 +331,13 @@ function MarketGrid() {
                 <Card
                   key={coin.id}
                   className={cn(
-                    'p-5 cursor-pointer transition-all hover:border-primary/40 hover:-translate-y-0.5 group',
+                    'p-4 cursor-pointer transition-all hover:border-primary/40 hover:-translate-y-0.5 group',
                     status === 'up' && 'ring-1 ring-success/40',
                     status === 'down' && 'ring-1 ring-destructive/40'
                   )}
                   onClick={() => goTrade(coin.symbol)}
                 >
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2.5">
                       <CoinIcon symbol={coin.symbol} size={36} />
                       <div>
@@ -355,10 +355,10 @@ function MarketGrid() {
                       {formatPercent(coin.change24h)}
                     </span>
                   </div>
-                  <div className="text-2xl font-mono font-bold tabular-nums">
+                  <div className="text-xl font-mono font-bold tabular-nums">
                     {formatPrice(price, currency)}
                   </div>
-                  <div className="mt-3 flex items-center justify-between">
+                  <div className="mt-2 flex items-center justify-between">
                     <Sparkline data={generateSpark(coin.change24h)} width={90} height={28} />
                     <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition" />
                   </div>
@@ -413,30 +413,30 @@ const FEATURES = [
 
 function Features() {
   return (
-    <section className="border-b border-border py-16 bg-sidebar/20">
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
-        <div className="text-center mb-12">
-          <Badge variant="outline" className="mb-3 border-primary/30 text-primary">
+    <section className="border-b border-border py-8 bg-sidebar/20">
+      <div className="max-w-[1400px] mx-auto px-3 lg:px-5">
+        <div className="text-center mb-6">
+          <Badge variant="outline" className="mb-2 border-primary/30 text-primary">
             ПРЕИМУЩЕСТВА ПЛАТФОРМЫ
           </Badge>
-          <h2 className="text-3xl lg:text-4xl font-bold">Почему РусКрипто</h2>
-          <p className="text-muted-foreground mt-3 max-w-2xl mx-auto">
+          <h2 className="text-2xl lg:text-3xl font-bold">Почему РусКрипто</h2>
+          <p className="text-muted-foreground mt-2 max-w-2xl mx-auto text-sm">
             Первая легальная криптобиржа на рынке РФ с готовой инфраструктурой
             для розничных и корпоративных клиентов.
           </p>
         </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {FEATURES.map((f) => (
-            <Card key={f.title} className="p-6 hover:border-primary/30 transition group">
+            <Card key={f.title} className="p-4 hover:border-primary/30 transition group">
               <div
                 className={cn(
-                  'w-12 h-12 rounded-2xl bg-muted/60 flex items-center justify-center mb-4 group-hover:scale-110 transition',
+                  'w-10 h-10 rounded-xl bg-muted/60 flex items-center justify-center mb-3 group-hover:scale-110 transition',
                   f.color
                 )}
               >
-                <f.icon className="w-6 h-6" />
+                <f.icon className="w-5 h-5" />
               </div>
-              <h3 className="font-semibold text-lg mb-2">{f.title}</h3>
+              <h3 className="font-semibold text-base mb-1.5">{f.title}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
             </Card>
           ))}
@@ -496,12 +496,12 @@ function MoversSection() {
   }
 
   return (
-    <section className="border-b border-border py-14">
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
-        <div className="flex items-end justify-between mb-8 flex-wrap gap-4">
+    <section className="border-b border-border py-8">
+      <div className="max-w-[1400px] mx-auto px-3 lg:px-5">
+        <div className="flex items-end justify-between mb-4 flex-wrap gap-3">
           <div>
-            <h2 className="text-2xl lg:text-3xl font-bold">Топ роста / Топ падения</h2>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h2 className="text-xl lg:text-2xl font-bold">Топ роста / Топ падения</h2>
+            <p className="text-xs text-muted-foreground mt-1">
               Лидеры и аутсайдеры за 24 часа • обновление каждые 15 сек
             </p>
           </div>
@@ -512,15 +512,15 @@ function MoversSection() {
         </div>
 
         {loading ? (
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card className="p-6 h-48 animate-pulse bg-muted/30" />
-            <Card className="p-6 h-48 animate-pulse bg-muted/30" />
+          <div className="grid md:grid-cols-2 gap-4">
+            <Card className="p-4 h-44 animate-pulse bg-muted/30" />
+            <Card className="p-4 h-44 animate-pulse bg-muted/30" />
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-4">
             {/* Gainers */}
-            <Card className="p-6 border-success/20 bg-gradient-to-br from-success/5 to-transparent">
-              <div className="flex items-center gap-2 mb-5">
+            <Card className="p-4 border-success/20 bg-gradient-to-br from-success/5 to-transparent">
+              <div className="flex items-center gap-2 mb-3">
                 <div className="w-9 h-9 rounded-xl bg-success/15 flex items-center justify-center">
                   <TrendingUp className="w-5 h-5 text-success" />
                 </div>
@@ -563,8 +563,8 @@ function MoversSection() {
             </Card>
 
             {/* Losers */}
-            <Card className="p-6 border-destructive/20 bg-gradient-to-br from-destructive/5 to-transparent">
-              <div className="flex items-center gap-2 mb-5">
+            <Card className="p-4 border-destructive/20 bg-gradient-to-br from-destructive/5 to-transparent">
+              <div className="flex items-center gap-2 mb-3">
                 <div className="w-9 h-9 rounded-xl bg-destructive/15 flex items-center justify-center">
                   <TrendingDown className="w-5 h-5 text-destructive" />
                 </div>
@@ -639,32 +639,32 @@ const SECURITY_FEATURES = [
 
 function AssetSecurity() {
   return (
-    <section className="border-b border-border py-14 bg-sidebar/20">
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
-        <div className="text-center mb-10">
-          <Badge variant="outline" className="mb-3 border-primary/30 text-primary gap-1.5">
+    <section className="border-b border-border py-8 bg-sidebar/20">
+      <div className="max-w-[1400px] mx-auto px-3 lg:px-5">
+        <div className="text-center mb-6">
+          <Badge variant="outline" className="mb-2 border-primary/30 text-primary gap-1.5">
             <ShieldCheck className="w-3 h-3" />
             БЕЗОПАСНОСТЬ АКТИВОВ
           </Badge>
-          <h2 className="text-2xl lg:text-3xl font-bold">Защита клиентских средств</h2>
-          <p className="text-muted-foreground mt-2 max-w-2xl mx-auto text-sm">
+          <h2 className="text-xl lg:text-2xl font-bold">Защита клиентских средств</h2>
+          <p className="text-muted-foreground mt-1.5 max-w-2xl mx-auto text-sm">
             Институциональный уровень защиты: холодное хранение, сертифицированные HSM,
             страховое покрытие.
           </p>
         </div>
-        <div className="grid md:grid-cols-3 gap-5">
+        <div className="grid md:grid-cols-3 gap-4">
           {SECURITY_FEATURES.map((f) => (
-            <Card key={f.title} className="p-6 hover:border-primary/30 transition group">
+            <Card key={f.title} className="p-4 hover:border-primary/30 transition group">
               <div
                 className={cn(
-                  'w-12 h-12 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition',
+                  'w-10 h-10 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition',
                   f.bg,
                   f.accent
                 )}
               >
-                <f.icon className="w-6 h-6" />
+                <f.icon className="w-5 h-5" />
               </div>
-              <h3 className="font-semibold text-base mb-2">{f.title}</h3>
+              <h3 className="font-semibold text-base mb-1.5">{f.title}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
             </Card>
           ))}
@@ -687,23 +687,23 @@ const PARTNERS = [
 
 function PartnersBand() {
   return (
-    <section className="border-b border-border py-12">
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
-        <div className="text-center mb-8">
-          <h2 className="text-xl lg:text-2xl font-bold">Поднадзорность и партнёры</h2>
-          <p className="text-sm text-muted-foreground mt-1">
+    <section className="border-b border-border py-6">
+      <div className="max-w-[1400px] mx-auto px-3 lg:px-5">
+        <div className="text-center mb-4">
+          <h2 className="text-lg lg:text-xl font-bold">Поднадзорность и партнёры</h2>
+          <p className="text-xs text-muted-foreground mt-1">
             Платформа работает в правовом поле РФ и интегрирована с ключевыми
             финансовыми и комплаенс-инфраструктурами
           </p>
         </div>
-        <Card className="p-6 lg:p-8 bg-card/60 backdrop-blur">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+        <Card className="p-4 lg:p-5 bg-card/60 backdrop-blur">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
             {PARTNERS.map((p) => (
               <div
                 key={p.name}
-                className="flex flex-col items-center justify-center text-center px-3 py-4 rounded-xl border border-border/60 bg-muted/30 hover:border-primary/40 hover:bg-primary/5 transition group"
+                className="flex flex-col items-center justify-center text-center px-2.5 py-3 rounded-xl border border-border/60 bg-muted/30 hover:border-primary/40 hover:bg-primary/5 transition group"
               >
-                <Building2 className="w-5 h-5 text-muted-foreground group-hover:text-primary transition mb-2" />
+                <Building2 className="w-5 h-5 text-muted-foreground group-hover:text-primary transition mb-1.5" />
                 <div className="text-xs font-semibold leading-tight">{p.name}</div>
                 <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
                   {p.subtitle}
@@ -720,14 +720,14 @@ function PartnersBand() {
 function CtaBand() {
   const setView = useAppStore((s) => s.setView)
   return (
-    <section className="py-16">
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
-        <Card className="relative overflow-hidden p-8 lg:p-12 bg-gradient-to-br from-primary/10 via-card to-card border-primary/20">
+    <section className="py-8">
+      <div className="max-w-[1400px] mx-auto px-3 lg:px-5">
+        <Card className="relative overflow-hidden p-5 lg:p-7 bg-gradient-to-br from-primary/10 via-card to-card border-primary/20">
           <div className="absolute -bottom-16 -right-16 w-64 h-64 rounded-full bg-primary/10 blur-3xl" />
-          <div className="relative flex flex-col lg:flex-row items-center justify-between gap-6">
+          <div className="relative flex flex-col lg:flex-row items-center justify-between gap-4">
             <div>
-              <h3 className="text-2xl lg:text-3xl font-bold">Готовы начать торговать?</h3>
-              <p className="text-muted-foreground mt-2">
+              <h3 className="text-xl lg:text-2xl font-bold">Готовы начать торговать?</h3>
+              <p className="text-muted-foreground mt-1.5 text-sm">
                 Верификация за 5 минут через Госуслуги. Демо-режим без рисков.
               </p>
             </div>
@@ -735,7 +735,7 @@ function CtaBand() {
               <Button
                 size="lg"
                 onClick={() => setView('auth')}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 h-12 px-7"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 h-11 px-6"
               >
                 Создать аккаунт
               </Button>
@@ -743,7 +743,7 @@ function CtaBand() {
                 size="lg"
                 variant="outline"
                 onClick={() => setView('kyc')}
-                className="h-12 px-7"
+                className="h-11 px-6"
               >
                 Узнать о KYC
               </Button>

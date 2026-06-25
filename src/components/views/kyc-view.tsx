@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/lib/store'
+import { useMounted } from '@/lib/use-mounted'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -48,6 +49,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog'
+import { StepSkeleton } from '@/components/page-skeleton'
 
 const STEPS = [
   { id: 0, title: 'Телефон', icon: Phone, desc: 'Подтверждение номера' },
@@ -120,7 +122,7 @@ function PhoneStep({ done, onNext }: { done: boolean; onNext: () => void }) {
         <Input
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
-          className="bg-input/40 font-mono h-11"
+          className="bg-input/40 font-mono h-10"
           placeholder="+7 (___) ___-__-__"
         />
       </div>
@@ -142,7 +144,7 @@ function PhoneStep({ done, onNext }: { done: boolean; onNext: () => void }) {
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
               inputMode="numeric"
-              className="bg-input/40 font-mono tracking-[0.5em] text-center h-11 text-lg"
+              className="bg-input/40 font-mono tracking-[0.5em] text-center h-10 text-base"
               placeholder="••••"
             />
             <p className="text-[10px] text-muted-foreground">Демо-код: 0000</p>
@@ -205,9 +207,9 @@ function DocumentStep({ done, onNext }: { done: boolean; onNext: () => void }) {
       {!uploaded ? (
         <button
           onClick={upload}
-          className="w-full border-2 border-dashed border-border rounded-xl py-8 flex flex-col items-center justify-center gap-2 hover:border-primary/40 hover:bg-primary/5 transition group"
+          className="w-full border-2 border-dashed border-border rounded-xl py-6 flex flex-col items-center justify-center gap-2 hover:border-primary/40 hover:bg-primary/5 transition group"
         >
-          <div className="w-12 h-12 rounded-2xl bg-muted/40 group-hover:bg-primary/10 flex items-center justify-center transition">
+          <div className="w-10 h-10 rounded-2xl bg-muted/40 group-hover:bg-primary/10 flex items-center justify-center transition">
             <Upload className="w-5 h-5 text-muted-foreground group-hover:text-primary" />
           </div>
           <div className="text-sm font-medium">Загрузить фото документа</div>
@@ -215,8 +217,8 @@ function DocumentStep({ done, onNext }: { done: boolean; onNext: () => void }) {
         </button>
       ) : (
         <div className="space-y-3">
-          <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/20">
-            <div className="w-16 h-10 rounded bg-gradient-to-br from-primary/30 to-primary/5 flex items-center justify-center">
+          <div className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-muted/20">
+            <div className="w-14 h-9 rounded bg-gradient-to-br from-primary/30 to-primary/5 flex items-center justify-center">
               <FileText className="w-5 h-5 text-primary" />
             </div>
             <div className="flex-1 min-w-0">
@@ -284,8 +286,8 @@ function SelfieStep({ done, onNext }: { done: boolean; onNext: () => void }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-4 p-4 rounded-xl border border-border bg-muted/20">
-        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center shrink-0">
+      <div className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/20">
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center shrink-0">
           {stage === 'scanning' ? (
             <ScanFace className="w-9 h-9 text-primary animate-pulse" />
           ) : stage === 'done' ? (
@@ -357,7 +359,7 @@ function AddressBindingStep({ done, onNext }: { done: boolean; onNext: () => voi
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2">
+      <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-2">
         <div className="flex items-center gap-2 text-sm font-medium text-primary">
           <Fingerprint className="w-4 h-4" />
           Адрес-идентификатор (ФЗ-1194918-8)
@@ -448,7 +450,7 @@ function QualificationStep({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-warning/30 bg-warning/5 p-4 space-y-1.5">
+      <div className="rounded-xl border border-warning/30 bg-warning/5 p-3 space-y-1.5">
         <div className="flex items-center gap-2 text-sm font-medium text-warning">
           <AlertTriangle className="w-4 h-4" />
           Квалификация инвестора
@@ -464,13 +466,13 @@ function QualificationStep({ onDone }: { onDone: () => void }) {
           onClick={startTest}
           disabled={path !== 'none' && path !== 'test'}
           className={cn(
-            'flex items-start gap-3 p-4 rounded-xl border text-left transition group',
+            'flex items-start gap-3 p-3 rounded-xl border text-left transition group',
             path === 'test'
               ? 'border-primary/40 bg-primary/5'
               : 'border-border bg-muted/20 hover:border-primary/30'
           )}
         >
-          <div className="w-10 h-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
             <GraduationCap className="w-5 h-5" />
           </div>
           <div className="flex-1 min-w-0">
@@ -486,13 +488,13 @@ function QualificationStep({ onDone }: { onDone: () => void }) {
           onClick={verifyAssets}
           disabled={(path !== 'none' && path !== 'assets') || assetsVerifying}
           className={cn(
-            'flex items-start gap-3 p-4 rounded-xl border text-left transition group',
+            'flex items-start gap-3 p-3 rounded-xl border text-left transition group',
             path === 'assets'
               ? 'border-primary/40 bg-primary/5'
               : 'border-border bg-muted/20 hover:border-primary/30'
           )}
         >
-          <div className="w-10 h-10 rounded-xl bg-success/15 text-success flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-success/15 text-success flex items-center justify-center shrink-0">
             <Award className="w-5 h-5" />
           </div>
           <div className="flex-1 min-w-0">
@@ -552,37 +554,37 @@ function VerifiedCard() {
 
   return (
     <Card className="bg-gradient-to-br from-success/10 via-card to-card border-success/30">
-      <CardContent className="p-8">
+      <CardContent className="p-5">
         <div className="flex flex-col items-center text-center max-w-md mx-auto">
-          <div className="w-20 h-20 rounded-3xl bg-success/15 text-success flex items-center justify-center mb-5 ring-8 ring-success/5">
-            <ShieldCheck className="w-10 h-10" />
+          <div className="w-16 h-16 rounded-3xl bg-success/15 text-success flex items-center justify-center mb-4 ring-8 ring-success/5">
+            <ShieldCheck className="w-8 h-8" />
           </div>
-          <Badge variant="outline" className="border-success/40 text-success mb-3 gap-1.5">
+          <Badge variant="outline" className="border-success/40 text-success mb-2.5 gap-1.5">
             <Sparkles className="w-3 h-3" />
             ВЕРИФИКАЦИЯ ПРОЙДЕНА
           </Badge>
-          <h2 className="text-2xl font-bold">Уровень 2 • Полный доступ</h2>
-          <p className="text-sm text-muted-foreground mt-2">
+          <h2 className="text-xl font-bold">Уровень 2 • Полный доступ</h2>
+          <p className="text-xs text-muted-foreground mt-1.5">
             Вам доступны все инструменты платформы, включая маржинальную торговлю
             и кросс-бордер платежи без лимитов.
           </p>
 
-          <div className="w-full grid grid-cols-2 gap-3 mt-6">
-            <div className="p-3 rounded-xl border border-border bg-muted/30">
+          <div className="w-full grid grid-cols-2 gap-2.5 mt-4">
+            <div className="p-2.5 rounded-xl border border-border bg-muted/30">
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
                 Уровень KYC
               </div>
-              <div className="text-lg font-bold text-success mt-0.5">Lv. 2</div>
+              <div className="text-base font-bold text-success mt-0.5">Lv. 2</div>
             </div>
-            <div className="p-3 rounded-xl border border-border bg-muted/30">
+            <div className="p-2.5 rounded-xl border border-border bg-muted/30">
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
                 Адрес-идентификатор
               </div>
-              <div className="text-sm font-mono font-bold mt-0.5 break-all">{aid}</div>
+              <div className="text-xs font-mono font-bold mt-0.5 break-all">{aid}</div>
             </div>
           </div>
 
-          <div className="w-full flex flex-wrap justify-center gap-2 mt-6">
+          <div className="w-full flex flex-wrap justify-center gap-2 mt-4">
             <Badge variant="outline" className="text-[10px] border-border">
               <CheckCircle2 className="w-3 h-3 text-success mr-1" /> Телефон
             </Badge>
@@ -600,7 +602,7 @@ function VerifiedCard() {
           <Button
             variant="outline"
             onClick={reVerify}
-            className="mt-6 gap-2 h-10"
+            className="mt-4 gap-2 h-10"
           >
             <RefreshCw className="w-4 h-4" />
             Пройти верификацию заново
@@ -627,7 +629,7 @@ function EsiaButton({ onFastTrack }: { onFastTrack: () => void }) {
       variant="outline"
       onClick={handleClick}
       disabled={loading}
-      className="gap-2 h-11 border-primary/30 hover:bg-primary/5 hover:text-primary"
+      className="gap-2 h-10 border-primary/30 hover:bg-primary/5 hover:text-primary"
     >
       {loading ? (
         <Loader2 className="w-4 h-4 animate-spin" />
@@ -642,8 +644,8 @@ function EsiaButton({ onFastTrack }: { onFastTrack: () => void }) {
 function ComplianceBadges() {
   return (
     <Card className="bg-card/40">
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 mb-3">
+      <CardContent className="p-3.5">
+        <div className="flex items-center gap-2 mb-2.5">
           <ShieldCheck className="w-4 h-4 text-success" />
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Соответствие законодательству
@@ -673,6 +675,7 @@ export function KycView() {
 
   const [step, setStep] = useState(0)
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set())
+  const mounted = useMounted()
 
   const isVerified = kycLevel >= 2
 
@@ -705,15 +708,15 @@ export function KycView() {
 
   if (isVerified) {
     return (
-      <div className="flex-1 py-8">
-        <div className="max-w-[1400px] mx-auto px-4 lg:px-8 space-y-6">
+      <div className="flex-1 py-4">
+        <div className="max-w-[1400px] mx-auto px-3 lg:px-5 space-y-4">
           <header>
-            <Badge variant="outline" className="border-success/40 text-success mb-2 gap-1.5">
+            <Badge variant="outline" className="border-success/40 text-success mb-1.5 gap-1.5">
               <ShieldCheck className="w-3 h-3" />
               KYC LEVEL 2
             </Badge>
-            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">Верификация</h1>
-            <p className="text-sm text-muted-foreground mt-1.5">
+            <h1 className="text-xl lg:text-2xl font-bold tracking-tight">Верификация</h1>
+            <p className="text-xs text-muted-foreground mt-1">
               Личность подтверждена • статус: {kycStatus}
             </p>
           </header>
@@ -727,12 +730,12 @@ export function KycView() {
   const progressPct = ((step + (completedSteps.has(step) ? 1 : 0)) / STEPS.length) * 100
 
   return (
-    <div className="flex-1 py-8">
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-8 space-y-6">
+    <div className="flex-1 py-4">
+      <div className="max-w-[1400px] mx-auto px-3 lg:px-5 space-y-4">
         {/* Header */}
-        <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+        <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-1.5">
               <Badge variant="outline" className="border-primary/30 text-primary gap-1.5">
                 <ShieldCheck className="w-3 h-3" />
                 KYC / AML
@@ -741,15 +744,15 @@ export function KycView() {
                 Уровень {kycLevel}
               </Badge>
             </div>
-            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">Верификация</h1>
-            <p className="text-sm text-muted-foreground mt-1.5">
+            <h1 className="text-xl lg:text-2xl font-bold tracking-tight">Верификация</h1>
+            <p className="text-xs text-muted-foreground mt-1">
               5 шагов для полного доступа • ~5 минут через Госуслуги
             </p>
           </div>
           <EsiaButton onFastTrack={handleEsia} />
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-4">
           {/* Stepper sidebar */}
           <Card className="bg-card/60 backdrop-blur h-fit lg:sticky lg:top-20">
             <CardHeader>
@@ -813,73 +816,77 @@ export function KycView() {
           </Card>
 
           {/* Step content */}
-          <div className="space-y-6">
-            {STEPS.map((s, i) => {
-              if (i !== step) return null
-              const Icon = s.icon
-              const completed = completedSteps.has(i)
-              return (
-                <Card key={s.id} className="bg-card/60 backdrop-blur">
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl bg-primary/15 text-primary flex items-center justify-center">
-                          <Icon className="w-5 h-5" />
+          <div className="space-y-4">
+            {!mounted ? (
+              <StepSkeleton />
+            ) : (
+              STEPS.map((s, i) => {
+                if (i !== step) return null
+                const Icon = s.icon
+                const completed = completedSteps.has(i)
+                return (
+                  <Card key={s.id} className="bg-card/60 backdrop-blur">
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-10 h-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center">
+                            <Icon className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-base">
+                              Шаг {i + 1}. {s.title}
+                            </CardTitle>
+                            <CardDescription className="text-xs mt-0.5">{s.desc}</CardDescription>
+                          </div>
                         </div>
-                        <div>
-                          <CardTitle className="text-lg">
-                            Шаг {i + 1}. {s.title}
-                          </CardTitle>
-                          <CardDescription className="text-xs mt-0.5">{s.desc}</CardDescription>
-                        </div>
+                        <Badge variant="outline" className="text-[10px] shrink-0">
+                          {i + 1} / {STEPS.length}
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className="text-[10px] shrink-0">
-                        {i + 1} / {STEPS.length}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {i === 0 && (
-                      <PhoneStep done={completed} onNext={() => markStepDone(0)} />
-                    )}
-                    {i === 1 && (
-                      <DocumentStep done={completed} onNext={() => markStepDone(1)} />
-                    )}
-                    {i === 2 && (
-                      <SelfieStep done={completed} onNext={() => markStepDone(2)} />
-                    )}
-                    {i === 3 && (
-                      <AddressBindingStep done={completed} onNext={() => markStepDone(3)} />
-                    )}
-                    {i === 4 && <QualificationStep onDone={handleQualificationDone} />}
+                    </CardHeader>
+                    <CardContent>
+                      {i === 0 && (
+                        <PhoneStep done={completed} onNext={() => markStepDone(0)} />
+                      )}
+                      {i === 1 && (
+                        <DocumentStep done={completed} onNext={() => markStepDone(1)} />
+                      )}
+                      {i === 2 && (
+                        <SelfieStep done={completed} onNext={() => markStepDone(2)} />
+                      )}
+                      {i === 3 && (
+                        <AddressBindingStep done={completed} onNext={() => markStepDone(3)} />
+                      )}
+                      {i === 4 && <QualificationStep onDone={handleQualificationDone} />}
 
-                    {i < STEPS.length - 1 && completed && (
-                      <div className="mt-4 pt-4 border-t border-border flex justify-end">
-                        <Button
-                          onClick={() => setStep(i + 1)}
-                          className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
-                        >
-                          Далее
-                          <ChevronRight className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    )}
-                    {i > 0 && !completed && (
-                      <div className="mt-4 pt-4 border-t border-border flex justify-between">
-                        <Button
-                          variant="ghost"
-                          onClick={() => setStep(i - 1)}
-                          className="gap-1 text-muted-foreground"
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                          Назад
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )
-            })}
+                      {i < STEPS.length - 1 && completed && (
+                        <div className="mt-3 pt-3 border-t border-border flex justify-end">
+                          <Button
+                            onClick={() => setStep(i + 1)}
+                            className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+                          >
+                            Далее
+                            <ChevronRight className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      )}
+                      {i > 0 && !completed && (
+                        <div className="mt-3 pt-3 border-t border-border flex justify-between">
+                          <Button
+                            variant="ghost"
+                            onClick={() => setStep(i - 1)}
+                            className="gap-1 text-muted-foreground"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                            Назад
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )
+              })
+            )}
 
             <ComplianceBadges />
           </div>

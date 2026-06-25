@@ -9,26 +9,29 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String?
-  phone        String?
-  passwordHash String?
-  kycLevel     Int      @default(0) // 0=guest, 1=L1 doc, 2=L2 full
-  kycStatus    String   @default("UNINITIATED") // UNINITIATED|PHONE_VERIFIED|DOC_VERIFIED|SELFIE_VERIFIED|ACTIVE
-  qualified    Boolean  @default(false) // квалифицированный инвестор
-  role         String   @default("USER") // USER|COMPLIANCE|ADMIN
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  phone         String?
+  passwordHash  String?
+  referralCode  String?
+  kycLevel      Int      @default(0) // 0=guest, 1=L1 doc, 2=L2 full
+  kycStatus     String   @default("UNINITIATED") // UNINITIATED|PHONE_VERIFIED|DOC_VERIFIED|SELFIE_VERIFIED|ACTIVE
+  qualified     Boolean  @default(false) // квалифицированный инвестор
+  role          String   @default("USER") // USER|COMPLIANCE|ADMIN
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  balances     Balance[]
-  orders       Order[]
-  trades       Trade[]
-  transactions Transaction[]
-  p2pOffers    P2POffer[]
-  p2pDeals     P2PDeal[]   @relation("dealBuyer")
-  payments     CrossBorderPayment[]
-  alerts       ComplianceAlert[]  @relation("alertReviewer")
+  balances      Balance[]
+  orders        Order[]
+  trades        Trade[]
+  transactions  Transaction[]
+  p2pOffers     P2POffer[]
+  p2pDeals      P2PDeal[]   @relation("dealBuyer")
+  payments      CrossBorderPayment[]
+  alerts        ComplianceAlert[]  @relation("alertReviewer")
+  loginEvents   LoginEvent[]
+  referrals     Referral[]
 }
 
 model Balance {
@@ -163,4 +166,27 @@ model KycDocument {
   docType   String   // passport|driver_license|id_card
   status    String   @default("PENDING") // PENDING|VERIFIED|REJECTED
   createdAt DateTime @default(now())
+}
+
+model LoginEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ip        String
+  device    String   // Chrome / iPhone / Firefox
+  browser   String
+  location  String   // "Москва, РФ"
+  success   Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Referral {
+  id            String   @id @default(cuid())
+  code          String   // referrer's code (multiple referrals share same code)
+  referrerId    String
+  referrer      User     @relation(fields: [referrerId], references: [id], onDelete: Cascade)
+  referredEmail String
+  reward        Float    @default(0)
+  status        String   @default("REGISTERED") // REGISTERED|VERIFIED|REWARDED
+  createdAt     DateTime @default(now())
 }

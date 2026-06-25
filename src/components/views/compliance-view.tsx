@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import {
   Scale,
   AlertTriangle,
@@ -32,6 +33,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
+import { AlertCardSkeleton } from '@/components/page-skeleton'
 
 const SEVERITY_CONFIG: Record<
   AlertSeverity,
@@ -111,21 +113,21 @@ function StatCard({
   }
   return (
     <Card className="bg-card/60 backdrop-blur">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between mb-3">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
           <span className="text-xs text-muted-foreground uppercase tracking-wider">
             {label}
           </span>
           <div
             className={cn(
-              'w-9 h-9 rounded-xl flex items-center justify-center bg-muted/40',
+              'w-8 h-8 rounded-xl flex items-center justify-center bg-muted/40',
               toneMap[tone]
             )}
           >
-            <Icon className="w-5 h-5" />
+            <Icon className="w-4 h-4" />
           </div>
         </div>
-        <div className="text-2xl font-bold tabular-nums">{value}</div>
+        <div className="text-xl font-bold tabular-nums">{value}</div>
         {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
       </CardContent>
     </Card>
@@ -157,7 +159,7 @@ function AlertListItem({
         className={cn('absolute left-0 top-0 bottom-0 w-1', sev.stripe)}
         aria-hidden
       />
-      <div className="pl-3.5 pr-3 py-3">
+      <div className="pl-3.5 pr-2.5 py-2.5">
         <div className="flex items-start justify-between gap-2 mb-1.5">
           <div className="flex items-center gap-2 min-w-0">
             <Badge
@@ -179,14 +181,14 @@ function AlertListItem({
             {alert.description}
           </p>
           <div className="text-right shrink-0 ml-2">
-            <div className={cn('text-lg font-bold tabular-nums leading-none', sev.color)}>
+            <div className={cn('text-base font-bold tabular-nums leading-none', sev.color)}>
               {Math.round(alert.riskScore * 100)}
               <span className="text-xs">%</span>
             </div>
             <div className="text-[9px] text-muted-foreground mt-0.5">risk</div>
           </div>
         </div>
-        <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/60">
+        <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-border/60">
           <span className="text-[10px] text-muted-foreground font-mono truncate">
             {alert.ruleId || '—'}
           </span>
@@ -309,10 +311,10 @@ function AlertDetail({
     <Card className="bg-card/60 backdrop-blur">
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div
               className={cn(
-                'w-11 h-11 rounded-xl flex items-center justify-center shrink-0',
+                'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
                 sev.bg,
                 sev.color
               )}
@@ -320,7 +322,7 @@ function AlertDetail({
               <ShieldAlert className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <CardTitle className="text-lg truncate">
+              <CardTitle className="text-base truncate">
                 {TYPE_LABEL[alert.type] || alert.type}
               </CardTitle>
               <CardDescription className="text-xs font-mono mt-0.5">
@@ -338,11 +340,11 @@ function AlertDetail({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-4">
         <p className="text-sm leading-relaxed">{alert.description}</p>
 
         {/* Risk score */}
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground flex items-center gap-1.5">
               <TrendingUp className="w-3.5 h-3.5" />
@@ -359,8 +361,8 @@ function AlertDetail({
         </div>
 
         {/* Meta */}
-        <div className="grid grid-cols-2 gap-3 text-xs">
-          <div className="p-3 rounded-lg border border-border bg-muted/20">
+        <div className="grid grid-cols-2 gap-2.5 text-xs">
+          <div className="p-2.5 rounded-lg border border-border bg-muted/20">
             <div className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">
               Тип сущности
             </div>
@@ -371,7 +373,7 @@ function AlertDetail({
               </div>
             )}
           </div>
-          <div className="p-3 rounded-lg border border-border bg-muted/20">
+          <div className="p-2.5 rounded-lg border border-border bg-muted/20">
             <div className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">
               Создан
             </div>
@@ -385,7 +387,7 @@ function AlertDetail({
         <Separator />
 
         {/* SHAP */}
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-violet-500/15 text-violet-400 flex items-center justify-center">
@@ -407,7 +409,7 @@ function AlertDetail({
 
         {/* Actions */}
         {isOpen && (
-          <div className="space-y-2 pt-2">
+          <div className="space-y-2 pt-1.5">
             <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Действия
             </div>
@@ -458,7 +460,7 @@ function AlertDetail({
         )}
 
         {!isOpen && (
-          <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/20 text-xs">
+          <div className="flex items-center gap-2 p-2.5 rounded-lg border border-border bg-muted/20 text-xs">
             <Lock className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-muted-foreground">
               Алерт обработан • действия заблокированы
@@ -467,7 +469,7 @@ function AlertDetail({
         )}
 
         {isCritical && isOpen && (
-          <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/5 flex items-start gap-2">
+          <div className="p-2.5 rounded-lg border border-destructive/30 bg-destructive/5 flex items-start gap-2">
             <ShieldX className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
             <div className="text-xs">
               <div className="font-medium text-destructive">
@@ -488,9 +490,9 @@ function AlertDetail({
 function EmptyDetail() {
   return (
     <Card className="bg-card/40 border-dashed">
-      <CardContent className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-muted/40 flex items-center justify-center mb-4">
-          <Scale className="w-7 h-7 text-muted-foreground" />
+      <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-muted/40 flex items-center justify-center mb-3">
+          <Scale className="w-6 h-6 text-muted-foreground" />
         </div>
         <div className="text-sm font-medium">Выберите алерт</div>
         <div className="text-xs text-muted-foreground mt-1 max-w-xs">
@@ -509,9 +511,9 @@ function QuarantineCard({ alerts }: { alerts: ComplianceAlert[] }) {
 
   return (
     <Card className="bg-gradient-to-r from-destructive/5 via-card to-card border-destructive/20">
-      <CardContent className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5">
+      <CardContent className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-destructive/15 text-destructive flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-destructive/15 text-destructive flex items-center justify-center shrink-0">
             <Lock className="w-5 h-5" />
           </div>
           <div className="text-sm">
@@ -526,7 +528,7 @@ function QuarantineCard({ alerts }: { alerts: ComplianceAlert[] }) {
               (Compliance Officer + Risk Manager). Подтверждение фиксируется в
               WORM-аудите и доступно регулятору.
             </p>
-            <div className="flex flex-wrap gap-3 mt-2 text-[11px] text-muted-foreground">
+            <div className="flex flex-wrap gap-2.5 mt-2 text-[11px] text-muted-foreground">
               <span className="flex items-center gap-1">
                 <ShieldAlert className="w-3 h-3" /> Критических в работе: {criticalOpen}
               </span>
@@ -559,7 +561,7 @@ export function ComplianceView() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const complianceUrl = refreshKey ? `/api/compliance?t=${refreshKey}` : '/api/compliance'
-  const { data } = useApi<{ alerts: ComplianceAlert[] }>(complianceUrl)
+  const { data, loading } = useApi<{ alerts: ComplianceAlert[] }>(complianceUrl)
 
   // Prefer API alerts when present; fall back to store for resilience
   const apiAlerts: ComplianceAlert[] | null =
@@ -608,13 +610,16 @@ export function ComplianceView() {
     })
   }, [alerts])
 
+  // First-paint skeleton: API still loading, no alerts yet
+  const showSkeleton = loading && !apiAlerts && storeAlerts.length === 0
+
   return (
-    <div className="flex-1 py-8">
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-8 space-y-6">
+    <div className="flex-1 py-4">
+      <div className="max-w-[1400px] mx-auto px-3 lg:px-5 space-y-4">
         {/* Header */}
-        <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+        <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <Badge variant="outline" className="border-destructive/40 text-destructive gap-1.5">
                 <Scale className="w-3 h-3" />
                 AML CONSOLE
@@ -625,56 +630,58 @@ export function ComplianceView() {
               <Badge variant="outline" className="text-[10px] text-muted-foreground">
                 Росфинмониторинг
               </Badge>
-              {stats.openCount > 0 && (
+              {!showSkeleton && stats.openCount > 0 && (
                 <Badge variant="destructive" className="text-[10px] gap-1">
                   <Activity className="w-3 h-3" />
                   {stats.openCount} активных
                 </Badge>
               )}
             </div>
-            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">
+            <h1 className="text-xl lg:text-2xl font-bold tracking-tight">
               Комплаенс-консоль
             </h1>
-            <p className="text-sm text-muted-foreground mt-1.5">
+            <p className="text-xs text-muted-foreground mt-1">
               AML-мониторинг • 115-ФЗ • Росфинмониторинг
             </p>
           </div>
         </header>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            icon={AlertTriangle}
-            label="Открытые алерты"
-            value={stats.openCount}
-            sub={`${alerts.length} всего в системе`}
-            tone="warning"
-          />
-          <StatCard
-            icon={ShieldAlert}
-            label="Критические"
-            value={stats.criticalCount}
-            sub="требуют немедленного действия"
-            tone="danger"
-          />
-          <StatCard
-            icon={Activity}
-            label="Средний risk score"
-            value={`${stats.avgRisk}%`}
-            sub="по открытым алертам"
-            tone={stats.avgRisk > 70 ? 'danger' : 'warning'}
-          />
-          <StatCard
-            icon={CheckCircle2}
-            label="Обработано сегодня"
-            value={stats.processedToday}
-            sub="APPROVED / REJECTED / SAR"
-            tone="success"
-          />
-        </div>
+        {/* Stats (only show real numbers when not skeleton) */}
+        {!showSkeleton && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatCard
+              icon={AlertTriangle}
+              label="Открытые алерты"
+              value={stats.openCount}
+              sub={`${alerts.length} всего в системе`}
+              tone="warning"
+            />
+            <StatCard
+              icon={ShieldAlert}
+              label="Критические"
+              value={stats.criticalCount}
+              sub="требуют немедленного действия"
+              tone="danger"
+            />
+            <StatCard
+              icon={Activity}
+              label="Средний risk score"
+              value={`${stats.avgRisk}%`}
+              sub="по открытым алертам"
+              tone={stats.avgRisk > 70 ? 'danger' : 'warning'}
+            />
+            <StatCard
+              icon={CheckCircle2}
+              label="Обработано сегодня"
+              value={stats.processedToday}
+              sub="APPROVED / REJECTED / SAR"
+              tone="success"
+            />
+          </div>
+        )}
 
         {/* List + Detail */}
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-4">
           {/* List */}
           <Card className="bg-card/60 backdrop-blur flex flex-col">
             <CardHeader className="pb-3">
@@ -684,14 +691,18 @@ export function ComplianceView() {
                   Лента алертов
                 </CardTitle>
                 <Badge variant="outline" className="text-[10px]">
-                  {sortedAlerts.length}
+                  {showSkeleton ? '—' : sortedAlerts.length}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-2 max-h-[680px] overflow-y-auto scrollbar-thin pr-1">
-              {sortedAlerts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="w-14 h-14 rounded-2xl bg-success/10 flex items-center justify-center mb-3">
+              {showSkeleton ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <AlertCardSkeleton key={i} />
+                ))
+              ) : sortedAlerts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-success/10 flex items-center justify-center mb-2.5">
                     <CheckCircle2 className="w-6 h-6 text-success" />
                   </div>
                   <div className="text-sm font-medium">Нет алертов</div>
@@ -700,27 +711,50 @@ export function ComplianceView() {
                   </div>
                 </div>
               ) : (
-                sortedAlerts.map((a) => (
-                  <AlertListItem
+                sortedAlerts.map((a, i) => (
+                  <motion.div
                     key={a.id}
-                    alert={a}
-                    active={a.id === effectiveId}
-                    onClick={() => setSelectedId(a.id)}
-                  />
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.22, delay: Math.min(i * 0.04, 0.5), ease: 'easeOut' }}
+                  >
+                    <AlertListItem
+                      alert={a}
+                      active={a.id === effectiveId}
+                      onClick={() => setSelectedId(a.id)}
+                    />
+                  </motion.div>
                 ))
               )}
             </CardContent>
           </Card>
 
           {/* Detail */}
-          {selected ? <AlertDetail alert={selected} onReviewed={refresh} /> : <EmptyDetail />}
+          {showSkeleton ? (
+            <Card className="bg-card/40 border-dashed">
+              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-muted/40 flex items-center justify-center mb-3">
+                  <Scale className="w-6 h-6 text-muted-foreground" />
+                </div>
+                <div className="text-sm font-medium">Загрузка деталей алерта…</div>
+                <div className="text-xs text-muted-foreground mt-1 max-w-xs">
+                  Данные комплаенс-консоли загружаются из БД. SHAP-объяснение и действия
+                  появятся через мгновение.
+                </div>
+              </CardContent>
+            </Card>
+          ) : selected ? (
+            <AlertDetail alert={selected} onReviewed={refresh} />
+          ) : (
+            <EmptyDetail />
+          )}
         </div>
 
         {/* Quarantine */}
-        <QuarantineCard alerts={alerts} />
+        {!showSkeleton && <QuarantineCard alerts={alerts} />}
 
         {/* Footer note */}
-        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-muted-foreground pt-2">
+        <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[11px] text-muted-foreground pt-1.5">
           <span className="flex items-center gap-1.5">
             <Brain className="w-3 h-3 text-violet-400" />
             ML-модель: Gradient Boosting • SHAP v0.45

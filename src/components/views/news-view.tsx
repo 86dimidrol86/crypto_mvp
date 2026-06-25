@@ -194,15 +194,15 @@ export function NewsView() {
 
   return (
     <div className="flex-1 bg-background">
-      <div className="mx-auto max-w-[1200px] px-4 lg:px-6 py-6">
+      <div className="mx-auto max-w-[1200px] px-3 lg:px-5 py-4">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center">
               <Newspaper className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Новости и анонсы</h1>
+              <h1 className="text-xl font-bold tracking-tight">Новости и анонсы</h1>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Регуляторика · Рынок · Платформа · Партнёрство — {newsItems.length} материалов
               </p>
@@ -220,7 +220,7 @@ export function NewsView() {
         </div>
 
         {/* Filter tabs */}
-        <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)} className="mb-5">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)} className="mb-4">
           <TabsList className="h-9 flex-wrap">
             <TabsTrigger value="all" className="gap-1.5">
               Все <span className="text-[10px] text-muted-foreground font-mono">{counts.all}</span>
@@ -242,7 +242,7 @@ export function NewsView() {
 
         {/* Featured pinned news */}
         {pinned.length > 0 && tab === 'all' && !query.trim() && (
-          <div className="grid gap-3 mb-5">
+          <div className="grid gap-2.5 mb-4">
             {pinned.map((item) => (
               <NewsCard key={item.id} item={item} featured />
             ))}
@@ -251,12 +251,12 @@ export function NewsView() {
 
         {/* News feed */}
         {filtered.length === 0 ? (
-          <Card className="p-12 text-center">
+          <Card className="p-10 text-center">
             <Newspaper className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
             <p className="text-sm text-muted-foreground">Ничего не найдено по запросу</p>
           </Card>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-2.5 md:grid-cols-2">
             <AnimatePresence mode="popLayout">
               {filtered.map((item) => (
                 <NewsCard key={item.id} item={item} />
@@ -266,7 +266,7 @@ export function NewsView() {
         )}
 
         {/* Footer */}
-        <div className="mt-6 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
+        <div className="mt-4 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
           <Badge variant="outline" className="border-border text-muted-foreground">
             <Newspaper className="w-3 h-3 mr-1" /> Демо-лента РусКрипто
           </Badge>

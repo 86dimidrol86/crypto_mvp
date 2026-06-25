@@ -341,9 +341,9 @@ function MyAlertsSection({ tickers }: { tickers: CoinTicker[] }) {
 
   if (priceAlerts.length === 0) {
     return (
-      <Card className="p-6 mt-5">
+      <Card className="p-4 mt-3">
         <div className="flex flex-col items-center text-center">
-          <div className="w-12 h-12 rounded-full bg-muted/60 flex items-center justify-center mb-2">
+          <div className="w-10 h-10 rounded-full bg-muted/60 flex items-center justify-center mb-2">
             <Bell className="w-5 h-5 text-muted-foreground" />
           </div>
           <h3 className="font-semibold text-sm">Алерты по цене</h3>
@@ -365,8 +365,8 @@ function MyAlertsSection({ tickers }: { tickers: CoinTicker[] }) {
   }
 
   return (
-    <Card className="p-4 mt-5">
-      <div className="flex items-center justify-between mb-3">
+    <Card className="p-3.5 mt-3">
+      <div className="flex items-center justify-between mb-2.5">
         <div className="flex items-center gap-2">
           <BellRing className="w-4 h-4 text-primary" />
           <h3 className="font-semibold text-sm">Мои алерты</h3>
@@ -657,9 +657,9 @@ export function MarketsView() {
 
   return (
     <div className="flex-1 bg-background">
-      <div className="mx-auto max-w-[1400px] px-4 lg:px-6 py-6">
+      <div className="mx-auto max-w-[1400px] px-3 lg:px-5 py-4">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-4">
           <div>
             <div className="flex items-center gap-2.5">
               <div className="w-10 h-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center">
@@ -676,8 +676,8 @@ export function MarketsView() {
         </div>
 
         {/* Aggregate stats banner */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-          <Card className="p-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <Card className="p-3.5">
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
               Объём 24ч (все пары)
             </div>
@@ -685,7 +685,7 @@ export function MarketsView() {
               {totalVolume > 0 ? <Volume24h rub={totalVolume} /> : '—'}
             </div>
           </Card>
-          <Card className="p-4">
+          <Card className="p-3.5">
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
               Растущих / Падающих
             </div>
@@ -695,7 +695,7 @@ export function MarketsView() {
               <span className="text-destructive">{losers}</span>
             </div>
           </Card>
-          <Card className="p-4">
+          <Card className="p-3.5">
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
               Топ роста
             </div>
@@ -710,7 +710,7 @@ export function MarketsView() {
               )}
             </div>
           </Card>
-          <Card className="p-4">
+          <Card className="p-3.5">
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
               Топ падения
             </div>
@@ -728,8 +728,8 @@ export function MarketsView() {
         </div>
 
         {/* Toolbar */}
-        <Card className="p-3 mb-4">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+        <Card className="p-2.5 mb-3">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-2.5">
             <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
               <TabsList>
                 <TabsTrigger value="all">Все</TabsTrigger>
@@ -779,7 +779,7 @@ export function MarketsView() {
           {loading ? (
             <TableSkeleton rows={8} />
           ) : sorted.length === 0 ? (
-            <div className="py-16 text-center text-sm text-muted-foreground">
+            <div className="py-12 text-center text-sm text-muted-foreground">
               Нет подходящих пар
             </div>
           ) : (
@@ -881,7 +881,7 @@ export function MarketsView() {
           {loading ? (
             <TableSkeleton rows={6} />
           ) : sorted.length === 0 ? (
-            <div className="py-16 text-center text-sm text-muted-foreground">
+            <div className="py-12 text-center text-sm text-muted-foreground">
               Нет подходящих пар
             </div>
           ) : (
@@ -889,8 +889,8 @@ export function MarketsView() {
               const up = r.change24h >= 0
               const dec = priceDecimals(r.priceRub)
               return (
-                <Card key={r.symbol} className="p-4">
-                  <div className="flex items-center justify-between mb-3">
+                <Card key={r.symbol} className="p-3.5">
+                  <div className="flex items-center justify-between mb-2.5">
                     <div className="flex items-center gap-2.5">
                       <button onClick={() => toggleFav(r.symbol)} aria-label="Избранное">
                         <Star
@@ -922,7 +922,7 @@ export function MarketsView() {
                     </span>
                   </div>
 
-                  <div className="flex items-end justify-between mb-3">
+                  <div className="flex items-end justify-between mb-2.5">
                     <div>
                       <div className="text-[10px] text-muted-foreground uppercase">Цена</div>
                       <div className="text-xl font-mono font-bold tabular-nums">
@@ -938,7 +938,7 @@ export function MarketsView() {
                     <Sparkline data={r.spark} width={90} height={30} />
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-[11px] mb-3">
+                  <div className="grid grid-cols-3 gap-2 text-[11px] mb-2.5">
                     <div>
                       <div className="text-muted-foreground">Макс 24ч</div>
                       <div className="font-mono tabular-nums">{r.high24h ? formatPrice(r.high24h, 'rub') : '—'}</div>
@@ -973,7 +973,7 @@ export function MarketsView() {
         <MyAlertsSection tickers={tickers} />
 
         {/* Footer hint */}
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
           <Badge variant="outline" className="border-border text-muted-foreground">
             <Star className="w-3 h-3 mr-1 fill-primary text-primary" /> Фавориты хранятся локально
           </Badge>

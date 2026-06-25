@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
+import { useI18n } from '@/lib/use-i18n'
 
 type Mode = 'login' | 'register'
 
@@ -61,6 +62,7 @@ const BADGES = [
 
 export function AuthView() {
   const isAuthed = useAppStore((s) => s.isAuthed)
+  const { t } = useI18n()
   const userName = useAppStore((s) => s.userName)
   const userEmail = useAppStore((s) => s.userEmail)
   const login = useAppStore((s) => s.login)
@@ -125,15 +127,15 @@ export function AuthView() {
   // If already authed
   if (isAuthed) {
     return (
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
-        <Card className="p-8 lg:p-10 max-w-md w-full text-center relative overflow-hidden bg-gradient-to-br from-primary/5 via-card to-card border-primary/20">
+      <div className="flex-1 flex items-center justify-center p-4 lg:p-6">
+        <Card className="p-5 lg:p-7 max-w-md w-full text-center relative overflow-hidden bg-gradient-to-br from-primary/5 via-card to-card border-primary/20">
           <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-primary/10 blur-3xl" aria-hidden />
           <div className="relative">
-            <div className="w-16 h-16 rounded-2xl bg-success/15 flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 className="w-8 h-8 text-success" />
+            <div className="w-14 h-14 rounded-2xl bg-success/15 flex items-center justify-center mx-auto mb-3">
+              <CheckCircle2 className="w-7 h-7 text-success" />
             </div>
-            <h1 className="text-2xl font-bold mb-2">Вы уже вошли</h1>
-            <p className="text-sm text-muted-foreground mb-6">
+            <h1 className="text-xl font-bold mb-1.5">{t('auth.welcome')}</h1>
+            <p className="text-xs text-muted-foreground mb-4">
               Аккаунт: <span className="text-foreground font-medium">{userName}</span>
               <br />
               {userEmail}
@@ -174,32 +176,32 @@ export function AuthView() {
 
   return (
     <div className="flex-1">
-      <div className="max-w-[1200px] mx-auto px-4 lg:px-8 py-8 lg:py-12">
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-stretch">
+      <div className="max-w-[1200px] mx-auto px-3 lg:px-5 py-4 lg:py-6">
+        <div className="grid lg:grid-cols-2 gap-5 lg:gap-7 items-stretch">
           {/* Side panel with value props (hidden on mobile) */}
           <div className="hidden lg:flex flex-col">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-black font-black text-2xl shadow-lg shadow-amber-500/20">
+            <div className="flex items-center gap-2.5 mb-5">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-black font-black text-2xl shadow-lg shadow-amber-500/20">
                 ₿
               </div>
               <div>
-                <div className="font-bold text-2xl tracking-tight">РусКрипто</div>
+                <div className="font-bold text-xl tracking-tight">РусКрипто</div>
                 <div className="text-xs text-muted-foreground tracking-wider">ЛЕГАЛЬНАЯ КРИПТОПЛАТФОРМА РФ</div>
               </div>
             </div>
 
-            <h2 className="text-3xl font-bold leading-tight mb-3">
+            <h2 className="text-2xl font-bold leading-tight mb-2">
               Торговля криптовалютой <span className="text-primary">по закону РФ</span>
             </h2>
-            <p className="text-sm text-muted-foreground mb-8">
+            <p className="text-sm text-muted-foreground mb-5">
               Первая лицензированная криптобиржа под надзором ЦБ. Спот-торги,
               P2P, кросс-бордер платежи и кастодия в единой экосистеме.
             </p>
 
-            <div className="space-y-4 mb-8">
+            <div className="space-y-3 mb-5">
               {VALUE_PROPS.map((v) => (
-                <div key={v.title} className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+                <div key={v.title} className="flex items-start gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
                     <v.icon className="w-5 h-5 text-primary" />
                   </div>
                   <div>
@@ -211,13 +213,13 @@ export function AuthView() {
             </div>
 
             <div className="mt-auto">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
                 <Scale className="w-3.5 h-3.5" />
                 Регуляторная база
               </div>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-2">
                 {BADGES.map((b) => (
-                  <div key={b.label} className="rounded-xl bg-muted/40 border border-border p-3">
+                  <div key={b.label} className="rounded-xl bg-muted/40 border border-border p-2.5">
                     <div className="font-mono font-bold text-sm text-primary">{b.label}</div>
                     <div className="text-[11px] text-muted-foreground mt-0.5">{b.desc}</div>
                   </div>
@@ -227,11 +229,11 @@ export function AuthView() {
           </div>
 
           {/* Form card */}
-          <Card className="p-6 lg:p-8 relative overflow-hidden">
+          <Card className="p-5 lg:p-6 relative overflow-hidden">
             <div className="absolute -top-20 -right-20 w-56 h-56 rounded-full bg-primary/5 blur-3xl" aria-hidden />
             <div className="relative">
               {/* Mobile logo */}
-              <div className="lg:hidden flex items-center gap-2.5 mb-6">
+              <div className="lg:hidden flex items-center gap-2.5 mb-4">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-black font-black text-xl shadow-lg shadow-amber-500/20">
                   ₿
                 </div>
@@ -242,7 +244,7 @@ export function AuthView() {
               </div>
 
               {/* Toggle */}
-              <div className="flex gap-1 bg-muted/60 p-1 rounded-xl mb-6">
+              <div className="flex gap-1 bg-muted/60 p-1 rounded-xl mb-4">
                 <button
                   type="button"
                   onClick={() => setMode('login')}
@@ -265,10 +267,10 @@ export function AuthView() {
                 </button>
               </div>
 
-              <h1 className="text-2xl font-bold mb-1">
-                {mode === 'login' ? 'Вход в аккаунт' : 'Создать аккаунт'}
+              <h1 className="text-xl font-bold mb-1">
+                {mode === 'login' ? t('auth.login') : t('auth.register')}
               </h1>
-              <p className="text-sm text-muted-foreground mb-6">
+              <p className="text-xs text-muted-foreground mb-4">
                 {mode === 'login'
                   ? 'Введите данные для входа в личный кабинет'
                   : 'Зарегистрируйтесь для доступа к торгам и кошельку'}
@@ -292,7 +294,7 @@ export function AuthView() {
                 )}
 
                 <div>
-                  <Label className="text-xs text-muted-foreground">Email</Label>
+                  <Label className="text-xs text-muted-foreground">{t('auth.email')}</Label>
                   <div className="relative mt-1.5">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
@@ -307,7 +309,7 @@ export function AuthView() {
                 </div>
 
                 <div>
-                  <Label className="text-xs text-muted-foreground">Пароль</Label>
+                  <Label className="text-xs text-muted-foreground">{t('auth.password')}</Label>
                   <div className="relative mt-1.5">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
@@ -367,14 +369,14 @@ export function AuthView() {
                     <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                   ) : (
                     <>
-                      {mode === 'login' ? 'Войти' : 'Создать аккаунт'}
+                      {mode === 'login' ? t('auth.loginBtn') : t('auth.registerBtn')}
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
                 </Button>
               </form>
 
-              <div className="flex items-center gap-3 my-5">
+              <div className="flex items-center gap-3 my-4">
                 <Separator className="flex-1" />
                 <span className="text-xs text-muted-foreground uppercase tracking-wider">или</span>
                 <Separator className="flex-1" />
@@ -389,20 +391,20 @@ export function AuthView() {
                 className="w-full h-11 gap-2.5 border-primary/40 text-primary hover:bg-primary/5"
               >
                 <Building2 className="w-4 h-4" />
-                Войти через Госуслуги (ЕСИА)
+                {t('auth.gosuslugi')}
               </Button>
 
               {/* Toggle link */}
-              <div className="text-center text-sm text-muted-foreground mt-6">
+              <div className="text-center text-sm text-muted-foreground mt-4">
                 {mode === 'login' ? (
                   <>
-                    Нет аккаунта?{' '}
+                    {t('auth.noAccount')}{' '}
                     <button
                       type="button"
                       onClick={() => setMode('register')}
                       className="text-primary font-semibold hover:underline"
                     >
-                      Зарегистрироваться
+                      {t('auth.registerLink')}
                     </button>
                   </>
                 ) : (
@@ -413,14 +415,14 @@ export function AuthView() {
                       onClick={() => setMode('login')}
                       className="text-primary font-semibold hover:underline"
                     >
-                      Войти
+                      {t('auth.loginLink')}
                     </button>
                   </>
                 )}
               </div>
 
               {/* Small print */}
-              <div className="mt-6 pt-5 border-t border-border text-[11px] text-muted-foreground leading-relaxed">
+              <div className="mt-4 pt-3 border-t border-border text-[11px] text-muted-foreground leading-relaxed">
                 {mode === 'register' ? (
                   <>
                     Регистрируясь, вы соглашаетесь с{' '}

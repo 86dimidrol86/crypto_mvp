@@ -1,6 +1,21 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  useSortable,
+  arrayMove,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
 import {
   ChevronDown,
   TrendingUp,
@@ -16,6 +31,8 @@ import {
   Wallet,
   Flame,
   Info,
+  GripVertical,
+  RotateCcw,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '@/lib/store'
@@ -45,6 +62,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { toast } from 'sonner'
+import { useMounted } from '@/lib/use-mounted'
+import { PositionRowSkeleton } from '@/components/page-skeleton'
 
 const PAIRS = [
   'BTC/RUB',
@@ -61,6 +80,61 @@ const LEVERAGE_PRESETS = [1, 2, 5, 10, 20]
 const MAX_LEVERAGE = 20
 const TAKER_FEE_RATE = 0.0006 // 0.06% taker (margin preferential)
 const MAINT_MARGIN_RATE = 0.005 // 0.5%
+
+// ─── Layout types & constants ───────────────────────────────────────────────
+type BlockId = 'chart' | 'positions' | 'history' | 'account' | 'form' | 'risk'
+type ColumnId = 'left' | 'right'
+
+const DEFAULT_LEFT_ORDER: BlockId[] = ['chart', 'positions', 'history']
+const DEFAULT_RIGHT_ORDER: BlockId[] = ['account', 'form', 'risk']
+
+const DEFAULT_SIZES = {
+  columns: [70, 30] as [number, number],
+  left: { chart: 55, positions: 28, history: 17 } as Record<BlockId, number>,
+  right: { account: 30, form: 45, risk: 25 } as Record<BlockId, number>,
+}
+
+const MIN_SIZES = {
+  left: { chart: 18, positions: 12, history: 10 } as Record<BlockId, number>,
+  right: { account: 12, form: 18, risk: 10 } as Record<BlockId, number>,
+}
+
+const LS_KEYS = {
+  leftOrder: 'margin-layout-order-left',
+  rightOrder: 'margin-layout-order-right',
+  leftSizes: 'margin-layout-sizes-left',
+  rightSizes: 'margin-layout-sizes-right',
+  columns: 'margin-layout-sizes-cols',
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function loadJSON<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return fallback
+    return JSON.parse(raw) as T
+  } catch {
+    return fallback
+  }
+}
+
+function saveJSON(key: string, value: unknown) {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    /* ignore */
+  }
+}
+
+function isValidOrder(saved: unknown, def: BlockId[]): saved is BlockId[] {
+  return (
+    Array.isArray(saved) &&
+    saved.length === def.length &&
+    saved.every((k) => def.includes(k as BlockId))
+  )
+}
 
 function priceDecimals(price: number): number {
   if (price >= 1000) return 2
@@ -81,7 +155,120 @@ function fmtSignedRub(n: number): string {
   return `${sign}${Math.abs(Math.round(n)).toLocaleString('ru-RU')} ₽`
 }
 
-// ─── Margin level bar (warning-color) ──────────────────────────────────────
+// ─── useMarginLayout: persist block order + panel sizes ─────────────────────
+function useMarginLayout() {
+  const [leftOrder, setLeftOrder] = useState<BlockId[]>(() => {
+    const saved = loadJSON<unknown>(LS_KEYS.leftOrder, DEFAULT_LEFT_ORDER)
+    return isValidOrder(saved, DEFAULT_LEFT_ORDER) ? saved : DEFAULT_LEFT_ORDER
+  })
+  const [rightOrder, setRightOrder] = useState<BlockId[]>(() => {
+    const saved = loadJSON<unknown>(LS_KEYS.rightOrder, DEFAULT_RIGHT_ORDER)
+    return isValidOrder(saved, DEFAULT_RIGHT_ORDER) ? saved : DEFAULT_RIGHT_ORDER
+  })
+  const [leftSizes, setLeftSizes] = useState<Record<BlockId, number>>(() =>
+    loadJSON(LS_KEYS.leftSizes, DEFAULT_SIZES.left)
+  )
+  const [rightSizes, setRightSizes] = useState<Record<BlockId, number>>(() =>
+    loadJSON(LS_KEYS.rightSizes, DEFAULT_SIZES.right)
+  )
+  const [columns, setColumns] = useState<[number, number]>(() =>
+    loadJSON(LS_KEYS.columns, DEFAULT_SIZES.columns)
+  )
+
+  // Per-key debounce timers so simultaneous onLayout callbacks from the three
+  // PanelGroups (cols + left + right) don't clobber each other's saves.
+  const saveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const debouncedSave = useCallback((key: string, value: unknown) => {
+    const timers = saveTimers.current
+    const existing = timers.get(key)
+    if (existing) clearTimeout(existing)
+    timers.set(
+      key,
+      setTimeout(() => {
+        saveJSON(key, value)
+        timers.delete(key)
+      }, 300)
+    )
+  }, [])
+
+  const onColumnsLayout = useCallback(
+    (sizes: number[]) => {
+      const next: [number, number] = [sizes[0] ?? 70, sizes[1] ?? 30]
+      setColumns(next)
+      debouncedSave(LS_KEYS.columns, next)
+    },
+    [debouncedSave]
+  )
+
+  const onLeftLayout = useCallback(
+    (sizes: number[]) => {
+      setLeftSizes((prev) => {
+        const next = { ...prev }
+        leftOrder.forEach((id, i) => {
+          next[id] = sizes[i] ?? prev[id] ?? 50
+        })
+        debouncedSave(LS_KEYS.leftSizes, next)
+        return next
+      })
+    },
+    [leftOrder, debouncedSave]
+  )
+
+  const onRightLayout = useCallback(
+    (sizes: number[]) => {
+      setRightSizes((prev) => {
+        const next = { ...prev }
+        rightOrder.forEach((id, i) => {
+          next[id] = sizes[i] ?? prev[id] ?? 50
+        })
+        debouncedSave(LS_KEYS.rightSizes, next)
+        return next
+      })
+    },
+    [rightOrder, debouncedSave]
+  )
+
+  const handleLeftReorder = useCallback((newOrder: BlockId[]) => {
+    setLeftOrder(newOrder)
+    saveJSON(LS_KEYS.leftOrder, newOrder)
+  }, [])
+  const handleRightReorder = useCallback((newOrder: BlockId[]) => {
+    setRightOrder(newOrder)
+    saveJSON(LS_KEYS.rightOrder, newOrder)
+  }, [])
+
+  const reset = useCallback(() => {
+    Object.values(LS_KEYS).forEach((k) => {
+      try {
+        localStorage.removeItem(k)
+      } catch {
+        /* ignore */
+      }
+    })
+    setLeftOrder(DEFAULT_LEFT_ORDER)
+    setRightOrder(DEFAULT_RIGHT_ORDER)
+    setLeftSizes(DEFAULT_SIZES.left)
+    setRightSizes(DEFAULT_SIZES.right)
+    setColumns(DEFAULT_SIZES.columns)
+    toast.success('Layout сброшен')
+  }, [])
+
+  return {
+    leftOrder,
+    rightOrder,
+    leftSizes,
+    rightSizes,
+    columns,
+    onColumnsLayout,
+    onLeftLayout,
+    onRightLayout,
+    handleLeftReorder,
+    handleRightReorder,
+    reset,
+  }
+}
+
+// ─── MarginLevelBar ─────────────────────────────────────────────────────────
 function MarginLevelBar({ ratio, label }: { ratio: number; label?: string }) {
   const v = Math.min(Math.max(ratio, 0), 100)
   let color = 'bg-success'
@@ -107,13 +294,69 @@ function MarginLevelBar({ ratio, label }: { ratio: number; label?: string }) {
   )
 }
 
-// ─── Account summary card ──────────────────────────────────────────────────
+// ─── Block: Chart (TradingView iframe, auto-reloads on significant resize) ─
+function ChartBlock({ dragHandle, symbol }: { dragHandle: ReactNode; symbol: string }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [reloadKey, setReloadKey] = useState(0)
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    let lastW = container.offsetWidth
+    let lastH = container.offsetHeight
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const ro = new ResizeObserver(() => {
+      const w = container.offsetWidth
+      const h = container.offsetHeight
+      if (Math.abs(w - lastW) > 60 || Math.abs(h - lastH) > 60) {
+        lastW = w
+        lastH = h
+        if (timer) clearTimeout(timer)
+        timer = setTimeout(() => setReloadKey((k) => k + 1), 600)
+      }
+    })
+    ro.observe(container)
+    return () => {
+      ro.disconnect()
+      if (timer) clearTimeout(timer)
+    }
+  }, [])
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col bg-card border border-border rounded-md overflow-hidden">
+      <div className="px-2.5 py-1.5 border-b border-border flex items-center gap-1.5 shrink-0">
+        {dragHandle}
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          График
+        </span>
+        <span className="ml-auto text-[10px] text-muted-foreground font-mono">
+          {symbol.replace('BINANCE:', '')}
+        </span>
+      </div>
+      <div ref={containerRef} className="flex-1 min-h-0 bg-black">
+        <iframe
+          key={reloadKey}
+          title="TradingView Margin Chart"
+          src={`https://www.tradingview.com/widgetembed/?frameElementId=tv&symbol=${encodeURIComponent(
+            symbol
+          )}&interval=5&theme=dark&hide_side_toolbar=false&hide_top_toolbar=false&allow_symbol_change=false&hideideas=true&hide_volume=false&autosize=true`}
+          className="w-full h-full border-0"
+          allowFullScreen
+        />
+      </div>
+    </div>
+  )
+}
+
+// ─── AccountSummaryCard ─────────────────────────────────────────────────────
 function AccountSummaryCard({
+  dragHandle,
   positions,
   equity,
   usedMargin,
   availableMargin,
 }: {
+  dragHandle: ReactNode
   positions: MarginPosition[]
   equity: number
   usedMargin: number
@@ -122,35 +365,35 @@ function AccountSummaryCard({
   const openPositions = positions.filter((p) => p.status === 'OPEN')
   const unrealizedPnl = openPositions.reduce((s, p) => s + p.unrealizedPnl, 0)
   const netEquity = equity + unrealizedPnl
-  // Account-level margin ratio: usedMargin / netEquity * 100
   const marginRatio = netEquity > 0 ? (usedMargin / netEquity) * 100 : 0
 
   return (
-    <Card className="overflow-hidden bg-card border-border">
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+    <div className="flex-1 min-h-0 flex flex-col bg-card border border-border rounded-md overflow-hidden">
+      <div className="px-2.5 py-1.5 border-b border-border flex items-center gap-1.5 shrink-0">
+        {dragHandle}
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
           <Wallet className="w-3.5 h-3.5 text-primary" />
-          Маржинальный аккаунт
+          Марж. аккаунт
         </span>
-        <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+        <Badge variant="outline" className="ml-auto text-[10px] border-primary/30 text-primary">
           RUB
         </Badge>
       </div>
-      <div className="p-4 space-y-3">
-        <div className="grid grid-cols-2 gap-3">
+      <div className="p-3 space-y-3 overflow-y-auto scrollbar-thin">
+        <div className="grid grid-cols-2 gap-2.5">
           <div>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Эквити</div>
-            <div className="text-lg font-mono font-bold tabular-nums mt-0.5">
+            <div className="text-base font-mono font-bold tabular-nums mt-0.5">
               {formatNumber(Math.round(netEquity))} ₽
             </div>
           </div>
           <div>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              Нереализованный PnL
+              Нереализ. PnL
             </div>
             <div
               className={cn(
-                'text-lg font-mono font-bold tabular-nums mt-0.5',
+                'text-base font-mono font-bold tabular-nums mt-0.5',
                 unrealizedPnl > 0
                   ? 'text-success'
                   : unrealizedPnl < 0
@@ -165,7 +408,7 @@ function AccountSummaryCard({
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
               Использовано
             </div>
-            <div className="text-sm font-mono tabular-nums mt-0.5">
+            <div className="text-xs font-mono tabular-nums mt-0.5">
               {formatNumber(Math.round(usedMargin))} ₽
             </div>
           </div>
@@ -173,7 +416,7 @@ function AccountSummaryCard({
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
               Доступно
             </div>
-            <div className="text-sm font-mono tabular-nums mt-0.5 text-primary">
+            <div className="text-xs font-mono tabular-nums mt-0.5 text-primary">
               {formatNumber(Math.round(availableMargin))} ₽
             </div>
           </div>
@@ -189,16 +432,18 @@ function AccountSummaryCard({
           )}
         </div>
       </div>
-    </Card>
+    </div>
   )
 }
 
-// ─── Open position form ────────────────────────────────────────────────────
+// ─── OpenPositionForm ───────────────────────────────────────────────────────
 function OpenPositionForm({
+  dragHandle,
   pair,
   price,
   availableMargin,
 }: {
+  dragHandle: ReactNode
   pair: string
   price: number
   availableMargin: number
@@ -259,20 +504,21 @@ function OpenPositionForm({
   }
 
   return (
-    <Card className="overflow-hidden bg-card border-border">
-      <div className="px-4 py-3 border-b border-border">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+    <div className="flex-1 min-h-0 flex flex-col bg-card border border-border rounded-md overflow-hidden">
+      <div className="px-2.5 py-1.5 border-b border-border flex items-center gap-1.5 shrink-0">
+        {dragHandle}
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
           <Zap className="w-3.5 h-3.5 text-primary" />
           Открыть позицию
         </span>
       </div>
-      <div className="p-4 space-y-3">
+      <div className="p-3 space-y-2.5 overflow-y-auto scrollbar-thin">
         {/* Side toggle */}
         <div className="grid grid-cols-2 gap-1.5">
           <button
             onClick={() => setSide('long')}
             className={cn(
-              'py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-1.5',
+              'py-2 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-1.5',
               side === 'long'
                 ? 'bg-success text-success-foreground shadow-sm'
                 : 'bg-muted/60 text-muted-foreground hover:bg-muted'
@@ -284,7 +530,7 @@ function OpenPositionForm({
           <button
             onClick={() => setSide('short')}
             className={cn(
-              'py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-1.5',
+              'py-2 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-1.5',
               side === 'short'
                 ? 'bg-destructive text-white shadow-sm'
                 : 'bg-muted/60 text-muted-foreground hover:bg-muted'
@@ -296,7 +542,7 @@ function OpenPositionForm({
         </div>
 
         {/* Leverage */}
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground">
             <span>Плечо</span>
             <span className="font-mono tabular-nums text-primary font-bold text-sm normal-case tracking-normal">
@@ -358,12 +604,15 @@ function OpenPositionForm({
             </span>
           </div>
           <div className="text-[10px] text-muted-foreground">
-            Доступно: <span className="font-mono tabular-nums">{formatNumber(Math.floor(availableMargin))} ₽</span>
+            Доступно:{' '}
+            <span className="font-mono tabular-nums">
+              {formatNumber(Math.floor(availableMargin))} ₽
+            </span>
           </div>
         </div>
 
         {/* Computed preview */}
-        <div className="space-y-1.5 p-3 rounded-lg bg-muted/40 border border-border">
+        <div className="space-y-1 p-2.5 rounded-lg bg-muted/40 border border-border">
           <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">Размер позиции</span>
             <span className="font-mono tabular-nums font-semibold">
@@ -371,7 +620,7 @@ function OpenPositionForm({
             </span>
           </div>
           <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Количество {base}</span>
+            <span className="text-muted-foreground">Кол-во {base}</span>
             <span className="font-mono tabular-nums">
               {quantity.toLocaleString('ru-RU', { maximumFractionDigits: 6 })}
             </span>
@@ -405,28 +654,29 @@ function OpenPositionForm({
         <Button
           onClick={handleSubmit}
           className={cn(
-            'w-full h-11 font-semibold text-white shadow-sm gap-1.5',
+            'w-full h-10 font-semibold text-white shadow-sm gap-1.5',
             side === 'long' ? 'bg-success hover:bg-success/90' : 'bg-destructive hover:bg-destructive/90'
           )}
         >
           Открыть {side === 'long' ? 'Long' : 'Short'} {pair}
         </Button>
       </div>
-    </Card>
+    </div>
   )
 }
 
-// ─── Risk metrics card ─────────────────────────────────────────────────────
-function RiskMetricsCard() {
+// ─── RiskMetricsCard ────────────────────────────────────────────────────────
+function RiskMetricsCard({ dragHandle }: { dragHandle: ReactNode }) {
   return (
-    <Card className="overflow-hidden bg-card border-border">
-      <div className="px-4 py-3 border-b border-border">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+    <div className="flex-1 min-h-0 flex flex-col bg-card border border-border rounded-md overflow-hidden">
+      <div className="px-2.5 py-1.5 border-b border-border flex items-center gap-1.5 shrink-0">
+        {dragHandle}
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
           <ShieldAlert className="w-3.5 h-3.5 text-warning" />
           Параметры риска
         </span>
       </div>
-      <div className="p-4 space-y-3 text-xs">
+      <div className="p-3 space-y-2 text-xs overflow-y-auto scrollbar-thin">
         <div className="flex justify-between">
           <span className="text-muted-foreground">Начальная маржа</span>
           <span className="font-mono tabular-nums">1 / плечо</span>
@@ -444,7 +694,9 @@ function RiskMetricsCard() {
           <span className="font-mono tabular-nums">{MAX_LEVERAGE}x</span>
         </div>
         <div className="pt-2 border-t border-border space-y-1.5">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Формула ликвидации</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Формула ликвидации
+          </div>
           <div className="font-mono text-[10px] text-muted-foreground leading-relaxed">
             <div>Long: P × (1 − 1/L + 0.005)</div>
             <div>Short: P × (1 + 1/L − 0.005)</div>
@@ -453,12 +705,12 @@ function RiskMetricsCard() {
         <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground pt-2 border-t border-border">
           <Info className="w-3 h-3 mt-0.5 shrink-0" />
           <span>
-            При достижении маржин-уровня 100% позиция автоматически
-            ликвидируется. Вы теряете всю предоставленную маржу.
+            При маржин-уровне 100% позиция автоматически ликвидируется. Вы теряете всю
+            предоставленную маржу.
           </span>
         </div>
       </div>
-    </Card>
+    </div>
   )
 }
 
@@ -492,7 +744,7 @@ function PositionRow({
   return (
     <div
       className={cn(
-        'grid grid-cols-12 gap-2 px-3 py-2.5 items-center text-xs border-b border-border/60 last:border-0 hover:bg-muted/40 transition-colors',
+        'grid grid-cols-12 gap-2 px-2.5 py-2 items-center text-xs border-b border-border/60 last:border-0 hover:bg-muted/40 transition-colors',
         flash === 'up' && 'flash-up',
         flash === 'down' && 'flash-down'
       )}
@@ -576,17 +828,23 @@ function PositionRow({
 }
 
 function OpenPositionsTable({
+  dragHandle,
   positions,
   onClose,
 }: {
+  dragHandle: ReactNode
   positions: MarginPosition[]
   onClose: (id: string) => void
 }) {
   const open = positions.filter((p) => p.status === 'OPEN')
+  const mounted = useMounted()
+  // First-paint skeleton: render before store hydrates (mounted false)
+  const showSkeleton = !mounted && open.length === 0
   return (
-    <Card className="overflow-hidden bg-card border-border">
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+    <div className="flex-1 min-h-0 flex flex-col bg-card border border-border rounded-md overflow-hidden">
+      <div className="px-2.5 py-1.5 border-b border-border flex items-center gap-1.5 shrink-0">
+        {dragHandle}
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
           <Activity className="w-3.5 h-3.5 text-primary" />
           Открытые позиции
           {open.length > 0 && (
@@ -596,17 +854,23 @@ function OpenPositionsTable({
           )}
         </span>
       </div>
-      {open.length === 0 ? (
-        <div className="px-4 py-12 text-center">
-          <CheckCircle2 className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
+      {showSkeleton ? (
+        <div className="p-2.5">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <PositionRowSkeleton key={i} />
+          ))}
+        </div>
+      ) : open.length === 0 ? (
+        <div className="px-3 py-10 text-center">
+          <CheckCircle2 className="w-7 h-7 mx-auto text-muted-foreground/40 mb-2" />
           <p className="text-sm text-muted-foreground">Нет открытых позиций</p>
           <p className="text-[11px] text-muted-foreground/70 mt-1">
-            Откройте Long или Short в форме справа
+            Откройте Long или Short в форме ниже
           </p>
         </div>
       ) : (
         <>
-          <div className="hidden md:grid grid-cols-12 gap-2 px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
+          <div className="hidden md:grid grid-cols-12 gap-2 px-2.5 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border shrink-0">
             <span className="col-span-2">Пара / Напр.</span>
             <span className="col-span-1">Размер</span>
             <span className="col-span-1">Вход</span>
@@ -616,7 +880,7 @@ function OpenPositionsTable({
             <span className="col-span-1">Ликв.</span>
             <span className="col-span-2">Маржин-колл</span>
           </div>
-          <ScrollArea className="max-h-[420px] scrollbar-thin">
+          <ScrollArea className="flex-1 min-h-0 scrollbar-thin">
             <div className="flex flex-col">
               {open.map((p) => (
                 <PositionRow key={p.id} pos={p} onClose={onClose} />
@@ -625,34 +889,41 @@ function OpenPositionsTable({
           </ScrollArea>
         </>
       )}
-    </Card>
+    </div>
   )
 }
 
 // ─── Position history table ────────────────────────────────────────────────
-function PositionHistory({ positions }: { positions: MarginPosition[] }) {
+function PositionHistory({
+  dragHandle,
+  positions,
+}: {
+  dragHandle: ReactNode
+  positions: MarginPosition[]
+}) {
   const closed = positions.filter((p) => p.status !== 'OPEN')
   return (
-    <Card className="overflow-hidden bg-card border-border">
-      <div className="px-4 py-3 border-b border-border">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+    <div className="flex-1 min-h-0 flex flex-col bg-card border border-border rounded-md overflow-hidden">
+      <div className="px-2.5 py-1.5 border-b border-border flex items-center gap-1.5 shrink-0">
+        {dragHandle}
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
           <XCircle className="w-3.5 h-3.5 text-muted-foreground" />
           История позиций
         </span>
       </div>
       {closed.length === 0 ? (
-        <div className="px-4 py-10 text-center">
+        <div className="px-3 py-8 text-center">
           <p className="text-sm text-muted-foreground">История пуста</p>
           <p className="text-[11px] text-muted-foreground/70 mt-1">
             Здесь появятся закрытые и ликвидированные позиции
           </p>
         </div>
       ) : (
-        <ScrollArea className="max-h-72 scrollbar-thin">
+        <ScrollArea className="flex-1 min-h-0 scrollbar-thin">
           <div className="flex flex-col">
-            <div className="hidden md:grid grid-cols-12 gap-2 px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
+            <div className="hidden md:grid grid-cols-12 gap-2 px-2.5 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
               <span className="col-span-2">Пара / Напр.</span>
-              <span className="col-span-2">PnL реализованный</span>
+              <span className="col-span-2">PnL реализ.</span>
               <span className="col-span-5">Вход → Выход</span>
               <span className="col-span-2">Статус</span>
               <span className="col-span-1 text-right">Время</span>
@@ -664,7 +935,7 @@ function PositionHistory({ positions }: { positions: MarginPosition[] }) {
               return (
                 <div
                   key={p.id}
-                  className="grid grid-cols-12 gap-2 px-3 py-2.5 items-center text-xs border-b border-border/60 last:border-0 hover:bg-muted/40"
+                  className="grid grid-cols-12 gap-2 px-2.5 py-2 items-center text-xs border-b border-border/60 last:border-0 hover:bg-muted/40"
                 >
                   <div className="col-span-12 md:col-span-2 flex items-center gap-1.5">
                     <CoinIcon symbol={p.pair.split('/')[0]} size={16} />
@@ -712,11 +983,167 @@ function PositionHistory({ positions }: { positions: MarginPosition[] }) {
           </div>
         </ScrollArea>
       )}
-    </Card>
+    </div>
   )
 }
 
-// ─── Main MarginView ───────────────────────────────────────────────────────
+// ─── MarginResizeHandle: thin draggable divider between panels ──────────────
+function MarginResizeHandle({
+  id,
+  orientation,
+}: {
+  id: string
+  orientation: 'horizontal' | 'vertical'
+}) {
+  const isHoriz = orientation === 'horizontal'
+  return (
+    <PanelResizeHandle
+      id={id}
+      className={cn(
+        'relative group flex items-center justify-center shrink-0 z-10',
+        isHoriz ? 'w-2 cursor-col-resize' : 'h-2 cursor-row-resize'
+      )}
+    >
+      <div
+        className={cn(
+          'bg-border group-hover:bg-primary transition-colors',
+          isHoriz ? 'w-px h-full' : 'h-px w-full'
+        )}
+      />
+      <div
+        className={cn(
+          'absolute rounded-full bg-primary/50 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none',
+          isHoriz ? 'h-6 w-1' : 'w-6 h-1'
+        )}
+      />
+    </PanelResizeHandle>
+  )
+}
+
+// ─── SortableBlock: wrapper that makes a block drag-reorderable ─────────────
+function SortableBlock({
+  id,
+  render,
+}: {
+  id: BlockId
+  render: (dragHandle: ReactNode) => ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, isDragging, isOver } = useSortable({ id })
+  const dragHandle = (
+    <button
+      type="button"
+      {...attributes}
+      {...listeners}
+      className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-primary touch-none flex items-center justify-center shrink-0"
+      aria-label="Перетащить блок"
+      title="Перетащите, чтобы изменить порядок"
+    >
+      <GripVertical className="w-3.5 h-3.5" />
+    </button>
+  )
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        'flex-1 min-h-0 flex flex-col',
+        isDragging && 'opacity-30',
+        isOver && !isDragging && 'ring-2 ring-inset ring-primary/70 z-20'
+      )}
+    >
+      {render(dragHandle)}
+    </div>
+  )
+}
+
+// ─── ColumnPanelGroup: a vertical PanelGroup with drag-reorderable blocks ──
+function ColumnPanelGroup({
+  columnId,
+  order,
+  sizes,
+  minSizes,
+  onLayout,
+  onReorder,
+  renderBlock,
+}: {
+  columnId: ColumnId
+  order: BlockId[]
+  sizes: Record<BlockId, number>
+  minSizes: Record<BlockId, number>
+  onLayout: (sizes: number[]) => void
+  onReorder: (newOrder: BlockId[]) => void
+  renderBlock: (blockId: BlockId, dragHandle: ReactNode) => ReactNode
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  )
+  const [isDragging, setIsDragging] = useState(false)
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id) return
+      const oldIndex = order.indexOf(active.id as BlockId)
+      const newIndex = order.indexOf(over.id as BlockId)
+      if (oldIndex < 0 || newIndex < 0) return
+      onReorder(arrayMove(order, oldIndex, newIndex))
+    },
+    [order, onReorder]
+  )
+
+  // While dragging, disable iframe pointer events so the TradingView chart
+  // can't steal the cursor (see globals.css `body.trade-dnd-dragging`).
+  useEffect(() => {
+    if (isDragging) {
+      document.body.classList.add('trade-dnd-dragging')
+      return () => document.body.classList.remove('trade-dnd-dragging')
+    }
+    return undefined
+  }, [isDragging])
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={() => setIsDragging(true)}
+      onDragEnd={(e) => {
+        setIsDragging(false)
+        handleDragEnd(e)
+      }}
+      onDragCancel={() => setIsDragging(false)}
+    >
+      <PanelGroup
+        direction="vertical"
+        id={`margin-${columnId}`}
+        onLayout={onLayout}
+        className="h-full"
+      >
+        <SortableContext items={order} strategy={verticalListSortingStrategy}>
+          {order.map((blockId, i) => (
+            <Fragment key={blockId}>
+              {i > 0 && (
+                <MarginResizeHandle id={`${columnId}-h-${i}`} orientation="vertical" />
+              )}
+              <Panel
+                id={blockId}
+                order={i}
+                defaultSize={sizes[blockId] ?? 50}
+                minSize={minSizes[blockId] ?? 10}
+                className="flex flex-col"
+              >
+                <SortableBlock
+                  id={blockId}
+                  render={(dh) => renderBlock(blockId, dh)}
+                />
+              </Panel>
+            </Fragment>
+          ))}
+        </SortableContext>
+      </PanelGroup>
+    </DndContext>
+  )
+}
+
+// ─── Main MarginView ────────────────────────────────────────────────────────
 export function MarginView() {
   const [selectedPair, setSelectedPair] = useState<string>('BTC/RUB')
   const [tickers, setTickers] = useState<CoinTicker[]>([])
@@ -728,6 +1155,8 @@ export function MarginView() {
   const marginAccount = useAppStore((s) => s.marginAccount)
   const closeMarginPosition = useAppStore((s) => s.closeMarginPosition)
   const updateMarginPrices = useAppStore((s) => s.updateMarginPrices)
+
+  const layout = useMarginLayout()
 
   // Live WS market data for selected pair
   const { livePrice: wsPrice, connected } = useLiveMarket(selectedPair)
@@ -789,8 +1218,6 @@ export function MarginView() {
   }, [highlight])
 
   // Live-update margin positions on each price tick for the selected pair.
-  // This recomputes PnL and margin ratio for all OPEN positions of this pair
-  // and auto-liquidates any that hit 100%.
   useEffect(() => {
     if (livePrice <= 0) return
     updateMarginPrices({ [selectedPair]: livePrice })
@@ -837,29 +1264,100 @@ export function MarginView() {
     })
   }
 
+  const renderBlock = useCallback(
+    (blockId: BlockId, dragHandle: ReactNode): ReactNode => {
+      switch (blockId) {
+        case 'chart':
+          return <ChartBlock dragHandle={dragHandle} symbol={tvSymbol} />
+        case 'positions':
+          return (
+            <OpenPositionsTable
+              dragHandle={dragHandle}
+              positions={marginPositions}
+              onClose={handleClose}
+            />
+          )
+        case 'history':
+          return <PositionHistory dragHandle={dragHandle} positions={marginPositions} />
+        case 'account':
+          return (
+            <AccountSummaryCard
+              dragHandle={dragHandle}
+              positions={marginPositions}
+              equity={marginAccount.equity}
+              usedMargin={marginAccount.usedMargin}
+              availableMargin={marginAccount.availableMargin}
+            />
+          )
+        case 'form':
+          return (
+            <OpenPositionForm
+              dragHandle={dragHandle}
+              pair={selectedPair}
+              price={livePrice}
+              availableMargin={marginAccount.availableMargin}
+            />
+          )
+        case 'risk':
+          return <RiskMetricsCard dragHandle={dragHandle} />
+        default:
+          return null
+      }
+    },
+    [
+      tvSymbol,
+      marginPositions,
+      handleClose,
+      marginAccount.equity,
+      marginAccount.usedMargin,
+      marginAccount.availableMargin,
+      selectedPair,
+      livePrice,
+    ]
+  )
+
+  // Mobile stacked-block heights
+  const mobileHeight = (id: BlockId): string => {
+    switch (id) {
+      case 'chart':
+        return 'h-[400px]'
+      case 'positions':
+        return 'h-[440px]'
+      case 'history':
+        return 'h-[260px]'
+      case 'account':
+        return 'h-[300px]'
+      case 'form':
+        return 'h-[560px]'
+      case 'risk':
+        return 'h-[280px]'
+      default:
+        return 'h-[260px]'
+    }
+  }
+
   return (
     <div className="flex-1 bg-background">
-      <div className="mx-auto max-w-[1600px] px-3 lg:px-5 py-4">
-        {/* Risk warning banner */}
-        <div className="mb-3 flex items-start gap-2.5 px-3 py-2.5 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive">
-          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-          <p className="text-xs leading-relaxed">
-            <span className="font-semibold">Внимание:</span> маржинальная торговля
-            сопряжена с высоким риском. При маржин-колле позиция ликвидируется, а
-            маржа полностью утрачивается. Используйте умеренное плечо и
-            устанавливайте стопы.
+      <div className="mx-auto max-w-[1600px] px-2 lg:px-3 py-2">
+        {/* Risk warning banner (fixed outside resizable area) */}
+        <div className="mb-2 flex items-start gap-2 px-2.5 py-1.5 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive">
+          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <p className="text-[11px] leading-relaxed">
+            <span className="font-semibold">Внимание:</span> маржинальная торговля сопряжена с
+            высоким риском. При маржин-колле позиция ликвидируется, а маржа полностью
+            утрачивается. Используйте умеренное плечо и устанавливайте стопы.
           </p>
         </div>
 
-        {/* Top pair bar */}
-        <div className="flex flex-wrap items-center gap-3 lg:gap-5 mb-4 p-3 bg-card border border-border rounded-xl">
+        {/* Top pair bar (fixed outside resizable area) */}
+        <div className="flex flex-wrap items-center gap-2 lg:gap-4 mb-2 p-2 bg-card border border-border rounded-lg">
           {/* Pair selector */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2 h-10 px-3 font-semibold">
-                <CoinIcon symbol={base} size={22} />
+              <Button variant="outline" className="gap-1.5 h-8 px-2.5 font-semibold text-sm">
+                <CoinIcon symbol={base} size={20} />
                 <span>{selectedPair}</span>
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
@@ -870,10 +1368,10 @@ export function MarginView() {
                   <DropdownMenuItem
                     key={p}
                     onClick={() => setSelectedPair(p)}
-                    className="gap-2.5 cursor-pointer py-2"
+                    className="gap-2 cursor-pointer py-1.5"
                   >
-                    <CoinIcon symbol={sym} size={20} />
-                    <span className="flex-1 font-medium">{p}</span>
+                    <CoinIcon symbol={sym} size={18} />
+                    <span className="flex-1 font-medium text-sm">{p}</span>
                     {tk && (
                       <span className="text-xs font-mono text-muted-foreground">
                         {formatPrice(tk.priceRub, 'rub')}
@@ -886,10 +1384,10 @@ export function MarginView() {
           </DropdownMenu>
 
           {/* Live price */}
-          <div className="flex items-baseline gap-3">
+          <div className="flex items-baseline gap-2">
             <span
               className={cn(
-                'inline-block rounded-md px-2 py-0.5 text-2xl lg:text-3xl font-mono font-bold tabular-nums transition-colors',
+                'inline-block rounded-md px-1.5 py-0.5 text-xl lg:text-2xl font-mono font-bold tabular-nums transition-colors',
                 highlight === 'up' && 'flash-up text-success',
                 highlight === 'down' && 'flash-down text-destructive',
                 !highlight && 'text-foreground'
@@ -899,7 +1397,7 @@ export function MarginView() {
                 ? `${livePrice.toLocaleString('ru-RU', { maximumFractionDigits: decimals })} ₽`
                 : '— —'}
             </span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-[11px] text-muted-foreground">
               ≈ {ticker ? formatPrice(ticker.priceUsd, 'usd') : '—'}
             </span>
             {connected && (
@@ -910,29 +1408,29 @@ export function MarginView() {
           </div>
 
           {/* 24h change */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <span
               className={cn(
-                'flex items-center gap-1 text-sm font-semibold px-2 py-1 rounded-md',
+                'flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded-md',
                 isUp ? 'text-success bg-success/10' : 'text-destructive bg-destructive/10'
               )}
             >
-              {isUp ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+              {isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
               {formatPercent(change24h)}
             </span>
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground hidden sm:inline">
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground hidden sm:inline">
               24ч
             </span>
           </div>
 
-          {/* Activate margin toggle */}
-          <div className="ml-auto flex items-center gap-2">
+          {/* Right side: margin activation toggle + reset layout */}
+          <div className="ml-auto flex items-center gap-1.5">
             <TooltipProvider delayDuration={200}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/40 border border-border">
+                  <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-muted/40 border border-border">
                     <Zap className="w-3.5 h-3.5 text-primary" />
-                    <span className="text-xs font-medium">Маржа активна</span>
+                    <span className="text-[11px] font-medium hidden sm:inline">Маржа активна</span>
                     <Switch checked={marginActivated} onCheckedChange={setMarginActivated} />
                   </div>
                 </TooltipTrigger>
@@ -941,55 +1439,87 @@ export function MarginView() {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={layout.reset}
+              className="h-8 gap-1.5 text-[11px] text-muted-foreground hover:text-primary"
+              title="Сбросить layout"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">Сбросить layout</span>
+            </Button>
           </div>
         </div>
 
         <AnimatePresence>
           {marginActivated ? (
             <motion.div
+              key="margin-active"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4"
             >
-              {/* LEFT/CENTER */}
-              <div className="space-y-4 min-w-0">
-                {/* Chart */}
-                <Card className="overflow-hidden bg-black border-border p-0">
-                  <div className="h-[400px] w-full">
-                    <iframe
-                      title="TradingView Margin Chart"
-                      src={`https://www.tradingview.com/widgetembed/?frameElementId=tv&symbol=${encodeURIComponent(
-                        tvSymbol
-                      )}&interval=5&theme=dark&hide_side_toolbar=false&hide_top_toolbar=false&allow_symbol_change=false&hideideas=true&hide_volume=false`}
-                      className="w-full h-full border-0"
-                      allowFullScreen
+              {/* Desktop (lg+): resizable + rearrangeable panel grid */}
+              <div className="hidden lg:block h-[calc(100vh-200px)] min-h-[480px]">
+                <PanelGroup
+                  direction="horizontal"
+                  id="margin-cols"
+                  onLayout={layout.onColumnsLayout}
+                >
+                  <Panel
+                    id="left-col"
+                    order={0}
+                    defaultSize={layout.columns[0]}
+                    minSize={45}
+                    maxSize={78}
+                    className="flex flex-col"
+                  >
+                    <ColumnPanelGroup
+                      columnId="left"
+                      order={layout.leftOrder}
+                      sizes={layout.leftSizes}
+                      minSizes={MIN_SIZES.left}
+                      onLayout={layout.onLeftLayout}
+                      onReorder={layout.handleLeftReorder}
+                      renderBlock={renderBlock}
                     />
-                  </div>
-                </Card>
-
-                <OpenPositionsTable positions={marginPositions} onClose={handleClose} />
-                <PositionHistory positions={marginPositions} />
+                  </Panel>
+                  <MarginResizeHandle id="cols-h" orientation="horizontal" />
+                  <Panel
+                    id="right-col"
+                    order={1}
+                    defaultSize={layout.columns[1]}
+                    minSize={22}
+                    maxSize={55}
+                    className="flex flex-col"
+                  >
+                    <ColumnPanelGroup
+                      columnId="right"
+                      order={layout.rightOrder}
+                      sizes={layout.rightSizes}
+                      minSizes={MIN_SIZES.right}
+                      onLayout={layout.onRightLayout}
+                      onReorder={layout.handleRightReorder}
+                      renderBlock={renderBlock}
+                    />
+                  </Panel>
+                </PanelGroup>
               </div>
 
-              {/* RIGHT */}
-              <div className="space-y-4">
-                <AccountSummaryCard
-                  positions={marginPositions}
-                  equity={marginAccount.equity}
-                  usedMargin={marginAccount.usedMargin}
-                  availableMargin={marginAccount.availableMargin}
-                />
-                <OpenPositionForm
-                  pair={selectedPair}
-                  price={livePrice}
-                  availableMargin={marginAccount.availableMargin}
-                />
-                <RiskMetricsCard />
+              {/* Mobile (<lg): stacked blocks, no resize/drag */}
+              <div className="lg:hidden space-y-2">
+                {[...layout.leftOrder, ...layout.rightOrder].map((blockId) => (
+                  <div key={blockId} className={cn(mobileHeight(blockId), 'flex flex-col')}>
+                    {renderBlock(blockId, <span aria-hidden />)}
+                  </div>
+                ))}
               </div>
             </motion.div>
           ) : (
             <motion.div
+              key="margin-inactive"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -998,11 +1528,12 @@ export function MarginView() {
                 <div className="w-16 h-16 mx-auto rounded-full bg-warning/10 flex items-center justify-center mb-4">
                   <ShieldAlert className="w-8 h-8 text-warning" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">Маржинальная торговля деактивирована</h3>
+                <h3 className="text-lg font-semibold mb-2">
+                  Маржинальная торговля деактивирована
+                </h3>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">
-                  Активируйте маржу, чтобы открывать позиции с плечом. Убедитесь,
-                  что вы понимаете риски маржинальной торговли перед
-                  использованием.
+                  Активируйте маржу, чтобы открывать позиции с плечом. Убедитесь, что вы понимаете
+                  риски маржинальной торговли перед использованием.
                 </p>
                 <Button
                   onClick={() => setMarginActivated(true)}

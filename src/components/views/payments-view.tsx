@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 import {
   Send,
   Clock,
@@ -27,6 +28,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -34,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { TxRowSkeleton } from '@/components/page-skeleton'
 
 const CORRIDORS: Corridor[] = [
   { id: 'RU-CN', name: 'Россия → Китай', from: 'RUB', to: 'CNY', rate: 0.083, fee: 0.008, eta: '15-40 мин', flag: '🇨🇳' },
@@ -278,11 +281,11 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">Коридор</Label>
           <Select value={corridorId} onValueChange={setCorridorId}>
-            <SelectTrigger className="w-full h-11">
+            <SelectTrigger className="w-full h-10">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -306,10 +309,10 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
               inputMode="decimal"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="h-14 text-2xl font-mono tabular-nums pr-16 bg-input/40"
+              className="h-12 text-xl font-mono tabular-nums pr-14 bg-input/40"
               placeholder="0"
             />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">
               {corridor.from}
             </span>
           </div>
@@ -357,7 +360,7 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
         </div>
 
         {/* Live computed summary */}
-        <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2.5">
+        <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Курс</span>
             <span className="font-mono">
@@ -372,8 +375,8 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
           </div>
           <Separator />
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Получит бенефициар</span>
-            <span className="text-xl font-mono font-bold text-primary tabular-nums">
+            <span className="sm:text-muted-foreground">Получит бенефициар</span>
+            <span className="text-lg font-mono font-bold text-primary tabular-nums">
               {formatNumber(receiveAmount)} {corridor.to}
             </span>
           </div>
@@ -388,7 +391,7 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
         <Button
           onClick={handleSubmit}
           disabled={submitting}
-          className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90 gap-2 font-semibold"
+          className="w-full h-10 bg-primary text-primary-foreground hover:bg-primary/90 gap-2 font-semibold"
         >
           {submitting ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -428,10 +431,10 @@ function CorridorsCard() {
         {CORRIDORS.map((c) => (
           <div
             key={c.id}
-            className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/20 hover:border-primary/30 transition group"
+            className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-muted/20 hover:border-primary/30 transition group"
           >
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="text-2xl leading-none">{c.flag}</span>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="text-xl leading-none">{c.flag}</span>
               <div className="min-w-0">
                 <div className="text-sm font-medium truncate">{c.name}</div>
                 <div className="text-[11px] text-muted-foreground font-mono">
@@ -455,13 +458,63 @@ function CorridorsCard() {
   )
 }
 
-function MyPayments({ apiPayments }: { apiPayments: CrossBorderPayment[] | null }) {
+function MyPayments({
+  apiPayments,
+  loading,
+}: {
+  apiPayments: CrossBorderPayment[] | null
+  loading: boolean
+}) {
   const storePayments = useAppStore((s) => s.payments)
   const mounted = useMounted()
   // Prefer API payments when present; fall back to store for resilience.
   // Also surface store-only payments (e.g. the just-created local record whose
   // status simulation is mid-flight) so the UI doesn't lose them.
   const payments = apiPayments && apiPayments.length > 0 ? apiPayments : storePayments
+
+  // First-paint skeleton: API still loading, no payments to show yet
+  if (loading && !apiPayments && storePayments.length === 0) {
+    return (
+      <Card className="bg-card/60 backdrop-blur">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center">
+              <Receipt className="w-5 h-5" />
+            </div>
+            <div className="space-y-1.5">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-3 w-40" />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2.5">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="p-3 rounded-xl border border-border bg-muted/20"
+              >
+                <div className="flex items-start justify-between gap-3 mb-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <Skeleton className="w-8 h-8 rounded-lg" />
+                    <div className="space-y-1.5">
+                      <Skeleton className="h-3.5 w-32" />
+                      <Skeleton className="h-2.5 w-24" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-5 w-20 rounded-md" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Skeleton className="h-8 w-full rounded-md" />
+                  <Skeleton className="h-8 w-full rounded-md" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card className="bg-card/60 backdrop-blur">
@@ -484,8 +537,8 @@ function MyPayments({ apiPayments }: { apiPayments: CrossBorderPayment[] | null 
       </CardHeader>
       <CardContent>
         {payments.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-muted/40 flex items-center justify-center mb-3">
+          <div className="flex flex-col items-center justify-center py-10 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-muted/40 flex items-center justify-center mb-2.5">
               <Send className="w-6 h-6 text-muted-foreground" />
             </div>
             <div className="text-sm font-medium">Платежей пока нет</div>
@@ -494,15 +547,18 @@ function MyPayments({ apiPayments }: { apiPayments: CrossBorderPayment[] | null 
             </div>
           </div>
         ) : (
-          <div className="space-y-3 max-h-[520px] overflow-y-auto scrollbar-thin pr-1">
-            {payments.map((p) => {
+          <div className="space-y-2.5 max-h-[520px] overflow-y-auto scrollbar-thin pr-1">
+            {payments.map((p, i) => {
               const flag = CORRIDORS.find((c) => c.name === p.corridor)?.flag || '🌐'
               return (
-                <div
+                <motion.div
                   key={p.id}
-                  className="p-4 rounded-xl border border-border bg-muted/20 hover:border-primary/30 transition"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.22, delay: Math.min(i * 0.03, 0.4), ease: 'easeOut' }}
+                  className="p-3 rounded-xl border border-border bg-muted/20 hover:border-primary/30 transition"
                 >
-                  <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex items-start justify-between gap-3 mb-2.5">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <span className="text-2xl leading-none">{flag}</span>
                       <div className="min-w-0">
@@ -527,7 +583,7 @@ function MyPayments({ apiPayments }: { apiPayments: CrossBorderPayment[] | null 
                     </Badge>
                   </div>
 
-                  <div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 mb-3">
+                  <div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 mb-2.5">
                     <div className="text-[11px] text-muted-foreground">Отправлено</div>
                     <div className="text-[11px] text-muted-foreground text-right">Получено</div>
                     <div className="text-sm font-mono font-semibold">
@@ -539,7 +595,7 @@ function MyPayments({ apiPayments }: { apiPayments: CrossBorderPayment[] | null 
                   </div>
 
                   <PaymentStepper payment={p} />
-                </div>
+                </motion.div>
               )
             })}
           </div>
@@ -552,8 +608,8 @@ function MyPayments({ apiPayments }: { apiPayments: CrossBorderPayment[] | null 
 function RegulatoryNote() {
   return (
     <Card className="bg-gradient-to-r from-primary/5 via-card to-card border-primary/20">
-      <CardContent className="flex items-start gap-4 p-5">
-        <div className="w-10 h-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
+      <CardContent className="flex items-start gap-3 p-4">
+        <div className="w-9 h-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
           <ShieldCheck className="w-5 h-5" />
         </div>
         <div className="text-sm">
@@ -567,7 +623,7 @@ function RegulatoryNote() {
             Все платежи проходят валютный контроль (173-ФЗ). Паспорт сделки и УФЭД
             формируются автоматически и доступны в Data Room регулятора.
           </p>
-          <div className="flex flex-wrap gap-3 mt-3 text-[11px] text-muted-foreground">
+          <div className="flex flex-wrap gap-2.5 mt-2.5 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1">
               <FileText className="w-3 h-3 text-primary" /> Паспорт сделки
             </span>
@@ -588,7 +644,7 @@ export function PaymentsView() {
   // Refresh trigger — bump after a payment is created to refetch from /api/payments
   const [refreshKey, setRefreshKey] = useState(0)
   const paymentsUrl = refreshKey ? `/api/payments?t=${refreshKey}` : '/api/payments'
-  const { data } = useApi<{ payments: any[] }>(paymentsUrl)
+  const { data, loading } = useApi<{ payments: any[] }>(paymentsUrl)
 
   const apiPayments: CrossBorderPayment[] | null =
     data?.payments && Array.isArray(data.payments) && data.payments.length > 0
@@ -598,12 +654,12 @@ export function PaymentsView() {
   const refresh = () => setRefreshKey((k) => k + 1)
 
   return (
-    <div className="flex-1 py-8">
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-8 space-y-6">
+    <div className="flex-1 py-4">
+      <div className="max-w-[1400px] mx-auto px-3 lg:px-5 space-y-4">
         {/* Header */}
-        <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+        <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-1.5">
               <Badge variant="outline" className="border-primary/30 text-primary gap-1.5">
                 <Send className="w-3 h-3" />
                 CROSS-BORDER
@@ -612,22 +668,22 @@ export function PaymentsView() {
                 173-ФЗ
               </Badge>
             </div>
-            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">
+            <h1 className="text-xl lg:text-2xl font-bold tracking-tight">
               Кросс-бордер платежи
             </h1>
-            <p className="text-sm text-muted-foreground mt-1.5">
+            <p className="text-xs text-muted-foreground mt-1">
               Валютный контроль 173-ФЗ • автоформируемые документы
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/40 border border-border">
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-muted/40 border border-border">
               <Building2 className="w-4 h-4 text-primary" />
               <div className="text-xs">
                 <div className="text-muted-foreground">Банк-корреспондент</div>
                 <div className="font-semibold"> Gazprombank (RUB)</div>
               </div>
             </div>
-            <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/40 border border-border">
+            <div className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-muted/40 border border-border">
               <Banknote className="w-4 h-4 text-success" />
               <div className="text-xs">
                 <div className="text-muted-foreground">Ликвидность 24ч</div>
@@ -638,13 +694,76 @@ export function PaymentsView() {
         </header>
 
         {/* Two-column layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-6">
-          <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-4">
+          <div className="space-y-4">
             <NewPaymentForm onCreated={refresh} />
           </div>
-          <div className="space-y-6">
-            <CorridorsCard />
-            <MyPayments apiPayments={apiPayments} />
+          <div className="space-y-4">
+            {/* First-paint skeletons for corridors card + my payments */}
+            {loading && !data ? (
+              <>
+                {/* Corridors skeleton (2 cards) */}
+                <Card className="bg-card/60 backdrop-blur">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <div className="w-9 h-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center">
+                        <Globe2 className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Skeleton className="h-4 w-36" />
+                        <Skeleton className="h-3 w-44" />
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {Array.from({ length: 2 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-muted/20"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Skeleton className="w-6 h-6 rounded-md" />
+                          <div className="space-y-1.5">
+                            <Skeleton className="h-3 w-32" />
+                            <Skeleton className="h-2.5 w-20" />
+                          </div>
+                        </div>
+                        <div className="text-right space-y-1.5">
+                          <Skeleton className="h-2.5 w-12 ml-auto" />
+                          <Skeleton className="h-2.5 w-16 ml-auto" />
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+                {/* My payments skeleton (3 rows) */}
+                <Card className="bg-card/60 backdrop-blur">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <div className="w-9 h-9 rounded-xl bg-primary/15 text-primary flex items-center justify-center">
+                        <Receipt className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-3 w-40" />
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2.5">
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <TxRowSkeleton key={i} />
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <>
+                <CorridorsCard />
+                <MyPayments apiPayments={apiPayments} loading={loading} />
+              </>
+            )}
           </div>
         </div>
 

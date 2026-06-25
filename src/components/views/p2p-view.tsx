@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import {
   Users,
   Plus,
@@ -42,6 +43,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { toast } from 'sonner'
+import { OfferRowSkeleton } from '@/components/page-skeleton'
 
 const PAYMENT_METHODS = ['СБП', 'Тинькофф', 'Сбер', 'Альфа-Банк', 'Райффайзен', 'СБП + Тинькофф']
 
@@ -149,7 +151,7 @@ function OfferRow({
     : 'bg-success text-success-foreground hover:bg-success/90'
 
   return (
-    <div className="grid grid-cols-12 gap-3 px-4 py-3.5 items-center border-b border-border/60 last:border-0 hover:bg-muted/30 transition">
+    <div className="grid grid-cols-12 gap-3 px-3 py-3 items-center border-b border-border/60 last:border-0 hover:bg-muted/30 transition">
       {/* User */}
       <div className="col-span-12 sm:col-span-4 flex items-center gap-2.5">
         <Avatar name={offer.user} size={32} />
@@ -203,9 +205,11 @@ function OfferRow({
 // ─── Offers section ─────────────────────────────────────────────────────────
 function OffersSection({
   apiOffers,
+  loading,
   onAcceptOffer,
 }: {
   apiOffers: P2POffer[] | null
+  loading: boolean
   onAcceptOffer: (offer: P2POffer) => void
 }) {
   const storeOffers = useAppStore((s) => s.p2pOffers)
@@ -246,10 +250,13 @@ function OffersSection({
     })
   }
 
+  // First-paint skeleton: API still loading, no offers yet to show
+  const showSkeleton = loading && !apiOffers && storeOffers.length === 0
+
   return (
     <Card className="overflow-hidden">
       {/* Buy / Sell toggle */}
-      <div className="p-3 border-b border-border">
+      <div className="p-2.5 border-b border-border">
         <div className="grid grid-cols-2 gap-1.5">
           <button
             onClick={() => setTab('buy')}
@@ -277,7 +284,7 @@ function OffersSection({
       </div>
 
       {/* Filters */}
-      <div className="p-3 border-b border-border grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+      <div className="p-2.5 border-b border-border grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
@@ -314,15 +321,21 @@ function OffersSection({
       </div>
 
       {/* Header row (desktop) */}
-      <div className="hidden sm:grid grid-cols-12 gap-3 px-4 py-2 text-[10px] uppercase tracking-wider text-muted-foreground bg-muted/30 border-b border-border">
+      <div className="hidden sm:grid grid-cols-12 gap-3 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground bg-muted/30 border-b border-border">
         <span className="col-span-4">Рекламодатель</span>
         <span className="col-span-3">Способ оплаты</span>
         <span className="col-span-2 text-right">Доступно</span>
         <span className="col-span-3 text-right">Цена</span>
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="p-10 text-center">
+      {showSkeleton ? (
+        <div>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <OfferRowSkeleton key={i} />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="p-8 text-center">
           <Users className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
           <p className="text-sm text-muted-foreground">Нет подходящих объявлений</p>
           <p className="text-[11px] text-muted-foreground/70 mt-1">
@@ -331,8 +344,15 @@ function OffersSection({
         </div>
       ) : (
         <ScrollArea className="max-h-[640px]">
-          {filtered.map((o) => (
-            <OfferRow key={o.id} offer={o} onAccept={handleAccept} />
+          {filtered.map((o, i) => (
+            <motion.div
+              key={o.id}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, delay: Math.min(i * 0.03, 0.4), ease: 'easeOut' }}
+            >
+              <OfferRow offer={o} onAccept={handleAccept} />
+            </motion.div>
           ))}
         </ScrollArea>
       )}
@@ -411,8 +431,8 @@ function CreateOfferDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
-          <div className="space-y-2">
+        <div className="space-y-3 py-2">
+          <div className="space-y-1.5">
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">
               Тип сделки
             </Label>
@@ -420,7 +440,7 @@ function CreateOfferDialog({
               <button
                 onClick={() => setType('buy')}
                 className={cn(
-                  'py-2 rounded-lg text-sm font-medium border transition',
+                  'py-1.5 rounded-lg text-sm font-medium border transition',
                   type === 'buy'
                     ? 'bg-success/15 border-success/50 text-success'
                     : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted/60'
@@ -431,7 +451,7 @@ function CreateOfferDialog({
               <button
                 onClick={() => setType('sell')}
                 className={cn(
-                  'py-2 rounded-lg text-sm font-medium border transition',
+                  'py-1.5 rounded-lg text-sm font-medium border transition',
                   type === 'sell'
                     ? 'bg-destructive/15 border-destructive/50 text-destructive'
                     : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted/60'
@@ -442,8 +462,8 @@ function CreateOfferDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="space-y-1.5">
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">
                 Цена за USDT, ₽
               </Label>
@@ -455,7 +475,7 @@ function CreateOfferDialog({
                 className="font-mono tabular-nums"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">
                 Количество USDT
               </Label>
@@ -469,7 +489,7 @@ function CreateOfferDialog({
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">
               Способ оплаты
             </Label>
@@ -572,7 +592,7 @@ function ChatWidget({
 
   return (
     <div className="fixed bottom-4 right-4 z-50 w-[340px] max-w-[calc(100vw-2rem)] shadow-2xl rounded-xl border border-border bg-card overflow-hidden">
-      <div className="flex items-center gap-2.5 p-3 border-b border-border bg-muted/40">
+      <div className="flex items-center gap-2.5 p-2.5 border-b border-border bg-muted/40">
         <Avatar name={deal.counterparty} size={32} />
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold truncate">{deal.counterparty}</div>
@@ -586,7 +606,7 @@ function ChatWidget({
         </Button>
       </div>
 
-      <div className="h-72 overflow-y-auto scrollbar-thin p-3 space-y-2.5 bg-background/40">
+      <div className="h-64 overflow-y-auto scrollbar-thin p-2.5 space-y-2 bg-background/40">
         {messages.map((m) => (
           <div
             key={m.id}
@@ -691,7 +711,7 @@ function MyDealsSection({
 
   return (
     <Card className="overflow-hidden">
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between flex-wrap gap-2">
+      <div className="px-3 py-2.5 border-b border-border flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4 text-primary" />
           <h3 className="text-sm font-semibold">Мои сделки</h3>
@@ -701,10 +721,10 @@ function MyDealsSection({
         </div>
         <Tabs value={subtab} onValueChange={(v) => setSubtab(v as typeof subtab)}>
           <TabsList className="h-8">
-            <TabsTrigger value="active" className="text-xs px-3">
+            <TabsTrigger value="active" className="text-xs px-2.5">
               Активные ({p2pDeals.filter((d) => activeStatuses.includes(d.status)).length})
             </TabsTrigger>
-            <TabsTrigger value="completed" className="text-xs px-3">
+            <TabsTrigger value="completed" className="text-xs px-2.5">
               Завершённые ({p2pDeals.filter((d) => completedStatuses.includes(d.status)).length})
             </TabsTrigger>
           </TabsList>
@@ -712,7 +732,7 @@ function MyDealsSection({
       </div>
 
       {filtered.length === 0 ? (
-        <div className="p-10 text-center">
+        <div className="p-8 text-center">
           <Clock className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
           <p className="text-sm text-muted-foreground">
             {subtab === 'active' ? 'Нет активных сделок' : 'Нет завершённых сделок'}
@@ -728,7 +748,7 @@ function MyDealsSection({
             return (
               <div
                 key={d.id}
-                className="grid grid-cols-12 gap-3 px-4 py-3 items-center border-b border-border/60 last:border-0 hover:bg-muted/30"
+                className="grid grid-cols-12 gap-3 px-3 py-2.5 items-center border-b border-border/60 last:border-0 hover:bg-muted/30"
               >
                 <div className="col-span-12 sm:col-span-3 flex items-center gap-2">
                   <Avatar name={d.counterparty} size={32} />
@@ -815,7 +835,7 @@ export function P2PView() {
   const [createOpen, setCreateOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const p2pUrl = refreshKey ? `/api/p2p?t=${refreshKey}` : '/api/p2p'
-  const { data } = useApi<any>(p2pUrl)
+  const { data, loading } = useApi<any>(p2pUrl)
   const acceptP2POffer = useAppStore((s) => s.acceptP2POffer)
 
   // Normalize API payloads (offers/deals come back as raw DB rows + rating/time)
@@ -843,14 +863,14 @@ export function P2PView() {
 
   return (
     <div className="flex-1 bg-background">
-      <div className="mx-auto max-w-[1400px] px-4 lg:px-6 py-6 space-y-5">
+      <div className="mx-auto max-w-[1400px] px-3 lg:px-5 py-4 space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
               <Users className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">P2P Торговля</h1>
+              <h1 className="text-xl font-bold tracking-tight">P2P Торговля</h1>
               <p className="text-xs text-muted-foreground">
                 Прямая торговля USDT/RUB • эскроу-гарант • 0% комиссия
               </p>
@@ -867,28 +887,28 @@ export function P2PView() {
 
         {/* Trust band */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <Card className="p-3.5 flex items-center gap-3">
+          <Card className="p-3 flex items-center gap-2.5">
             <ShieldCheck className="w-5 h-5 text-success shrink-0" />
             <div>
               <div className="text-sm font-semibold">Эскроу-гарант</div>
               <div className="text-[10px] text-muted-foreground">USDT блокируются</div>
             </div>
           </Card>
-          <Card className="p-3.5 flex items-center gap-3">
+          <Card className="p-3 flex items-center gap-2.5">
             <Clock className="w-5 h-5 text-warning shrink-0" />
             <div>
               <div className="text-sm font-semibold">15 мин окно</div>
               <div className="text-[10px] text-muted-foreground">на оплату СБП</div>
             </div>
           </Card>
-          <Card className="p-3.5 flex items-center gap-3">
+          <Card className="p-3 flex items-center gap-2.5">
             <TrendingUp className="w-5 h-5 text-primary shrink-0" />
             <div>
               <div className="text-sm font-semibold">0% комиссия</div>
               <div className="text-[10px] text-muted-foreground">на P2P-сделки</div>
             </div>
           </Card>
-          <Card className="p-3.5 flex items-center gap-3">
+          <Card className="p-3 flex items-center gap-2.5">
             <MessageCircle className="w-5 h-5 text-sky-400 shrink-0" />
             <div>
               <div className="text-sm font-semibold">Встроенный чат</div>
@@ -897,7 +917,7 @@ export function P2PView() {
           </Card>
         </div>
 
-        <OffersSection apiOffers={apiOffers} onAcceptOffer={handleAcceptOffer} />
+        <OffersSection apiOffers={apiOffers} loading={loading} onAcceptOffer={handleAcceptOffer} />
 
         <MyDealsSection apiDeals={apiDeals} onRefresh={refresh} />
       </div>

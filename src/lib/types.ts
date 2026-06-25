@@ -13,6 +13,7 @@ export type ViewId =
   | 'analytics'
   | 'kyc'
   | 'compliance'
+  | 'admin'
   | 'profile'
   | 'auth'
 

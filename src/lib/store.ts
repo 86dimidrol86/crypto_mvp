@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import type { Locale } from './i18n'
 import type {
   ViewId,
   Currency,
@@ -69,6 +70,9 @@ interface AppState {
 
   currency: Currency
   setCurrency: (c: Currency) => void
+
+  locale: Locale
+  setLocale: (l: Locale) => void
 
   // auth (демо)
   isAuthed: boolean
@@ -414,6 +418,9 @@ export const useAppStore = create<AppState>()(
 
       currency: 'rub',
       setCurrency: (c) => set({ currency: c }),
+
+      locale: 'ru',
+      setLocale: (l) => set({ locale: l }),
 
       isAuthed: false,
       userEmail: null,
@@ -816,6 +823,7 @@ export const useAppStore = create<AppState>()(
         payments: s.payments,
         currency: s.currency,
         sidebarCollapsed: s.sidebarCollapsed,
+        locale: s.locale,
         marginPositions: s.marginPositions,
         marginAccount: s.marginAccount,
         priceAlerts: s.priceAlerts,

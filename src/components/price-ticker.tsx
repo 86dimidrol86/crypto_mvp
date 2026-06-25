@@ -2,14 +2,20 @@
 
 import { useEffect, useState } from 'react'
 import { TrendingUp, TrendingDown } from 'lucide-react'
-import { fetchTickers, COINS } from '@/lib/market'
+import { fetchTickers } from '@/lib/market'
 import type { CoinTicker } from '@/lib/types'
 import { formatPrice } from '@/lib/format'
+import { useAppStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
+import { useMounted } from '@/lib/use-mounted'
 
 export function PriceTicker() {
   const [tickers, setTickers] = useState<CoinTicker[]>([])
-  const [currency, setCurrency] = useState<'rub' | 'usd'>('rub')
+  const currency = useAppStore((s) => s.currency)
+  const setCurrency = useAppStore((s) => s.setCurrency)
+  const setSelectedPair = useAppStore((s) => s.setSelectedPair)
+  const setView = useAppStore((s) => s.setView)
+  const mounted = useMounted()
 
   useEffect(() => {
     let mounted = true
@@ -25,56 +31,81 @@ export function PriceTicker() {
     }
   }, [])
 
-  const display = tickers.length > 0 ? tickers : COINS.map((c) => ({
-    id: c.symbol.toLowerCase(),
-    symbol: c.symbol,
-    name: c.name,
-    priceUsd: 0,
-    priceRub: 0,
-    change24h: 0,
-  }))
+  // placeholder пока загружаются
+  const display = tickers.length > 0 ? tickers : []
+  // дублируем 3x для бесшовного marquee
+  const items = display.length > 0 ? [...display, ...display, ...display] : []
 
   return (
-    <div className="flex items-center gap-1 overflow-x-auto scrollbar-thin w-full">
-      <div className="flex items-center gap-1 mr-2 shrink-0">
+    <div className="flex items-center w-full h-full">
+      {/* RUB/USD табы */}
+      <div className="flex items-center gap-0.5 mr-2 shrink-0 bg-muted/40 rounded-md p-0.5">
         <button
           onClick={() => setCurrency('rub')}
           className={cn(
-            'px-2 py-0.5 rounded-md text-[11px] font-semibold transition',
+            'px-2 py-0.5 rounded text-[10px] font-bold transition',
             currency === 'rub' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
           )}
         >
-          RUB
+          ₽
         </button>
         <button
           onClick={() => setCurrency('usd')}
           className={cn(
-            'px-2 py-0.5 rounded-md text-[11px] font-semibold transition',
+            'px-2 py-0.5 rounded text-[10px] font-bold transition',
             currency === 'usd' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
           )}
         >
-          USD
+          $
         </button>
       </div>
-      {display.slice(0, 6).map((t) => {
-        const price = currency === 'rub' ? t.priceRub : t.priceUsd
-        const up = t.change24h >= 0
-        return (
+
+      {/* Marquee */}
+      <div className="relative flex-1 overflow-hidden">
+        {items.length > 0 ? (
           <div
-            key={t.symbol}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-muted/60 transition shrink-0"
+            className="flex gap-5 whitespace-nowrap will-change-transform"
+            style={{ animation: 'rc-ticker 80s linear infinite' }}
           >
-            <span className="text-[11px] font-semibold text-muted-foreground">{t.symbol}</span>
-            <span className="text-[11px] font-mono tabular-nums">
-              {price > 0 ? formatPrice(price, currency) : '—'}
-            </span>
-            <span className={cn('flex items-center text-[10px]', up ? 'text-success' : 'text-destructive')}>
-              {up ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-              {Math.abs(t.change24h).toFixed(1)}%
-            </span>
+            {items.map((t, i) => {
+              const price = currency === 'rub' ? t.priceRub : t.priceUsd
+              const up = t.change24h >= 0
+              return (
+                <button
+                  key={`${t.symbol}-${i}`}
+                  onClick={() => {
+                    setSelectedPair(`${t.symbol}/RUB`)
+                    setView('trade')
+                  }}
+                  className="flex items-center gap-1.5 shrink-0 hover:opacity-80 transition py-0.5"
+                  title={`${t.name} • перейти к торгам`}
+                >
+                  <span className="text-[11px] font-bold text-foreground/90">{t.symbol}</span>
+                  <span className="text-[11px] font-mono tabular-nums text-muted-foreground">
+                    {mounted && price > 0 ? formatPrice(price, currency) : '—'}
+                  </span>
+                  <span className={cn('flex items-center gap-0.5 text-[10px] font-medium', up ? 'text-success' : 'text-destructive')}>
+                    {up ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+                    {Math.abs(t.change24h).toFixed(1)}%
+                  </span>
+                  <span className="text-muted-foreground/30 ml-1">|</span>
+                </button>
+              )
+            })}
           </div>
-        )
-      })}
+        ) : (
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground py-0.5">
+            <span className="inline-block w-2 h-2 rounded-full bg-primary/40 animate-pulse" />
+            Загрузка котировок…
+          </div>
+        )}
+      </div>
+      <style jsx>{`
+        @keyframes rc-ticker {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-33.333%); }
+        }
+      `}</style>
     </div>
   )
 }
