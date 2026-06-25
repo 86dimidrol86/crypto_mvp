@@ -807,3 +807,32 @@ Work record saved to: `/home/z/my-project/agent-ctx/4-B-full-stack-developer.md`
 - Mutations hit the API first (persisted to SQLite via Prisma) and then mirror to the store for instant UI feedback + toasts/notifications. A failed API call no longer breaks the UI — the local store still updates so the demo flows continue.
 - After each mutation, the relevant view re-fetches from the API to re-sync (refreshKey cache-buster pattern).
 - All existing UI components, shadcn styling, Russian text, toasts, animations, status steppers, SHAP explainer, chat widget, QR codes, trust bands, regulatory notes, etc. — preserved exactly. Only data sources + mutation call sites changed.
+
+---
+Task ID: 1-4 (Stages 1-4 completion)
+Agent: Orchestrator + 2 full-stack-developer subagents (4-A, 4-B)
+Task: Complete Stages 1 (API+Prisma), 2 (socket.io realtime), 4 (features+polish) per the plan.
+
+Work Log:
+- Stage 1: Created prisma/seed.ts (demo user, officer, balances, txs, trades, 18 P2P offers, 5 AML alerts, 2 cross-border payments). Created 8 API routes (auth, market, wallet, orders, payments, compliance, p2p, kyc) with Prisma persistence. Created src/lib/use-api.ts (useApi, apiPost, apiPatch, useMutation hooks).
+- Stage 2: Created mini-services/market-service (socket.io on port 3003) — generates live order book, price ticks, trades for 8 pairs every 1.5s. Created src/lib/use-live-market.ts hook. Integrated live WS into trade-view (OrderBook + RecentTrades use live data with mock fallback; LIVE indicator; price flash animations).
+- Stage 4 (delegated to 4-A + 4-B in parallel):
+  • 4-A: Integrated API into 5 views (wallet, p2p, compliance, payments, profile) — hybrid API+store with fallback resilience. All mutations now persist to Prisma.
+  • 4-B: Added 6 features — (1) new Markets view (sortable/searchable table, favorites, sparklines); (2) Light/Dark theme toggle; (3) Depth chart on trade-view; (4) Order book flash animations; (5) Home real stats + animated numbers; (6) Page skeletons.
+- QA: agent-browser — all 12 views render with 0 errors. API verified end-to-end (POST /api/orders → DB trade; PATCH /api/compliance → alert status; POST /api/payments → payment created). Lint clean. Dev server 200.
+- Git: committed (073e894) + pushed to origin/spa-mvp.
+
+Stage Summary:
+- ALL STAGES COMPLETE (0-4). Production-grade investor demo with:
+  • 12 views (home, trade, markets, p2p, payments, wallet, portfolio, analytics, kyc, compliance, profile, auth)
+  • Real Binance prices + CB RF USD/RUB rate
+  • Live WebSocket order book + trades (socket.io mini-service, port 3003)
+  • Prisma persistence (SQLite) via 8 API routes
+  • Gold/navy Binance-style theme + light/dark toggle
+  • AML compliance console with SHAP explainability
+  • KYC wizard with Gosuslugi (ESIA) mock
+  • Cross-border payment saga with 6-step status tracker
+  • P2P trading with offers/deals/chat
+  • Portfolio with 3-NDFL CSV export
+  • Animations, skeletons, responsive design
+- Scheduled task (every 15 min) will continue: more features, more polish, bug fixes.
