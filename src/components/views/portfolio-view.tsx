@@ -31,6 +31,7 @@ import {
 import { useAppStore } from '@/lib/store'
 import { fetchTickers } from '@/lib/market'
 import type { CoinTicker } from '@/lib/types'
+import { useMounted } from '@/lib/use-mounted'
 import {
   formatPrice,
   formatNumber,
@@ -104,6 +105,7 @@ export function PortfolioView() {
   const orders = useAppStore((s) => s.orders)
   const transactions = useAppStore((s) => s.transactions)
   const setView = useAppStore((s) => s.setView)
+  const mounted = useMounted()
 
   const [tickers, setTickers] = useState<CoinTicker[]>([])
 
@@ -244,7 +246,7 @@ export function PortfolioView() {
             className="gap-1.5 border-primary/30 bg-primary/5 text-primary"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-            Обновлено {new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+            Обновлено {mounted ? new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}
           </Badge>
         </div>
 

@@ -20,6 +20,7 @@ import { useAppStore } from '@/lib/store'
 import { fetchTickers, jitterPrice } from '@/lib/market'
 import type { CoinTicker, PriceAlertCondition } from '@/lib/types'
 import { formatPrice, formatNumber, formatPercent, timeAgo } from '@/lib/format'
+import { useMounted } from '@/lib/use-mounted'
 import { cn } from '@/lib/utils'
 import { CoinIcon } from '@/components/coin-icon'
 import { Sparkline } from '@/components/sparkline'
@@ -336,6 +337,7 @@ function MyAlertsSection({ tickers }: { tickers: CoinTicker[] }) {
   const priceAlerts = useAppStore((s) => s.priceAlerts)
   const removePriceAlert = useAppStore((s) => s.removePriceAlert)
   const togglePriceAlert = useAppStore((s) => s.togglePriceAlert)
+  const mounted = useMounted()
 
   if (priceAlerts.length === 0) {
     return (
@@ -450,7 +452,7 @@ function MyAlertsSection({ tickers }: { tickers: CoinTicker[] }) {
                   <div className="ml-auto flex items-center gap-2 shrink-0">
                     {isTriggered ? (
                       <Badge variant="outline" className="text-[10px] text-destructive border-destructive/40">
-                        сработал {a.triggeredAt ? timeAgo(a.triggeredAt) : ''}
+                        сработал {a.triggeredAt && mounted ? timeAgo(a.triggeredAt) : ''}
                       </Badge>
                     ) : (
                       <Switch

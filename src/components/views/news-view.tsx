@@ -16,6 +16,7 @@ import {
 import { useAppStore } from '@/lib/store'
 import type { NewsCategory, NewsItem } from '@/lib/types'
 import { timeAgo, formatDateTime } from '@/lib/format'
+import { useMounted } from '@/lib/use-mounted'
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -66,6 +67,7 @@ function CategoryBadge({ category }: { category: NewsCategory }) {
 
 function NewsCard({ item, featured = false }: { item: NewsItem; featured?: boolean }) {
   const cfg = CATEGORY_CONFIG[item.category]
+  const mounted = useMounted()
   return (
     <motion.div
       layout
@@ -102,7 +104,7 @@ function NewsCard({ item, featured = false }: { item: NewsItem; featured?: boole
             )}
             <span className="ml-auto flex items-center gap-1 text-[11px] text-muted-foreground">
               <Clock className="w-3 h-3" />
-              {timeAgo(item.publishedAt)}
+              {mounted ? timeAgo(item.publishedAt) : ''}
             </span>
           </div>
 

@@ -23,6 +23,7 @@ import { useAppStore } from '@/lib/store'
 import type { ViewId } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { timeAgo } from '@/lib/format'
+import { useMounted } from '@/lib/use-mounted'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -191,6 +192,7 @@ function SidebarContent({ onNavigate, collapsed }: { onNavigate?: () => void; co
 function NewsTicker() {
   const newsItems = useAppStore((s) => s.newsItems)
   const setView = useAppStore((s) => s.setView)
+  const mounted = useMounted()
   const headlines = newsItems.slice(0, 4)
   if (headlines.length === 0) return null
   const items = [...headlines, ...headlines, ...headlines] // loop 3x for smooth marquee
@@ -219,7 +221,7 @@ function NewsTicker() {
                 <span className="font-medium text-foreground/80">{n.source.split(' • ')[0]}:</span>
                 <span className="truncate max-w-[420px]">{n.title}</span>
                 <span className="text-[10px] text-muted-foreground/60 ml-1">
-                  {timeAgo(n.publishedAt)}
+                  {mounted ? timeAgo(n.publishedAt) : ''}
                 </span>
               </button>
             ))}

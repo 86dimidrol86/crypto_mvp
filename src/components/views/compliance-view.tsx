@@ -20,6 +20,7 @@ import {
 import { toast } from 'sonner'
 import { useAppStore } from '@/lib/store'
 import { useApi, apiPatch } from '@/lib/use-api'
+import { useMounted } from '@/lib/use-mounted'
 import type {
   AlertSeverity,
   AlertStatus,
@@ -141,6 +142,7 @@ function AlertListItem({
   onClick: () => void
 }) {
   const sev = SEVERITY_CONFIG[alert.severity]
+  const mounted = useMounted()
   return (
     <button
       onClick={onClick}
@@ -190,7 +192,7 @@ function AlertListItem({
           </span>
           <span className="text-[10px] text-muted-foreground flex items-center gap-1">
             <Clock className="w-2.5 h-2.5" />
-            {timeAgoShort(alert.createdAt)}
+            {mounted ? timeAgoShort(alert.createdAt) : ''}
           </span>
         </div>
       </div>
@@ -279,6 +281,7 @@ function AlertDetail({
 }) {
   const reviewAlert = useAppStore((s) => s.reviewAlert)
   const pushNotification = useAppStore((s) => s.pushNotification)
+  const mounted = useMounted()
 
   const sev = SEVERITY_CONFIG[alert.severity]
   const riskPct = Math.round(alert.riskScore * 100)
@@ -372,9 +375,9 @@ function AlertDetail({
             <div className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">
               Создан
             </div>
-            <div className="font-medium">{new Date(alert.createdAt).toLocaleString('ru-RU')}</div>
+            <div className="font-medium">{mounted ? new Date(alert.createdAt).toLocaleString('ru-RU') : '—'}</div>
             <div className="text-[10px] text-muted-foreground mt-0.5">
-              {timeAgoShort(alert.createdAt)} назад
+              {mounted ? `${timeAgoShort(alert.createdAt)} назад` : ''}
             </div>
           </div>
         </div>

@@ -16,6 +16,7 @@ import {
 import { toast } from 'sonner'
 import { useAppStore } from '@/lib/store'
 import { useApi, apiPost, apiPatch } from '@/lib/use-api'
+import { useMounted } from '@/lib/use-mounted'
 import type { Corridor, CrossBorderPayment, PaymentStatus } from '@/lib/types'
 import { formatNumber, timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -456,6 +457,7 @@ function CorridorsCard() {
 
 function MyPayments({ apiPayments }: { apiPayments: CrossBorderPayment[] | null }) {
   const storePayments = useAppStore((s) => s.payments)
+  const mounted = useMounted()
   // Prefer API payments when present; fall back to store for resilience.
   // Also surface store-only payments (e.g. the just-created local record whose
   // status simulation is mid-flight) so the UI doesn't lose them.
@@ -506,7 +508,7 @@ function MyPayments({ apiPayments }: { apiPayments: CrossBorderPayment[] | null 
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate">{p.beneficiary}</div>
                         <div className="text-[11px] text-muted-foreground">
-                          {p.corridor} • {timeAgo(p.createdAt)}
+                          {p.corridor} • {mounted ? timeAgo(p.createdAt) : ''}
                         </div>
                       </div>
                     </div>
