@@ -1,0 +1,500 @@
+---
+Task ID: 1-A
+Agent: Docs Analyst (general-purpose)
+Task: Read and summarize all 6 crypto platform documentation files; produce target-state summary.
+
+Work Log:
+- Verified file locations and sizes via `ls` (PRD_clean 122KB/384 lines, Arch_clean 145KB/524 lines, Domain_clean 80KB/300 lines, Personas_clean 518KB/1582 lines, openapi_crypto_platform.yaml 43KB/1604 lines, full_platform_demo.html 238KB/1438 lines).
+- Confirmed `/home/z/my-project/worklog.md` did not exist yet (first task entry).
+- Read PRD_clean.txt in full (offsets 1, 75, 175, 225, 275, 325) — captured market analysis, FZ-1194918-8 law, business model, monetization, functional/non-functional requirements, CAPEX/OPEX, ROI/IRR, 4-phase roadmap, risks.
+- Read Arch_clean.txt in full (offsets 1, 80, 140, 200, 260, 320, 380, 440) — captured 11 bounded contexts, 6 architectural patterns, Kafka topics, API Gateway profiles, STRIDE threat model, RBAC+ABAC matrix, data stores, DR/observability.
+- Read Domain_clean.txt in full (offsets 1, 81, 161, 241) — captured matching engine internals, STP, pre-trade risk, custody hot/warm/cold, HSM/key ceremony, compliance rules+ML, cross-border saga, market data, KYC pipeline, RBAC+ABAC.
+- Read Personas_clean.txt: TOC + intro (offsets 1, 81), sampled P01/P13/P33 personas, read full synthesis (1482-1582) covering bounded contexts, RBAC matrix, load profiles, architecture imperatives.
+- Parsed openapi_crypto_platform.yaml via Grep for all `paths:` entries + method + summary lines — captured all 27 endpoints grouped by 6 tags (Trading/Wallet/KYC/Payment/MarketData/Compliance) and 30+ component schemas.
+- Parsed full_platform_demo.html via Python: extracted `SCENARIOS` (7 use-cases, 29 steps), `PERSONAS` (4 demo personas), all 32 API call references, 42 domain entities, and 7 state machines. Verified the demo is retail-focused (no cross-border/P2P/admin/compliance screens present).
+- Composed consolidated structured summary (below) and wrote it to worklog.md.
+
+Stage Summary:
+
+# CRYPTO PLATFORM — TARGET-STATE STRUCTURED SUMMARY
+
+This summary distills 6 source documents (PRD, Architecture, Domain Deep-Dive, 50 Personas, OpenAPI spec, HTML demo) describing the target state of a Russian-law-compliant crypto exchange MVP (Binance/Bybit analog under Federal Law № 1194918-8, effective 1 July 2026).
+
+---
+
+## 1. PRD (`/tmp/PRD_clean.txt`)
+
+### Key goals & scope
+- Build a **vertically-integrated crypto ecosystem** (exchange + exchanger + custodian depository + broker) fully compliant with Russian Federal Law № 1194918-8 “On digital currency and digital rights”, in force from 1 July 2026.
+- Strategic priority: **cross-border payment corridors** (Russia↔China, UAE, Turkey, India, CIS) as the main revenue driver, given SWIFT sanctions.
+- First-mover advantage on the legal Russian market (estimated 8–12 bln USD by 2027; 15–35 bln USD by 2028).
+
+### Functional modules described
+1. **Identity & KYC module** — ESIA (Gosuslugi) integration via SAML/OAuth, biometric liveness, sanctions list screening (SDN, Russian lists), address-identifier system (law-mandated), investor qualification testing (25-question test or ≥3 mln RUB asset proof).
+2. **Trading engine** — CLOB matching, latency ≤10 ms, ≤100K TPS, 50+ pairs at launch (→200+), order types: market / limit / stop-loss / take-profit / conditional; FIX protocol + REST for liquidity bridging; market data (order book, trade tape, quotes) ≤50 ms.
+3. **Custody & wallets** — hot/warm/cold 5%/15%/80% split; HSM (FSTEC-certified); 2-of-3 warm multisig, 3-of-5 cold multisig; multi-factor withdrawal confirmation (SMS/push + email + biometric for ≥100K RUB).
+4. **Cross-border payment module** — corridor-based (RU-CN, RU-AE, RU-TR, RU-IN, RU-CIS); correspondent banking + payment gateways; currency-control docs (passports of deals, FX reports per FZ-173).
+5. **Compliance & monitoring** — rule-based + ML transaction monitoring, real-time suspicious-pattern blocking, quarantine.
+6. **Admin & operations**, **regulatory reporting**, **listing & tokenization** (mentioned as ecosystem extensions).
+
+### Non-functional requirements (Table 3 in PRD)
+| Requirement | Target |
+|---|---|
+| SLA availability | 99.95% (≤4.38 h downtime/yr) |
+| Matching latency | <10 ms at up to 100K TPS |
+| API throughput | up to 50 000 req/s |
+| Encryption | GOST 28147-89 + AES-256 (mandatory by law) |
+| Backup | RPO <1 min, RTO <15 min |
+| Data localization | All data on Russian territory |
+| Scalability | horizontal, up to 1M users |
+| Audit trail | full logging, 5-year retention |
+
+### Tech stack / architecture components
+- Microservices with 6 domains: IAM, Trading Engine, Custody & Wallet, Payments & Settlement, Compliance & Monitoring, Analytics & Reporting.
+- Backend: Go/Rust (high-load); Python for ML; React/TypeScript frontend.
+- HSM FSTEC-certified; FSTEC-certified data centers (УЗИ-1).
+
+### Roadmap (4 phases, 12–15 months total)
+- **Phase 1 (months 1–3): Preparation** — legal entities, license application, architecture doc, core team of 15.
+- **Phase 2 (months 3–8): MVP development** — trading engine, KYC, custody, partner-bank integration; MVP ready for load testing.
+- **Phase 3 (months 8–11): Testing & certification** — load testing, pentests, FSTEC certification, receive Central Bank license.
+- **Phase 4 (months 11–15): Launch & scale** — soft launch, marketing, corridor activation, expansion to 50+ pairs and 10K+ verified users.
+
+### Business model / monetization (revenue streams, % of revenue Y1 / Y3)
+- Trading fees (exchange) — 35–40% / 25–30% (margin 65–75%); maker 0.6%, taker 0.8% at launch.
+- Fiat-crypto conversion — 25–30% / 20–25% (50–60% margin).
+- Cross-border transfers — 15–20% / 30–40% (45–55% margin); fees 1.0–2.5%.
+- Custody services — 5–8% / 8–12% (70–80% margin); 0.5–1.5%/yr of AUC.
+- Premium services & market data — 3–5% / 5–8% (80–90% margin); subscriptions 5K–50K RUB/mo.
+- Listing & tokenization — 2–5% / 5–8% (60–70% margin).
+
+### Regulatory / compliance requirements
+- **Five licensed crypto-org types** under FZ-1194918-8: exchange operators, digital depositories, digital brokers, management companies, digital exchangers — each licensed by Central Bank.
+- **Charter capital thresholds**: ≥35 mln RUB for exchanger; ≥100 mln RUB for exchange.
+- **Address-identifier system** mandatory — every crypto address bound to verified identity.
+- **Investor qualification**: non-qualified investors capped at 300K RUB/yr crypto investments; qualified (test passed + asset criteria) have no limit.
+- **ESIA integration** for citizen verification; biometric liveness; sanction screening.
+- **Currency control** per FZ-173 for cross-border (passports of deals, FX reports to Central Bank).
+- **Security**: FZ-152 (personal data), 115-FZ (AML), PCI DSS (cards), ISO 27001; data on Russian soil; FSTEC-certified DCs (УЗИ-1); FSB crypto license; ≥15% of dev budget on InfoSec.
+
+### Financials (base case)
+- CAPEX: 115–182 mln RUB (base 145); OPEX 8–18 mln RUB/mo.
+- Revenue Y1→Y5: 180 → 540 → 1080 → 1620 → 2250 mln RUB; EBITDA margin 0%→83%.
+- IRR 28–35%, NPV 850–1200 mln RUB (@15%), payback 2.5–3.5 yrs, PI 3.2–4.5x.
+
+---
+
+## 2. Architecture (`/tmp/Arch_clean.txt`)
+
+### Key goals & scope
+- Target architecture derived from the 50 personas, designed around DDD/Clean Architecture/Event-Driven principles.
+- Satisfy: 99.95% SLA, <10 ms matching, <1M users scale, full RF data localization, 5-year audit retention.
+
+### Architectural patterns (Table 1)
+- **Clean Architecture** (all 11 contexts); **DDD Bounded Contexts** (strategic design, ACL); **CQRS** (Trading/Custody/Compliance); **Event Sourcing** (Custody/Compliance/Trading); **Event-Driven** via Kafka; **Hexagonal (Ports & Adapters)** (all services); **Saga** (Payments/Cross-Border); **Outbox Pattern + Debezium CDC** (event delivery guarantee).
+
+### Bounded Contexts (11) — microservices, tech stack, DB (Table 2)
+| Context | Microservices | Stack | DB |
+|---|---|---|---|
+| Identity & Access | iam-service, kyc-service, address-id-service | Go, PostgreSQL, Redis | PostgreSQL |
+| Trading Engine | matching-engine, order-service, trade-service | Rust, Redis, Kafka | Redis + TimescaleDB |
+| Custody & Wallet | wallet-service, key-management, withdrawal-service | Go, HSM, PostgreSQL | PostgreSQL + Event Store |
+| Payments & Settlement | payment-service, conversion-service, settlement-engine | Go, Kafka, PostgreSQL | PostgreSQL |
+| Compliance & Monitoring | aml-engine, transaction-monitor, sar-service, quarantine-service | Python (ML) + Go, Kafka | PostgreSQL + Elasticsearch |
+| Cross-Border Gateway | corridor-service, fiat-bridge, currency-control | Go, Kafka, PostgreSQL | PostgreSQL |
+| Market Data | market-data-service, candle-service, orderbook-service | Rust, Redis, TimescaleDB | TimescaleDB + Redis |
+| Notification | notification-service, template-engine, push-service | Go, Kafka, PostgreSQL | PostgreSQL |
+| Admin & Operations | admin-service, config-service, incident-service | Go, PostgreSQL, Vue.js | PostgreSQL |
+| Regulatory Reporting | reporting-service, data-room, rosfinmonitoring-adapter | Go, PostgreSQL, Apache POI | PostgreSQL |
+| Listing & Tokenization | listing-service, due-diligence, cfa-bridge | Go, PostgreSQL, Solidity | PostgreSQL |
+
+### Data flow SLAs (trade op = 7 steps, ≤500 ms end-to-end)
+Validate (IAM <50 ms) → Reserve funds (Custody gRPC <100 ms) → Match (in-memory <10 ms) → Execute (<10 ms) → Settle (Kafka+gRPC <100 ms) → Compliance async (<50 ms) → Notify (<500 ms).
+
+### Event backbone — Apache Kafka topics
+`trading.events` (100K/s), `custody.events` (10K/s), `compliance.alerts` (100/day), `iam.events` (1K/hr), `payments.events` (5K/min), `kafka-connect.cdc` (continuous). 12 partitions/topic, 3× replication, 7-day operational retention, indefinite for compliance.
+
+### API Gateway (Kong) — access profiles (Table 5)
+Web/Mobile REST+WS (P01–P32, JWT+TOTP); FIX 4.4/5.0 for institutional (P24/P45, mTLS); Merchant REST+Webhooks (P11/P18, API Key+HMAC); Sandbox REST (P41/P43/P16); Admin REST+gRPC (P33–P40, mTLS+HW key); Regulatory Portal REST read-only (P47/P49, gov PKI+mTLS); Board Portal (P50).
+
+### Security (STRIDE model, Defense-in-Depth 7 layers)
+- Dual encryption: GOST 28147-89 / R 34.12-2015 (Магма/Кузнечик) for regulated data + AES-256-GCM elsewhere.
+- Hierarchical keys: Master (HSM, never leaves) → KEK (quarterly rotation) → DEK (monthly) → Ephemeral session (per connection).
+- **Key Ceremony** with 5-of-7 quorum (CTO P34, Compliance P33, Risk P36, Legal P37, Audit P40) + external auditor (P48).
+- **RBAC + ABAC**: 11 base roles (UNQUALIFIED_INVESTOR, QUALIFIED_INVESTOR, CORPORATE_USER, INSTITUTIONAL, COMPLIANCE_OFFICER, SUPPORT_AGENT, RISK_MANAGER, ADMIN, AUDITOR, REGULATOR, BOARD_MEMBER) + ABAC context checks (qualification, corridor jurisdiction, amount, time, IP, device fingerprint).
+- Separation of Duties for critical ops (account block, large withdrawal, limit change, emergency shutdown).
+- Immutable audit trail via Event Sourcing + Merkle Tree + WORM storage (hourly Merkle Root publication).
+- SOC 24/7 (SIEM on Elastic Security, UEBA, MITRE ATT&CK, 5 analysts + head, reporting to CISO).
+
+### Infrastructure
+- Kubernetes 1.29+ in 2 FSTEC-certified DCs (Moscow + St. Petersburg), **active-active**.
+- Istio Service Mesh (mTLS zero-trust, circuit breaking, canary); Calico network policies; Falco runtime security; Trivy container scanning; GitLab CI (lint→unit→integration→SAST/DAST→scan→staging→smoke→canary→prod); auto-rollback if error rate >1% in 5 min.
+- Data stores: PostgreSQL 16 (operational, sync 2-DC), TimescaleDB (time-series), Redis Cluster (cache/order book), Kafka + EventStoreDB (event store), Elasticsearch (search/AML), ClickHouse (DW/BI), MinIO (S3 docs), WORM audit.
+- DR: Active-Active, RPO <1 min, RTO <15 min; quarterly chaos drills; Merkle Tree data integrity.
+- Observability: Prometheus+Grafana (metrics), ELK (logs), OpenTelemetry+Jaeger (traces); MTTI <15 min.
+
+### Performance targets (Table 9)
+Matching p99 <10 ms; API p95 <200 ms; trading 100K TPS; API 50K req/s; 1M concurrent WS; Kafka 500K msg/s; SLA 99.95%; RTO <15 min.
+
+### Implementation priority
+Sprints 1–4: IAM + Custody + K8s/CI-CD; Sprints 5–8: Trading Engine + Market Data; Sprints 9–12: Payments + Cross-Border Gateway; Compliance integrated throughout as horizontal concern.
+
+---
+
+## 3. Domain Deep-Dive (`/tmp/Domain_clean.txt`)
+
+### Trading Engine
+- **Partitioned matching** (one engine instance per instrument) in **Rust**; 3-layer core: Order Validator (O(1), <50 µs) → In-Memory Order Book (Red-Black Tree per price level, O(log n), p95 <3 ms) → Matching Algorithm (price-time FIFO).
+- Order types: limit (GTC/GTT/IOC/FOK), market, stop-limit, stop-market. Slippage circuit breaker (reject market order if price deviation >2% from best).
+- **Self-Trade Prevention (STP)**: 4 modes (Cancel Newest/Oldest/Both/Smaller), ownership hierarchy via user_id/sub-account/linked accounts.
+- **Pre-Trade Risk Engine** (5 checks): Margin (<2 ms), Exposure Limit (<1 ms), Rate Limit (10 req/s retail, 100 institutional), Investor Qualification (<3 ms, 300K RUB/yr cap), Circuit Breaker (<0.1 ms, halt on >10% in 5 min).
+- **Saga**: OrderPlaced → ReserveFunds (gRPC 5s) → SubmitToMatching → TradeExecuted → SettleBalances (gRPC 3s) → CalculateFee → EmitEvents (Kafka). 30 s saga timeout; idempotency via `client_order_id` (Redis SETNX).
+
+### Custody & Wallet
+- Hot/Warm/Cold 5/15/80 split; thresholds: hot <100K RUB auto-AML; warm 100K–1M TOTP+officer; cold >1M m-of-n (3/5) ceremony.
+- Sweeper service rebalances every 15 min; transfers >500K RUB-equivalent need 2 custody-officer confirmations.
+- HSM: Thales Luna Network HSM (FIPS 140-2 L3 + FSTEC); BIP-32/BIP-44 derivation + GOST encryption; 4-stage key lifecycle (Generation→Activation→Rotation→Destruction); tamper-evident audit.
+- **Event Sourcing**: balance = fold of DepositConfirmed / WithdrawalCompleted / TradeSettled / FeeCharged / BalanceAdjusted; optimistic concurrency via version; snapshots every 100 events; full reconstruction <1 s/account.
+
+### Compliance & Monitoring (two-tier detection)
+- **Tier 1 — Rules Engine** (<100 ms real-time, 95%+ precision): 200+ rules across threshold / velocity / pattern (smurfing, structuring, round-tripping, layering) / sanctions (SDN, Russian lists, FATF) / behavioral. JSON-declarative, hot-reloadable via Kafka `compliance.rules.updated`.
+- **Tier 2 — ML Pipeline**: XGBoost (<5 min, 0.87 F1, 150+ features, SHAP explainability) + GNN (<15 min, 0.82 F1, GNNExplainer); weekly retraining via Airflow; canary 10% → full deploy. External **Chainalysis** for source-of-funds (<30 s/tx).
+- All ML decisions explainable (regulator requirement for user appeal).
+
+### Payments & Settlement (Cross-Border Saga — 7 steps)
+1. ValidateCorridor (<50 ms); 2. CurrencyControlValidation per FZ-173 (<1 s); 3. ReserveFunds (Custody <100 ms); 4. ReserveLiquidity via liquidity bridge (<2 s); 5. ExecuteConversion (<500 ms); 6. SendToBank SWIFT/SPFS (<5 s); 7. WaitForSettlement (≤48 h async). Compensating transactions at each step.
+- **CorridorPlugin interface** (validate/execute/settle/compensate/getStatus) — new corridors (RU-CN, RU-AE, RU-IN, RU-TR, …) added without core changes; config in PostgreSQL + Redis cache.
+- Currency control: auto-generates passports of deals (>50K USD), FX operation codes, УФЭД docs; stored in MinIO (GOST-encrypted), exposed to regulator via Data Room.
+
+### Market Data
+- Hot path (<100 ms): in-memory ring buffer (10K ticks/instrument) → WebSocket delta-encoded (10–50× bandwidth reduction vs full snapshot); up to 1M concurrent WS.
+- Warm path (<5 s): TimescaleDB continuous aggregates (1m/5m/15m/1h/4h/1d/1w); hypertables chunk_time_interval=1 day (ticks) / 1 month (daily); compression 95% after 30 days; retention 2 yrs ticks, indefinite candles.
+- Channels: WebSocket, REST (cursor pagination), Kafka `market-data.events`.
+
+### Identity & Access Management
+- KYC state machine: UNINITIATED → PHONE_VERIFIED (L0 view-only) → DOCUMENT_VERIFIED (L1 deposits) → SELFIE_VERIFIED → ADDRESS_VERIFIED → FULLY_VERIFIED (L2 full access); rejection → LIMITED/REJECTED.
+- OCR via fine-tuned **PaddleOCR** with RF passport format validation; confidence <0.85 → manual review.
+- Biometric: liveness (3D depth + eye blink + head movement) + face match (cosine ≥0.90 auto-approve, 0.80–0.90 manual, <0.80 reject).
+- **ESIA (Gosuslugi)** SAML 2.0/OAuth 2.0 — auto-imports FIO/DOB/SNILS/registration (+35% conversion); EGRUL API (FNS) for legal entities.
+- **Qualification test**: adaptive engine, 500-question bank (5 categories × 100), 25 random questions, pass = 20/25; valid 1 year. Alternative: ≥3 mln RUB asset proof via partner bank API.
+
+### API contracts & inter-service comms
+- OpenAPI 3.1 covers 6 APIs; gRPC/Protobuf for sync internal; Kafka+Avro Schema Registry for async.
+- **Idempotency** via client idempotency key (Redis SETNX, TTL 24h).
+- **Transactional Outbox + Debezium CDC** → at-least-once Kafka delivery → dedup table → exactly-once semantics.
+- **Rate limiting** 3 layers: Kong (global IP/API-key), app-level (user_id × op type), TCP (syn cookies, conn throttle); HTTP 429 + Retry-After.
+
+---
+
+## 4. Personas (`/tmp/Personas_clean.txt`) — 50 personas in 6 segments
+
+| Segment | Personas | Sample roles |
+|---|---|---|
+| 1. Retail investors | P01–P12 | IT specialist, marketer, entrepreneur, student, pensioner, freelancer, degen, accountant, full-time trader, surgeon, online-shop owner, CFA holder |
+| 2. B2B / corporate | P13–P24 | Importer fin-director, logistics CEO, agro-exporter, DeFi startup, financial controller, payment-service operator, kolkhoz chair, HR head, pharma procurement, family office, NCO head, crypto hedge-fund CEO |
+| 3. Cross-border individuals | P25–P32 | Migrant builder (TJ→RU), IT contractor (AM↔RU), SMM (KZ→RU), entrepreneur (RU↔CN), online English tutor (UAE), tour-firm owner (RU↔TR), remote doctor (RU→DE), e-sportsman |
+| 4. Platform operators | P33–P40 | Compliance/AML officer, CTO, support agent, risk manager, legal head, DevOps, listing manager, internal auditor |
+| 5. Technical integrators | P41–P46 | Trading-bot dev, bank-system integrator, OSS API lib author, marketing DS, exchange integrator, mobile-app PO |
+| 6. Regulatory & audit | P47–P50 | Central Bank inspector, Big-4 external auditor, Rosfinmonitoring officer, independent board director |
+
+Each persona has: profile, goals, pains/barriers, KYC level, technical level, risk profile, key scenarios, security requirements, access pattern.
+
+### Domain decomposition from personas (Table 2)
+11 bounded contexts derived (matches Architecture doc): Identity & Access (all 50), Trading Engine (P01-P12, P24, P41, P45), Custody & Wallet (all with assets), Payments & Settlement (P06, P11, P13-P23, P25-P32), Compliance & Monitoring (P33, P36-P37, P40, P47, P49), Cross-Border Gateway (P13-P21, P25-P32), Market Data & Analytics (P01, P07, P09, P24, P44, P46), Listing & Tokenization (P12, P16, P39), Notification & Communication (all 50), Admin & Operations (P33-P40), Regulatory Reporting (P33, P37, P47, P49).
+
+### RBAC matrix from personas (Table 3)
+11 roles: Unqualified Investor, Qualified Investor, Legal Entity, Institutional, Compliance Officer, Support Agent, Risk Manager, Administrator, Auditor, Regulator, Board Member — each mapped to specific personas with critical-operation permissions.
+
+### Load profiles (Table 4)
+- Trading Engine: 100K TPS (P01/P07/P09/P24/P41 HFT/API).
+- Identity & Access (KYC): 5K TPS (mass onboarding).
+- Payments & Settlement: 10K TPS (cross-border).
+- Custody & Wallet: 50K TPS (volatility spikes).
+- Compliance & Monitoring: 100K TPS (every tx checked).
+- Market Data: 500K msg/s (WS).
+- Notification: 50K/min (push/SMS/email).
+- API Gateway: 200K TPS aggregate.
+
+### Key architectural imperatives (from personas)
+1. **Fast-path / slow-path split** — trading + market data on hot in-memory path; compliance, reporting, admin on async slow path.
+2. **Multi-corridor plug-in architecture** — cross-border is critical for 16/50 personas (P06, P11, P13–P21, P25–P32).
+3. **Immutable audit trail** as architectural primitive (5-yr retention; 115-FZ, Central Bank rules).
+4. **Hybrid RBAC + ABAC** — RBAC for roles + ABAC for context (qualification, corridor jurisdiction, sanctions).
+
+---
+
+## 5. OpenAPI Spec (`/home/z/my-project/upload/openapi_crypto_platform.yaml`)
+
+- OpenAPI 3.1.0; base URL `https://api.crypto-platform.ru/v1` (prod, sandbox, localhost).
+- Security: `BearerAuth` (JWT) + `ApiKeyAuth` (X-API-Key header).
+- 6 tags: Trading, Wallet, KYC, Payment, MarketData, Compliance.
+- 30+ component schemas (Order, Trade, Instrument, Position, Account, DepositAddress, WithdrawalRequest, Transaction, KYCSession, DocumentVerification, SelfieVerification, QualificationResult, KYCStatus, CrossBorderPaymentRequest, PaymentResponse, Corridor, ConversionQuote, Tick, Candle, OrderBook, AMLAlert, SARDetails, ComplianceCheckRequest/Result, etc.).
+
+### All endpoints grouped by module (27 total)
+
+**Trading (7 endpoints)**
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/orders` | Place new order (limit/market); saga: validate→risk→reserve→match→settle |
+| GET | `/orders` | List user's orders |
+| GET | `/orders/{orderId}` | Get order by ID |
+| DELETE | `/orders/{orderId}` | Cancel order |
+| GET | `/trades` | Trade history |
+| GET | `/instruments` | List tradable instruments |
+| GET | `/positions` | User's current positions |
+
+**Wallet & Custody (5 endpoints)**
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/wallet/accounts` | All user accounts/balances |
+| GET | `/wallet/accounts/{currency}` | Balance by currency |
+| POST | `/wallet/deposit-address` | Get deposit address (HD derivation) |
+| POST | `/wallet/withdraw` | Request withdrawal (multi-factor auth) |
+| GET | `/wallet/transactions` | Transaction history |
+
+**KYC / Identity (6 endpoints)**
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/kyc/session` | Start KYC session |
+| POST | `/kyc/session/{sessionId}/phone` | Verify phone number |
+| POST | `/kyc/session/{sessionId}/document` | Upload document for verification |
+| POST | `/kyc/session/{sessionId}/selfie` | Selfie + liveness verification |
+| POST | `/kyc/qualification` | Pass qualification test (25 Q) |
+| GET | `/kyc/status` | Current KYC status |
+
+**Payment & Cross-Border (4 endpoints)**
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/payments/cross-border` | Initiate cross-border payment (saga) |
+| GET | `/payments/{paymentId}` | Payment status |
+| GET | `/payments/corridors` | List available corridors (RU-CN, RU-AE, etc.) |
+| POST | `/payments/convert` | Convert currency (quote locked for limited time) |
+
+**Market Data (3 endpoints)**
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/market/ticks` | Latest ticks by instrument |
+| GET | `/market/candles` | OHLCV candles |
+| GET | `/market/orderbook` | Order book (L2 depth) |
+
+**Compliance (4 endpoints)**
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/compliance/alerts` | AML alerts (role COMPLIANCE_OFFICER/ADMIN) |
+| POST | `/compliance/alerts/{alertId}/review` | Review AML alert (approve/reject/escalate) |
+| POST | `/compliance/check` | AML transaction check (internal API) |
+| POST | `/compliance/quarantine` | Quarantine account (m-of-n: Compliance + Risk Manager) |
+
+---
+
+## 6. HTML Demo (`/home/z/my-project/upload/full_platform_demo.html`)
+
+### Overview
+Single-page interactive multi-scenario prototype (Binance-style gold #F0B90B + dark navy #0B1426 theme). 3-column layout: persona switcher / step indicator / canvas / annotations panel / footer nav. Each step shows: rendered UI (`screen_html`) + API calls (`api`) + state machine (`states`) + business logic notes (`logic`) + domain entities (`entities`).
+
+### 4 demo personas (all retail)
+- `novice` — Алексей, 28, first crypto experience (focus: simplicity, hints, security).
+- `investor` — Мария, 34, 3+ years trading (focus: analytics, portfolio).
+- `active` — Дмитрий, 42, long-term positions (focus: instruments, risk).
+- `algo` — Сергей, 31, automation & API (focus: programmatic access).
+
+### 7 scenarios × 29 steps (every distinct page/section)
+
+**UC-01 Onboarding & KYC** (default persona: novice)
+1. Регистрация по Email — auth card, email/password/country/ToS, password strength meter, Gosuslugi button.
+2. Подтверждение Email — 6-digit OTP entry, resend (rate-limited).
+3. KYC: Загрузка документа — passport upload (multipart), document preview.
+4. KYC: Биометрическая проверка — selfie + liveness check (SumSub integration).
+5. KYC Approved — аккаунт активирован — success screen with verification badge.
+
+**UC-02 Deposit & Withdraw** (default persona: investor)
+1. Выбор актива и сети для депозита — asset/network selector (BTC/BEP20 etc.).
+2. QR-код и адрес для депозита — QR + address, warnings.
+3. Транзакция обнаружена в сети — on-chain detection, confirmation progress.
+4. Депозит зачислен на баланс — balance updated, double-entry ledger.
+
+**UC-03 Spot Trading** (default persona: active)
+1. Терминал: выбор пары и стакан — trading terminal, pair header, L2 order book, depth chart.
+2. Форма ордера (Limit Buy) — order form (buy/sell, limit/market, price, qty, TIF).
+3. Превью ордера и подтверждение — preview: fee, slippage, risk; confirm.
+4. Ордер исполнен — сделка совершена — fill notification, trade record.
+
+**UC-04 Margin & Futures** (default persona: active)
+1. Активация маржинальной торговли — risk test + agreement.
+2. Настройка кредитного плеча — leverage selector per pair.
+3. Открытие Long позиции — margin position open form.
+4. Мониторинг позиции (PnL, Liquidation) — real-time PnL, margin ratio, liquidation price, WS updates.
+
+**UC-05 Social & Copy Trading** (default persona: novice)
+1. Топ трейдеров — лидерборд — leaderboard (period/sort/filters).
+2. Профиль трейдера — trader profile + verified stats.
+3. Настройка копирования — copy-relationship config (allocation, limits).
+4. Зеркалирование сделок в реальном времени — real-time mirrored trades stream.
+
+**UC-06 Portfolio Management** (default persona: investor)
+1. Обзор портфеля — portfolio summary (value, PnL, allocation).
+2. Анализ аллокации и рисков — current vs target allocation, risk metrics.
+3. Ребалансировка портфеля — rebalance job (batch orders, queued→executing→completed).
+4. История транзакций и налоговый отчёт — transaction history + 3-NDFL-compatible tax report.
+
+**UC-07 Analytics & Screener** (default persona: algo)
+1. Фильтры скринера рынка — screener filters (price, vol, RSI, category, indicators).
+2. Результаты скринера — paginated results.
+3. Детальный анализ актива — coin detail + indicators.
+4. Сохранение пресета и alert — save preset + scheduled alerts.
+
+### 32 API call references in the demo (REST + WebSocket)
+Includes `/api/v1/auth/register`, `/auth/verify-email`, `/kyc/documents`, `/kyc/face-verification`, `/kyc/applications/{id}`, `/wallets/deposit-address`, `/ledger/entries`, `/markets/{symbol}/orderbook`, `/orders/preview`, `/orders`, `/margin/enable`, `/margin/leverage`, `/futures/positions`, `/social/leaderboard`, `/social/traders/{id}`, `/copy/relationships`, `/portfolio/summary`, `/portfolio/allocation`, `/portfolio/rebalance`, `/portfolio/transactions`, `/tax/report`, `/screener`, `/screener/results`, `/coins/{id}`, `/screener/presets`; plus WebSocket streams for deposits, orderbook depth, order updates, futures positions, copy-trade mirroring.
+
+### 42 domain entities referenced
+User, UserSession, EmailVerification, KycApplication, KycDocument, BiometricCheck, RiskTestResult, Asset, DepositAddress, Deposit, BlockchainTx, LedgerEntry, Transaction, Wallet, Market, OrderBookSnapshot, Order, Trade, ConditionalOrder, FeeTier, MarginAccount, MarginPosition, MarginCall, FundingPayment, Trader, TraderStats, TraderTrade, CopyRelationship, CopyTrade, CopyPerformance, Portfolio, PortfolioMetrics, PortfolioTarget, RebalanceJob, RebalanceOrder, TaxLot, TaxReport, ScreenerQuery, ScreenerRun, ScreenerResult, ScreenerPreset, PriceAlert, AuditLog.
+
+### State machines (one per scenario, all visualized)
+UC-01: GUEST → PENDING_EMAIL → EMAIL_VERIFIED → KYC_PENDING → ACTIVE.
+UC-02: ADDRESS_REQUESTED → AWAITING_TRANSACTION → DETECTED_ON_CHAIN → CONFIRMED → CREDITED.
+UC-03: MARKET_SELECTED → ORDER_FORM → PREVIEW → SUBMITTED → FILLED (+ NEW/PARTIALLY_FILLED/CANCELLED/REJECTED).
+UC-04: DISABLED → RISK_TEST → AGREEMENT_SIGNED → ENABLED → LEVERAGE_SET → POSITION_OPENED → MONITORED → MARGIN_CALLED → LIQUIDATED → CLOSED.
+UC-05: BROWSE_LEADERBOARD → VIEW_PROFILE → CONFIGURE_COPY → COPYING → MIRROR_TRADES → PAUSED/STOPPED.
+UC-06: PORTFOLIO_VIEWED → ALLOCATION_ANALYZED → REBALANCE_PROPOSED → REBALANCE_EXECUTED (+ QUEUED/EXECUTING/PARTIALLY_DONE/COMPLETED/FAILED).
+UC-07: FILTERS_SET → QUERY_EXECUTED → RESULTS_VIEWED → DETAIL_VIEWED → PRESET_SAVED → SCHEDULED → ALERT_TRIGGERED.
+
+### Coverage gap (important for Target State)
+The HTML demo covers **only retail-investor flows**. It does NOT contain screens for: cross-border payments, P2P trading, compliance officer console, admin panel, regulatory portal, listing/tokenization, or notification center — all of which are required by PRD/Architecture/Domain docs.
+
+---
+
+# CONSOLIDATED TARGET STATE
+
+## What modules/screens MUST a working investor-demo prototype have?
+
+Based on the union of all 6 docs, a credible investor demo should include at minimum the following modules and screens:
+
+### A. Identity & Onboarding (must-have)
+- Email/phone registration; **ESIA (Gosuslugi) login button**.
+- KYC wizard: phone OTP → document upload (RF passport) → selfie+liveness → sanctions check → address-identifier assignment.
+- Qualification test (25 Q) and/or asset-proof path; status badge (UNQUALIFIED / QUALIFIED).
+- 2FA/MFA setup (TOTP, optionally FIDO2).
+
+### B. Wallet & Custody (must-have)
+- Multi-currency balance dashboard (RUB + USDT + BTC + ETH at minimum).
+- Deposit flow: asset+network selector → QR/address → on-chain detection → confirmation → credit.
+- Withdrawal flow: address book (whitelist), amount, fee preview, multi-factor confirmation (with biometric prompt for >100K RUB).
+- Transaction history with filters and export.
+
+### C. Spot Trading (must-have)
+- Trading terminal: pair selector, **L2 order book (depth chart)**, recent trades tape, price chart.
+- Order form: buy/sell, types (limit/market/stop-limit/stop-market), price, qty, time-in-force (GTC/GTT/IOC/FOK), client_order_id (idempotency).
+- Order preview (fee, slippage, risk check) → confirm.
+- Open orders / order history / trade history; WebSocket real-time updates.
+
+### D. Portfolio & Analytics (must-have for investor demo)
+- Portfolio overview (total value, PnL, allocation pie).
+- Allocation analysis (current vs target), risk metrics.
+- Transaction history + **3-NDFL-compatible tax report** export.
+
+### E. Cross-Border Payments (differentiator — must-have for investor pitch)
+- Corridor selector (RU-CN, RU-AE, RU-TR, RU-IN, RU-CIS) with fees/ETA.
+- Payment form: from/to currency, amount, beneficiary (name, account, bank, SWIFT), purpose, currency-control docs upload.
+- Conversion quote (locked rate with TTL), payment status tracker (initiated → currency-control-pending → liquidity-reserving → converting → sending → settling → completed).
+
+### F. Compliance console (must-have for regulator/investor due diligence)
+- AML alerts list with risk score, triggered rule, explainability (SHAP/GNN).
+- Alert review actions (approve / reject / escalate / file SAR).
+- Account quarantine action (m-of-n approval flow).
+
+### G. Admin & Operations (minimum)
+- User lookup, role assignment, configuration management, incident view.
+- Read-only Regulatory Data Room portal (for P47/P49 inspector persona).
+
+### H. Notification center
+- In-app + push + email + SMS; transactional alerts (deposits, withdrawals, fills, margin calls, AML holds).
+
+## Minimum viable feature set for the demo (MVP scope)
+
+For a focused investor demo (single-meeting wow factor), implement:
+
+1. **Onboarding & KYC** (UC-01): 5 screens — registration, email OTP, document upload, selfie/liveness, success. **Gosuslagi mock button.**
+2. **Wallet** (UC-02 + withdrawals): 4 deposit screens + balance dashboard + withdraw form.
+3. **Spot Trading** (UC-03): 4 screens — terminal+order book, order form, preview, fill confirmation. **WebSocket for live order book + fills.**
+4. **Portfolio & Tax** (UC-06 condensed): portfolio overview + tax report download.
+5. **Cross-Border Payment** (NEW screen not in current demo): corridor picker + payment form + status tracker — this is the #1 monetization driver and must be visible.
+6. **Compliance Alert Console** (NEW screen): list of sample AML alerts with risk scores + review actions — demonstrates regulatory compliance to investors.
+
+Optional/second-priority for the demo (mention but defer): margin/futures (UC-04), social/copy trading (UC-05), screener/analytics (UC-07), listing/tokenization, regulatory portal.
+
+Each screen should display the **API call** (matching OpenAPI spec paths), **state machine step**, **business logic notes**, and **domain entities** — i.e. preserve the demo HTML's 4-tab annotation pattern (API / State / Logic / Data).
+
+## Ideal tech stack (synthesized from Architecture + Domain docs)
+
+### Frontend
+- **Next.js 16 + React 19 + TypeScript** (matches existing `/home/z/my-project` scaffold: Next.js, Tailwind, shadcn/ui).
+- **Tailwind CSS 4** + **shadcn/ui** for design system (gold #F0B90B + dark navy theme).
+- **TanStack Query** for REST, **native WebSocket** (or `socket.io`) for streams.
+- **Recharts / Lightweight Charts** (TradingView) for charts; **Zustand** or **Jotai** for state.
+- Mobile: **React Native** (Expo) sharing types with web.
+
+### Backend
+- **Matching engine**: **Rust** (deterministic latency, partitioned per instrument).
+- **Core services** (IAM, Custody, Payments, Cross-Border Gateway, Notification, Admin, Reporting, Listing): **Go** (1.22+).
+- **Compliance ML**: **Python** (XGBoost + PyG GNN, Airflow, Feature Store).
+- Inter-service sync: **gRPC + Protobuf**; async: **Apache Kafka** (Avro + Schema Registry).
+- API Gateway: **Kong** (with custom plugins for GOST TLS, rate-limit, auth).
+- Service Mesh: **Istio** (mTLS zero-trust).
+
+### Data stores
+- **PostgreSQL 16** (operational, sync 2-DC replication).
+- **TimescaleDB** (ticks, candles, metrics).
+- **Redis Cluster** (order book cache, rate limits, idempotency keys).
+- **EventStoreDB** (Custody/Compliance event sourcing) + **Kafka** with **Debezium CDC** + Outbox pattern.
+- **Elasticsearch** (AML search, audit queries).
+- **ClickHouse** (BI / data warehouse).
+- **MinIO** (S3-compatible, GOST-encrypted document storage).
+- **WORM storage** for immutable audit trail (Merkle Root hourly publication).
+
+### Infrastructure
+- **Kubernetes 1.29+** in 2 FSTEC-certified RF data centers (Moscow + St. Petersburg), active-active.
+- **GitLab CI** (lint → unit → integration → SAST/DAST → Trivy scan → staging → smoke → canary → prod; auto-rollback >1% error in 5 min).
+- **Calico** network policies; **Falco** runtime security; **Trivy** container scans.
+- **HSM Thales Luna** (FIPS 140-2 L3 + FSTEC) for key management; BIP-32/44 + GOST 28147-89.
+
+### Observability & Security
+- **Prometheus + Grafana** (metrics), **ELK** (logs), **OpenTelemetry + Jaeger** (traces).
+- **SIEM** (Elastic Security) + UEBA + SOC 24/7.
+- **GOST 28147-89 / R 34.12-2015 + AES-256-GCM** dual encryption; hierarchical key model (Master→KEK→DEK→ephemeral); Key Ceremony 5-of-7.
+- **RBAC + ABAC** authorization; 11 roles; Separation of Duties for critical ops.
+
+### For the MVP/demo specifically (pragmatic subset)
+- Next.js 16 + TypeScript + Tailwind + shadcn/ui (already scaffolded in repo).
+- Mock JSON server or **Prisma + PostgreSQL** local for persistence.
+- Single WebSocket endpoint stub for live order book + fills.
+- Storybook-style scenarios mirroring the 7 demo UCs + new cross-border + compliance console.
+- No real HSM/Kafka/Rust engine needed for the demo — simulate latency and matching in TypeScript, but keep the OpenAPI contract identical to the production spec so the demo is "production-shaped".
+
+---
+Task ID: 1-B
+Agent: Repo Explorer (orchestrator fallback after rate-limit)
+Task: Thoroughly analyze current state of crypto_mvp_repo (cloned from https://github.com/86dimidrol86/crypto_mvp).
+
+Work Log:
+- Cloned repo to /home/z/my-project/crypto_mvp_repo.
+- Read package.json, README.md, CLAUDE.md, AGENTS.md, tailwind.config.js, app/globals.css.
+- Read all 8 page files (home, trade, wallet, p2p, payments, analytics, profile, auth) + lib/store.ts + lib/utils.ts.
+- Reviewed git log (~20 commits; trajectory: tailwind v3↔v4 struggles, recent feature additions).
+
+Stage Summary (CURRENT STATE):
+- Stack: Next.js 16.2.9, React 19.2.7, TypeScript 5, Tailwind CSS v3.4 (NOT v4), Zustand 5 (persist), framer-motion 12, chart.js + react-chartjs-2, sonner toasts, ws. NO shadcn/ui (components.json present but no components/). NO Prisma/DB. NO API routes. NO auth library.
+- Config quirk: package.json mixes @tailwindcss/postcss ^4.3.1 with tailwindcss ^3.4.1 + autoprefixer ^10 (git log shows repeated tailwind v3/v4 flip-flops; "restore tailwind v3" is the latest stable state). globals.css is minimal (3 @tailwind directives + 2 vars).
+- Documentation: README is default create-next-app boilerplate. CLAUDE.md → just "@AGENTS.md". AGENTS.md warns "This is NOT the Next.js you know" (breaking changes). No project-specific conventions documented.
+- Pages (all 'use client', mock-driven, no backend):
+  • app/page.tsx (home, 250 lines): hero + live market cards pulling REAL prices from Binance 24hr ticker (8 symbols) + exchangerate-api USD→RUB; 4s local price micro-sim for highlight animation; RUB/USD toggle; features section. Header nav + footer.
+  • app/trade/page.tsx (252 lines): trading terminal — pair selector (8 BTC/RUB…AVAX/RUB pairs), TradingView iframe chart, mock L2 order book (8 bids/asks generated from price), order form (limit/market, buy/sell, price, qty), places order via Zustand store (updates balances + trade history, persisted), toast confirmation. Debug console.log left in.
+  • app/wallet/page.tsx (155 lines): 4 tabs (assets/deposit/withdraw/history). STATIC hardcoded balances (not from store!). Deposit = generate fake bc1q address + alert. Withdraw = alert. History = 3 static rows. No QR, no network selector, no fee preview, no 2FA.
+  • app/p2p/page.tsx (384 lines): MOST functional page. Generates 100 random USDT/RUB offers, buy/sell tabs, search + min/max price filter + sort, create-offer modal, accept-offer → creates deal, my-deals (active/completed) with confirm/cancel, floating chat widget with canned bot replies. Deals persisted to localStorage.
+  • app/payments/page.tsx (99 lines): cross-border — 3 corridors (RU-CN/AE/TR), amount input, computed receive/fee/ETA, "Создать платёж" just sets step=2 (no real flow). Currency-control note only.
+  • app/analytics/page.tsx (138 lines): platform stats (4 KPIs by period 1h/24h/7d/30d, hardcoded), TradingView iframe + chart.js Pie for portfolio allocation (hardcoded %). Static.
+  • app/profile/page.tsx (307 lines): 7-tab sidebar (overview/wallet/history/kyc/security/referral/settings). Pulls REAL Binance prices + USD→RUB for balance valuation; uses Zustand store balances. KYC tab = static "Lv.2 verified" + re-verify button. Security/referral/settings = static stubs.
+  • app/auth/page.tsx (88 lines): login/register toggle, email+password(+phone on register), on submit writes to localStorage and redirects /profile. No real auth, no KYC flow, no Gosuslugi.
+- State: lib/store.ts — Zustand + persist('trade-storage'): balances (4 assets: RUB/USDT/BTC/ETH), tradeHistory (cap 20), placeOrder (adjusts balances), updateBalance. Note: wallet page uses its OWN static balances, NOT the store (inconsistency).
+- Quality assessment: MOCKUP-grade. Real price feeds (Binance/CoinGecko/exchangerate) but NO backend, NO database, NO API routes, NO real matching engine, NO auth, NO WebSocket server (ws dep unused). Trading "execution" is a local store mutation. No tests. Debug console.log in trade page. Tailwind v3 (sandbox is v4). No shadcn/ui. Footer NOT sticky (just a plain footer in home; other pages have no footer). Mobile nav missing (header nav hidden md:flex).
+- Gap vs target (see Task 1-A): missing entirely — KYC flow, real order book WS, deposit/withdraw real flow, cross-border saga tracker, compliance console, admin/regulatory portal, portfolio tax report, margin/futures, copy/social trading, screener, notification center. Plus no backend/API/DB layer at all.
+- Key risks for "connection": Tailwind v3→v4 migration, shadcn/ui adoption, building entire backend from scratch while preserving the working mock UI and real price integrations.

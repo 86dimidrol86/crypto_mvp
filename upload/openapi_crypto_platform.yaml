@@ -1,0 +1,1603 @@
+openapi: 3.1.0
+info:
+  title: Crypto Platform — Inter-Service API Contracts
+  description: |
+    OpenAPI-спецификация контрактов между микросервисами криптовалютной платформы.
+    
+    Спецификация покрывает 6 ключевых API:
+    - Trading API (ордера, сделки)
+    - Wallet & Custody API (балансы, депозиты, выводы)
+    - KYC/Identity API (верификация, квалификация)
+    - Payment & Cross-Border API (платежи, коридоры)
+    - Market Data API (тики, свечи, стакан)
+    - Compliance API (AML-проверки, алерты)
+    
+    Все внутренние коммуникации между сервисами используют gRPC/Protobuf.
+    REST-эндпоинты — внешний API (через API Gateway).
+  version: 1.0.0
+  contact:
+    name: Platform Architecture Team
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://api.crypto-platform.ru/v1
+    description: Production API Gateway
+  - url: https://api-sandbox.crypto-platform.ru/v1
+    description: Sandbox
+  - url: http://localhost:8080/v1
+    description: Local development
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+tags:
+  - name: Trading
+    description: Управление ордерами и получение информации о сделках
+  - name: Wallet
+    description: Балансы, депозиты и выводы
+  - name: KYC
+    description: Верификация личности и квалификационное тестирование
+  - name: Payment
+    description: Кросс-бордер платежи и конвертация
+  - name: MarketData
+    description: Рыночные данные, тики, свечи, стакан
+  - name: Compliance
+    description: AML-проверки, санкционные списки, алерты
+
+# ═══════════════════════════════════════════════════
+# PATHS
+# ═══════════════════════════════════════════════════
+paths:
+  # ── TRADING ──
+  /orders:
+    post:
+      tags: [Trading]
+      summary: Создать новый ордер
+      description: |
+        Размещает новый ордер (limit/market). 
+        Сага: validate → risk check → reserve funds → match → settle.
+      operationId: placeOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaceOrderRequest'
+      responses:
+        '201':
+          description: Ордер создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Недостаточная квалификация или превышен лимит
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenDetail'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: Торговля приостановлена (circuit breaker)
+
+    get:
+      tags: [Trading]
+      summary: Получить список ордеров пользователя
+      operationId: listOrders
+      parameters:
+        - name: instrument_id
+          in: query
+          schema:
+            type: string
+          description: Фильтр по торговой паре
+        - name: status
+          in: query
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/OrderStatus'
+          description: Фильтр по статусу
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 500
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Список ордеров
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderListResponse'
+
+  /orders/{orderId}:
+    get:
+      tags: [Trading]
+      summary: Получить ордер по ID
+      operationId: getOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Детали ордера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Trading]
+      summary: Отменить ордер
+      description: |
+        Отменяет открытый ордер. Если ордер частично исполнен, 
+        отменяется оставшаяся часть, зарезервированные средства возвращаются.
+      operationId: cancelOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Ордер отменён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '409':
+          description: Ордер уже исполнен/отменён
+
+  /trades:
+    get:
+      tags: [Trading]
+      summary: Получить историю сделок
+      operationId: listTrades
+      parameters:
+        - name: instrument_id
+          in: query
+          schema:
+            type: string
+        - name: side
+          in: query
+          schema:
+            type: string
+            enum: [buy, sell]
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 500
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Список сделок
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TradeListResponse'
+
+  /instruments:
+    get:
+      tags: [Trading]
+      summary: Получить список торговых инструментов
+      operationId: listInstruments
+      parameters:
+        - name: active_only
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Список инструментов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Instrument'
+
+  /positions:
+    get:
+      tags: [Trading]
+      summary: Получить текущие позиции пользователя
+      operationId: getPositions
+      responses:
+        '200':
+          description: Позиции пользователя
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Position'
+
+  # ── WALLET & CUSTODY ──
+  /wallet/accounts:
+    get:
+      tags: [Wallet]
+      summary: Получить все счета пользователя
+      operationId: getAccounts
+      responses:
+        '200':
+          description: Список счетов с балансами
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Account'
+
+  /wallet/accounts/{currency}:
+    get:
+      tags: [Wallet]
+      summary: Получить баланс по валюте
+      operationId: getAccountByCurrency
+      parameters:
+        - name: currency
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Баланс
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+
+  /wallet/deposit-address:
+    post:
+      tags: [Wallet]
+      summary: Получить адрес для депозита
+      description: |
+        Генерирует или возвращает существующий адрес для пополнения.
+        Адрес привязан к пользователю через AddressIdentifier (1194918-8).
+      operationId: getDepositAddress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currency]
+              properties:
+                currency:
+                  type: string
+                  example: BTC
+                network:
+                  type: string
+                  example: bitcoin
+      responses:
+        '200':
+          description: Депозитный адрес
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepositAddress'
+
+  /wallet/withdraw:
+    post:
+      tags: [Wallet]
+      summary: Запросить вывод средств
+      description: |
+        Инициирует вывод. Для сумм > 100K RUB требуется TOTP + биометрия.
+        Для сумм > 1M RUB — m-of-n подтверждение от custody officers.
+      operationId: requestWithdrawal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WithdrawalRequest'
+      responses:
+        '201':
+          description: Запрос на вывод создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WithdrawalResponse'
+        '403':
+          description: KYC недостаточен / адрес не в whitelist
+        '422':
+          description: Недостаточно средств / превышен лимит
+
+  /wallet/transactions:
+    get:
+      tags: [Wallet]
+      summary: Получить историю транзакций
+      operationId: listTransactions
+      parameters:
+        - name: currency
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [deposit, withdrawal, trade, fee, internal]
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: История транзакций
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+
+  # ── KYC / IDENTITY ──
+  /kyc/session:
+    post:
+      tags: [KYC]
+      summary: Начать KYC-сессию
+      operationId: startKYC
+      responses:
+        '201':
+          description: KYC-сессия создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KYCSession'
+
+  /kyc/session/{sessionId}/phone:
+    post:
+      tags: [KYC]
+      summary: Верифицировать номер телефона
+      operationId: verifyPhone
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [otp_code]
+              properties:
+                otp_code:
+                  type: string
+                  example: "123456"
+      responses:
+        '200':
+          description: Телефон верифицирован
+
+  /kyc/session/{sessionId}/document:
+    post:
+      tags: [KYC]
+      summary: Загрузить документ для верификации
+      operationId: uploadDocument
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [document_type, front_image]
+              properties:
+                document_type:
+                  type: string
+                  enum: [passport_rf, foreign_passport, driver_license, residence_permit]
+                front_image:
+                  type: string
+                  format: binary
+                back_image:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Документ обработан (OCR)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentVerification'
+
+  /kyc/session/{sessionId}/selfie:
+    post:
+      tags: [KYC]
+      summary: Верификация selfie + liveness
+      operationId: verifySelfie
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [selfie_image]
+              properties:
+                selfie_image:
+                  type: string
+                  format: binary
+                liveness_video:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Selfie верифицирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SelfieVerification'
+
+  /kyc/qualification:
+    post:
+      tags: [KYC]
+      summary: Пройти квалификационное тестирование
+      description: |
+        25 вопросов по 5 категориям. Порог: 20/25.
+        Альтернатива: подтверждение активов > 3 млн руб.
+      operationId: takeQualificationTest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [answers]
+              properties:
+                answers:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      question_id:
+                        type: string
+                      answer:
+                        type: string
+      responses:
+        '200':
+          description: Результат тестирования
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QualificationResult'
+
+  /kyc/status:
+    get:
+      tags: [KYC]
+      summary: Получить текущий статус KYC
+      operationId: getKYCStatus
+      responses:
+        '200':
+          description: Статус верификации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KYCStatus'
+
+  # ── PAYMENT & CROSS-BORDER ──
+  /payments/cross-border:
+    post:
+      tags: [Payment]
+      summary: Инициировать кросс-бордер платёж
+      description: |
+        Saga: validate → currency control → reserve liquidity → convert → 
+        send to bank → settle. Компенсация при сбое любого шага.
+      operationId: initiateCrossBorderPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrossBorderPaymentRequest'
+      responses:
+        '201':
+          description: Платёж инициирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '403':
+          description: Недостаточный KYC / валютный контроль не пройден
+        '422':
+          description: Коридор недоступен / превышен лимит
+
+  /payments/{paymentId}:
+    get:
+      tags: [Payment]
+      summary: Получить статус платежа
+      operationId: getPaymentStatus
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Статус платежа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentDetail'
+
+  /payments/corridors:
+    get:
+      tags: [Payment]
+      summary: Получить доступные платёжные коридоры
+      operationId: listCorridors
+      parameters:
+        - name: from_currency
+          in: query
+          schema:
+            type: string
+        - name: to_currency
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Список коридоров
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Corridor'
+
+  /payments/convert:
+    post:
+      tags: [Payment]
+      summary: Конвертировать валюту
+      description: Фиксирует курс на ограниченное время (quote)
+      operationId: convertCurrency
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from_currency, to_currency, amount]
+              properties:
+                from_currency:
+                  type: string
+                  example: BTC
+                to_currency:
+                  type: string
+                  example: RUB
+                amount:
+                  type: string
+                  example: "0.5"
+      responses:
+        '200':
+          description: Котировка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversionQuote'
+
+  # ── MARKET DATA ──
+  /market/ticks:
+    get:
+      tags: [MarketData]
+      summary: Получить последние тики по инструменту
+      operationId: getTicks
+      parameters:
+        - name: instrument_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+            maximum: 1000
+      responses:
+        '200':
+          description: Тики
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tick'
+
+  /market/candles:
+    get:
+      tags: [MarketData]
+      summary: Получить OHLCV свечи
+      operationId: getCandles
+      parameters:
+        - name: instrument_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: timeframe
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [1m, 5m, 15m, 1h, 4h, 1d, 1w]
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 500
+            maximum: 2000
+      responses:
+        '200':
+          description: Свечи
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Candle'
+
+  /market/orderbook:
+    get:
+      tags: [MarketData]
+      summary: Получить стакан ордеров
+      operationId: getOrderBook
+      parameters:
+        - name: instrument_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: depth
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Стакан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderBook'
+
+  # ── COMPLIANCE (Admin only) ──
+  /compliance/alerts:
+    get:
+      tags: [Compliance]
+      summary: Получить AML-алерты
+      description: Требуется роль COMPLIANCE_OFFICER или ADMIN
+      operationId: listAlerts
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, reviewed, closed, escalated]
+        - name: risk_level
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Список алертов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AMLAlert'
+
+  /compliance/alerts/{alertId}/review:
+    post:
+      tags: [Compliance]
+      summary: Рассмотреть AML-алерт
+      operationId: reviewAlert
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision, notes]
+              properties:
+                decision:
+                  type: string
+                  enum: [confirm_false_positive, escalate, quarantine_account, file_sar]
+                notes:
+                  type: string
+                sar_details:
+                  $ref: '#/components/schemas/SARDetails'
+      responses:
+        '200':
+          description: Решение зафиксировано
+
+  /compliance/check:
+    post:
+      tags: [Compliance]
+      summary: AML-проверка транзакции (внутренний API)
+      description: |
+        Внутренний эндпоинт для Wallet/Trading сервисов.
+        Возвращает risk_score и рекомендацию (approve/flag/reject).
+      operationId: checkTransaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComplianceCheckRequest'
+      responses:
+        '200':
+          description: Результат проверки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceCheckResult'
+
+  /compliance/quarantine:
+    post:
+      tags: [Compliance]
+      summary: Карантин аккаунта
+      description: Требуется m-of-n подтверждение (Compliance + Risk Manager)
+      operationId: quarantineAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, reason]
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                reason:
+                  type: string
+                duration_hours:
+                  type: integer
+                  default: 72
+      responses:
+        '201':
+          description: Аккаунт помещён в карантин
+
+# ═══════════════════════════════════════════════════
+# COMPONENTS
+# ═══════════════════════════════════════════════════
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  parameters:
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Ошибка валидации
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Неавторизован
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    RateLimited:
+      description: Превышен лимит запросов
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Секунды до повторного запроса
+
+  schemas:
+    # ── Common ──
+    ErrorResponse:
+      type: object
+      required: [error_code, message]
+      properties:
+        error_code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Invalid order quantity
+        details:
+          type: object
+          additionalProperties: true
+
+    ForbiddenDetail:
+      type: object
+      required: [error_code, message, reason]
+      properties:
+        error_code:
+          type: string
+          example: INSUFFICIENT_QUALIFICATION
+        message:
+          type: string
+        reason:
+          type: string
+          enum:
+            - insufficient_qualification
+            - yearly_limit_exceeded
+            - margin_not_allowed
+            - instrument_not_available
+            - address_not_whitelisted
+        current_limits:
+          type: object
+          properties:
+            yearly_volume:
+              type: string
+            yearly_limit:
+              type: string
+            qualification:
+              type: string
+
+    # ── Trading ──
+    OrderStatus:
+      type: string
+      enum:
+        - new
+        - validating
+        - risk_checking
+        - funds_reserved
+        - open
+        - partially_filled
+        - filled
+        - cancelled
+        - expired
+        - rejected
+
+    OrderSide:
+      type: string
+      enum: [buy, sell]
+
+    OrderType:
+      type: string
+      enum: [limit, market, stop_limit, stop_market]
+
+    TimeInForce:
+      type: string
+      enum: [GTC, GTT, IOC, FOK]
+
+    PlaceOrderRequest:
+      type: object
+      required: [instrument_id, side, type, quantity]
+      properties:
+        instrument_id:
+          type: string
+          example: BTC/RUB
+        side:
+          $ref: '#/components/schemas/OrderSide'
+        type:
+          $ref: '#/components/schemas/OrderType'
+        price:
+          type: string
+          description: Обязателен для limit и stop_limit ордеров
+          example: "5875000.00"
+        quantity:
+          type: string
+          example: "0.001"
+        time_in_force:
+          $ref: '#/components/schemas/TimeInForce'
+          default: GTC
+        expire_at:
+          type: string
+          format: date-time
+          description: Для GTT ордеров
+        stop_price:
+          type: string
+          description: Для stop_limit и stop_market
+        client_order_id:
+          type: string
+          description: Идемпотентный ключ (idempotency)
+          maxLength: 64
+
+    OrderResponse:
+      type: object
+      required: [id, instrument_id, side, type, quantity, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        client_order_id:
+          type: string
+        instrument_id:
+          type: string
+        side:
+          $ref: '#/components/schemas/OrderSide'
+        type:
+          $ref: '#/components/schemas/OrderType'
+        price:
+          type: string
+        quantity:
+          type: string
+        filled_quantity:
+          type: string
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        time_in_force:
+          $ref: '#/components/schemas/TimeInForce'
+        fee:
+          type: string
+          description: Accumulated fee
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    OrderListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderResponse'
+        cursor:
+          type: string
+          nullable: true
+
+    TradeResponse:
+      type: object
+      required: [id, instrument_id, side, price, quantity, fee, executed_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        order_id:
+          type: string
+          format: uuid
+        instrument_id:
+          type: string
+        side:
+          $ref: '#/components/schemas/OrderSide'
+        price:
+          type: string
+        quantity:
+          type: string
+        fee:
+          type: string
+        fee_currency:
+          type: string
+        executed_at:
+          type: string
+          format: date-time
+
+    TradeListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TradeResponse'
+        cursor:
+          type: string
+          nullable: true
+
+    Instrument:
+      type: object
+      required: [id, base_currency, quote_currency, tick_size, min_qty, is_active]
+      properties:
+        id:
+          type: string
+          example: BTC/RUB
+        base_currency:
+          type: string
+        quote_currency:
+          type: string
+        tick_size:
+          type: string
+          example: "0.00000001"
+        min_qty:
+          type: string
+          example: "0.0001"
+        max_qty:
+          type: string
+        maker_fee_rate:
+          type: string
+          example: "0.001"
+        taker_fee_rate:
+          type: string
+          example: "0.002"
+        is_active:
+          type: boolean
+        trading_status:
+          type: string
+          enum: [normal, halted, pre_market, post_market]
+
+    Position:
+      type: object
+      properties:
+        instrument_id:
+          type: string
+        quantity:
+          type: string
+        avg_entry_price:
+          type: string
+        unrealized_pnl:
+          type: string
+        current_price:
+          type: string
+
+    # ── Wallet ──
+    Account:
+      type: object
+      required: [currency, available_balance, reserved_balance]
+      properties:
+        currency:
+          type: string
+        available_balance:
+          type: string
+        reserved_balance:
+          type: string
+        wallet_type:
+          type: string
+          enum: [hot, warm, cold]
+
+    DepositAddress:
+      type: object
+      required: [address, currency, network]
+      properties:
+        address:
+          type: string
+          example: bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh
+        currency:
+          type: string
+        network:
+          type: string
+        address_id:
+          type: string
+          format: uuid
+        expires_at:
+          type: string
+          format: date-time
+
+    WithdrawalRequest:
+      type: object
+      required: [currency, amount, destination_address]
+      properties:
+        currency:
+          type: string
+          example: BTC
+        amount:
+          type: string
+          example: "0.1"
+        destination_address:
+          type: string
+        network:
+          type: string
+        totp_code:
+          type: string
+          description: Обязателен для сумм > 100K RUB equivalent
+        memo:
+          type: string
+          description: Для Tag/Memo сетей (XRP, XLM)
+
+    WithdrawalResponse:
+      type: object
+      required: [id, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending_approval, approved, processing, completed, failed, blocked]
+        fee:
+          type: string
+        estimated_completion:
+          type: string
+          format: date-time
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [deposit, withdrawal, trade, fee, internal, cross_border]
+        currency:
+          type: string
+        amount:
+          type: string
+        status:
+          type: string
+        tx_hash:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    # ── KYC ──
+    KYCSession:
+      type: object
+      required: [session_id, required_steps]
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        required_steps:
+          type: array
+          items:
+            type: string
+            enum: [phone, document, selfie, address, qualification]
+        status:
+          type: string
+          enum: [pending, in_progress, submitted, approved, limited, rejected]
+
+    DocumentVerification:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [processing, verified, failed]
+        extracted_fields:
+          type: object
+          properties:
+            full_name:
+              type: string
+            date_of_birth:
+              type: string
+            document_number:
+              type: string
+            issuer:
+              type: string
+        confidence:
+          type: number
+          format: float
+
+    SelfieVerification:
+      type: object
+      properties:
+        match_score:
+          type: number
+          format: float
+        liveness_passed:
+          type: boolean
+        status:
+          type: string
+          enum: [verified, failed]
+
+    QualificationResult:
+      type: object
+      properties:
+        passed:
+          type: boolean
+        score:
+          type: integer
+          description: Количество правильных ответов (из 25)
+        qualification_level:
+          type: string
+          enum: [unqualified, qualified]
+        valid_until:
+          type: string
+          format: date-time
+
+    KYCStatus:
+      type: object
+      properties:
+        kyc_level:
+          type: integer
+          enum: [0, 1, 2, 3]
+          description: "0=none, 1=basic, 2=full, 3=corporate"
+        qualification:
+          type: string
+          enum: [none, unqualified, qualified]
+        completed_steps:
+          type: array
+          items:
+            type: string
+        pending_steps:
+          type: array
+          items:
+            type: string
+        address_identifier_assigned:
+          type: boolean
+        yearly_volume:
+          type: string
+        yearly_limit:
+          type: string
+
+    # ── Payment ──
+    CrossBorderPaymentRequest:
+      type: object
+      required: [corridor_id, from_currency, to_currency, from_amount, beneficiary]
+      properties:
+        corridor_id:
+          type: string
+          example: RU-CN
+        from_currency:
+          type: string
+          example: RUB
+        to_currency:
+          type: string
+          example: CNY
+        from_amount:
+          type: string
+          example: "500000"
+        beneficiary:
+          type: object
+          properties:
+            name:
+              type: string
+            account:
+              type: string
+            bank_name:
+              type: string
+            bank_swift:
+              type: string
+        purpose:
+          type: string
+        currency_control_docs:
+          type: array
+          items:
+            type: object
+
+    PaymentResponse:
+      type: object
+      required: [payment_id, status, saga_id]
+      properties:
+        payment_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [initiated, currency_control_pending, liquidity_reserving, converting, sending, settling, completed, failed, compensated]
+        saga_id:
+          type: string
+          format: uuid
+        estimated_completion:
+          type: string
+          format: date-time
+
+    PaymentDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        corridor_id:
+          type: string
+        from_currency:
+          type: string
+        to_currency:
+          type: string
+        from_amount:
+          type: string
+        to_amount:
+          type: string
+        exchange_rate:
+          type: string
+        status:
+          type: string
+        saga_steps:
+          type: array
+          items:
+            type: object
+            properties:
+              step:
+                type: string
+              status:
+                type: string
+              completed_at:
+                type: string
+                format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Corridor:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        from_currency:
+          type: string
+        to_currency:
+          type: string
+        min_amount:
+          type: string
+        max_amount:
+          type: string
+        fee_rate:
+          type: string
+        estimated_time:
+          type: string
+        is_active:
+          type: boolean
+
+    ConversionQuote:
+      type: object
+      properties:
+        quote_id:
+          type: string
+          format: uuid
+        from_currency:
+          type: string
+        to_currency:
+          type: string
+        from_amount:
+          type: string
+        to_amount:
+          type: string
+        rate:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+
+    # ── Market Data ──
+    Tick:
+      type: object
+      properties:
+        instrument_id:
+          type: string
+        price:
+          type: string
+        quantity:
+          type: string
+        side:
+          type: string
+          enum: [buy, sell]
+        timestamp:
+          type: string
+          format: date-time
+        trade_id:
+          type: string
+          format: uuid
+
+    Candle:
+      type: object
+      properties:
+        instrument_id:
+          type: string
+        timeframe:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        open:
+          type: string
+        high:
+          type: string
+        low:
+          type: string
+        close:
+          type: string
+        volume:
+          type: string
+        trades_count:
+          type: integer
+
+    OrderBook:
+      type: object
+      properties:
+        instrument_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        bids:
+          type: array
+          items:
+            type: object
+            properties:
+              price:
+                type: string
+              quantity:
+                type: string
+              order_count:
+                type: integer
+        asks:
+          type: array
+          items:
+            type: object
+            properties:
+              price:
+                type: string
+              quantity:
+                type: string
+              order_count:
+                type: integer
+
+    # ── Compliance ──
+    AMLAlert:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        rule_id:
+          type: string
+        risk_level:
+          type: string
+          enum: [low, medium, high, critical]
+        risk_score:
+          type: number
+          format: float
+        details:
+          type: object
+          additionalProperties: true
+        status:
+          type: string
+          enum: [open, reviewed, closed, escalated]
+        assigned_to:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+
+    SARDetails:
+      type: object
+      properties:
+        report_type:
+          type: string
+          enum: [3-FM, 4-FM]
+        description:
+          type: string
+        related_transactions:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    ComplianceCheckRequest:
+      type: object
+      required: [user_id, transaction_type, amount, currency]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        transaction_type:
+          type: string
+          enum: [deposit, withdrawal, trade, cross_border, p2p]
+        amount:
+          type: string
+        currency:
+          type: string
+        counterparty_address:
+          type: string
+        source_country:
+          type: string
+        destination_country:
+          type: string
+
+    ComplianceCheckResult:
+      type: object
+      required: [recommendation, risk_score]
+      properties:
+        recommendation:
+          type: string
+          enum: [approve, flag, reject]
+        risk_score:
+          type: number
+          format: float
+        matched_rules:
+          type: array
+          items:
+            type: object
+            properties:
+              rule_id:
+                type: string
+              rule_name:
+                type: string
+              severity:
+                type: string
+        requires_manual_review:
+          type: boolean
+        review_deadline_hours:
+          type: integer
