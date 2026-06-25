@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Bell } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
+import { useI18n } from '@/lib/use-i18n'
 import { Button } from '@/components/ui/button'
 import {
   Popover,
@@ -16,6 +17,7 @@ import { timeAgo } from '@/lib/format'
 export function NotificationsBell() {
   const notifications = useAppStore((s) => s.notifications)
   const markRead = useAppStore((s) => s.markNotificationsRead)
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const unread = notifications.filter((n) => !n.read).length
 
@@ -33,16 +35,16 @@ export function NotificationsBell() {
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="end">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <span className="font-semibold text-sm">Уведомления</span>
+          <span className="font-semibold text-sm">{t('notif.title')}</span>
           {unread > 0 && (
-            <span className="text-[10px] text-muted-foreground">{unread} новых</span>
+            <span className="text-[10px] text-muted-foreground">{unread} {t('notif.unread')}</span>
           )}
         </div>
         <ScrollArea className="h-80">
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-center px-4">
               <Bell className="w-6 h-6 text-muted-foreground/40 mb-2" />
-              <p className="text-xs text-muted-foreground">Пока нет уведомлений</p>
+              <p className="text-xs text-muted-foreground">{t('notif.empty')}</p>
             </div>
           ) : (
             <div className="flex flex-col">

@@ -36,6 +36,7 @@ import {
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '@/lib/store'
+import { useI18n } from '@/lib/use-i18n'
 import { fetchTickers, jitterPrice } from '@/lib/market'
 import { useLiveMarket } from '@/lib/use-live-market'
 import type { CoinTicker, MarginSide, MarginPosition } from '@/lib/types'
@@ -157,6 +158,7 @@ function fmtSignedRub(n: number): string {
 
 // ─── useMarginLayout: persist block order + panel sizes ─────────────────────
 function useMarginLayout() {
+  const { t } = useI18n()
   const [leftOrder, setLeftOrder] = useState<BlockId[]>(() => {
     const saved = loadJSON<unknown>(LS_KEYS.leftOrder, DEFAULT_LEFT_ORDER)
     return isValidOrder(saved, DEFAULT_LEFT_ORDER) ? saved : DEFAULT_LEFT_ORDER
@@ -250,8 +252,8 @@ function useMarginLayout() {
     setLeftSizes(DEFAULT_SIZES.left)
     setRightSizes(DEFAULT_SIZES.right)
     setColumns(DEFAULT_SIZES.columns)
-    toast.success('Layout сброшен')
-  }, [])
+    toast.success(t('margin.reset.toast'))
+  }, [t])
 
   return {
     leftOrder,
@@ -270,6 +272,7 @@ function useMarginLayout() {
 
 // ─── MarginLevelBar ─────────────────────────────────────────────────────────
 function MarginLevelBar({ ratio, label }: { ratio: number; label?: string }) {
+  const { t } = useI18n()
   const v = Math.min(Math.max(ratio, 0), 100)
   let color = 'bg-success'
   if (v >= 80) color = 'bg-destructive'
@@ -296,6 +299,7 @@ function MarginLevelBar({ ratio, label }: { ratio: number; label?: string }) {
 
 // ─── Block: Chart (TradingView iframe, auto-reloads on significant resize) ─
 function ChartBlock({ dragHandle, symbol }: { dragHandle: ReactNode; symbol: string }) {
+  const { t } = useI18n()
   const containerRef = useRef<HTMLDivElement>(null)
   const [reloadKey, setReloadKey] = useState(0)
 
@@ -327,7 +331,7 @@ function ChartBlock({ dragHandle, symbol }: { dragHandle: ReactNode; symbol: str
       <div className="px-2.5 py-1.5 border-b border-border flex items-center gap-1.5 shrink-0">
         {dragHandle}
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          График
+          {t('margin.tabs.chart')}
         </span>
         <span className="ml-auto text-[10px] text-muted-foreground font-mono">
           {symbol.replace('BINANCE:', '')}
@@ -362,6 +366,7 @@ function AccountSummaryCard({
   usedMargin: number
   availableMargin: number
 }) {
+  const { t } = useI18n()
   const openPositions = positions.filter((p) => p.status === 'OPEN')
   const unrealizedPnl = openPositions.reduce((s, p) => s + p.unrealizedPnl, 0)
   const netEquity = equity + unrealizedPnl
@@ -373,7 +378,7 @@ function AccountSummaryCard({
         {dragHandle}
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
           <Wallet className="w-3.5 h-3.5 text-primary" />
-          Марж. аккаунт
+          {t('margin.account.title')}
         </span>
         <Badge variant="outline" className="ml-auto text-[10px] border-primary/30 text-primary">
           RUB
@@ -382,14 +387,14 @@ function AccountSummaryCard({
       <div className="p-3 space-y-3 overflow-y-auto scrollbar-thin">
         <div className="grid grid-cols-2 gap-2.5">
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Эквити</div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t('margin.account.equity')}</div>
             <div className="text-base font-mono font-bold tabular-nums mt-0.5">
               {formatNumber(Math.round(netEquity))} ₽
             </div>
           </div>
           <div>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              Нереализ. PnL
+              {t('margin.account.unrealizedPnl')}
             </div>
             <div
               className={cn(
@@ -406,7 +411,7 @@ function AccountSummaryCard({
           </div>
           <div>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              Использовано
+              {t('margin.account.used')}
             </div>
             <div className="text-xs font-mono tabular-nums mt-0.5">
               {formatNumber(Math.round(usedMargin))} ₽
@@ -414,7 +419,7 @@ function AccountSummaryCard({
           </div>
           <div>
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              Доступно
+              {t('margin.account.available')}
             </div>
             <div className="text-xs font-mono tabular-nums mt-0.5 text-primary">
               {formatNumber(Math.round(availableMargin))} ₽
@@ -423,11 +428,11 @@ function AccountSummaryCard({
         </div>
 
         <div className="pt-2 border-t border-border">
-          <MarginLevelBar ratio={marginRatio} label="Маржин уровень" />
+          <MarginLevelBar ratio={marginRatio} label={t('margin.account.marginLevel')} />
           {marginRatio >= 80 && (
             <div className="mt-2 flex items-center gap-1.5 text-[10px] text-destructive">
               <Flame className="w-3 h-3" />
-              Критический уровень. Снизьте риск или закройте позиции.
+              {t('margin.account.critical')}
             </div>
           )}
         </div>
@@ -449,6 +454,7 @@ function OpenPositionForm({
   availableMargin: number
 }) {
   const openMarginPosition = useAppStore((s) => s.openMarginPosition)
+  const { t } = useI18n()
   const [side, setSide] = useState<MarginSide>('long')
   const [leverage, setLeverage] = useState<number>(5)
   const [marginInput, setMarginInput] = useState<string>('')
@@ -467,16 +473,16 @@ function OpenPositionForm({
 
   const handleSubmit = () => {
     if (price <= 0) {
-      toast.error('Цена ещё не загружена')
+      toast.error(t('margin.toast.priceNotLoaded'))
       return
     }
     if (margin <= 0) {
-      toast.error('Введите сумму маржи')
+      toast.error(t('margin.toast.marginRequired'))
       return
     }
     if (margin > availableMargin) {
-      toast.error('Недостаточно доступной маржи', {
-        description: `Доступно: ${formatNumber(Math.floor(availableMargin))} ₽`,
+      toast.error(t('margin.toast.insufficientMargin'), {
+        description: `${t('margin.toast.availableWord')} ${formatNumber(Math.floor(availableMargin))} ₽`,
       })
       return
     }
@@ -489,16 +495,16 @@ function OpenPositionForm({
         entryPrice: price,
       })
       toast.success(
-        `${side === 'long' ? 'Long' : 'Short'} ${pair} открыт • ${leverage}x`,
+        `${side === 'long' ? 'Long' : 'Short'} ${pair} ${t('margin.toast.openedPrefix')} • ${leverage}x`,
         {
-          description: `Маржа ${formatNumber(margin)} ₽ • объём ${formatNumber(positionSize)} ₽ • ликвидация ${liquidationPrice.toLocaleString('ru-RU', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })} ₽`,
+          description: `${t('margin.toast.marginWord')} ${formatNumber(margin)} ₽ • ${t('margin.toast.volumeWord')} ${formatNumber(positionSize)} ₽ • ${t('margin.toast.liquidationWord')} ${liquidationPrice.toLocaleString('ru-RU', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })} ₽`,
         }
       )
       setMarginInput('')
       void pos
     } catch (e) {
-      toast.error('Не удалось открыть позицию', {
-        description: e instanceof Error ? e.message : 'Неизвестная ошибка',
+      toast.error(t('margin.toast.openFailed'), {
+        description: e instanceof Error ? e.message : t('margin.toast.unknownError'),
       })
     }
   }
@@ -509,7 +515,7 @@ function OpenPositionForm({
         {dragHandle}
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
           <Zap className="w-3.5 h-3.5 text-primary" />
-          Открыть позицию
+          {t('margin.form.title')}
         </span>
       </div>
       <div className="p-3 space-y-2.5 overflow-y-auto scrollbar-thin">
@@ -544,7 +550,7 @@ function OpenPositionForm({
         {/* Leverage */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground">
-            <span>Плечо</span>
+            <span>{t('margin.form.leverage')}</span>
             <span className="font-mono tabular-nums text-primary font-bold text-sm normal-case tracking-normal">
               {leverage}x
             </span>
@@ -582,7 +588,7 @@ function OpenPositionForm({
         {/* Margin input */}
         <div className="space-y-1">
           <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground">
-            <span>Маржа</span>
+            <span>{t('margin.form.margin')}</span>
             <button
               onClick={handleMax}
               className="text-primary hover:underline normal-case tracking-normal text-[11px] font-semibold"
@@ -604,7 +610,7 @@ function OpenPositionForm({
             </span>
           </div>
           <div className="text-[10px] text-muted-foreground">
-            Доступно:{' '}
+            {t('margin.form.availableLabel')}{' '}
             <span className="font-mono tabular-nums">
               {formatNumber(Math.floor(availableMargin))} ₽
             </span>
@@ -614,19 +620,19 @@ function OpenPositionForm({
         {/* Computed preview */}
         <div className="space-y-1 p-2.5 rounded-lg bg-muted/40 border border-border">
           <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Размер позиции</span>
+            <span className="text-muted-foreground">{t('margin.form.positionSize')}</span>
             <span className="font-mono tabular-nums font-semibold">
               {formatNumber(positionSize)} ₽
             </span>
           </div>
           <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Кол-во {base}</span>
+            <span className="text-muted-foreground">{t('margin.form.qty')} {base}</span>
             <span className="font-mono tabular-nums">
               {quantity.toLocaleString('ru-RU', { maximumFractionDigits: 6 })}
             </span>
           </div>
           <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Цена входа</span>
+            <span className="text-muted-foreground">{t('margin.form.entryPrice')}</span>
             <span className="font-mono tabular-nums">
               {price > 0
                 ? price.toLocaleString('ru-RU', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
@@ -635,7 +641,7 @@ function OpenPositionForm({
             </span>
           </div>
           <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Ликвидация</span>
+            <span className="text-muted-foreground">{t('margin.form.liquidation')}</span>
             <span className="font-mono tabular-nums text-warning">
               {liquidationPrice > 0
                 ? liquidationPrice.toLocaleString('ru-RU', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
@@ -644,7 +650,7 @@ function OpenPositionForm({
             </span>
           </div>
           <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Комиссия (0.06%)</span>
+            <span className="text-muted-foreground">{t('margin.form.feeTaker')}</span>
             <span className="font-mono tabular-nums text-muted-foreground">
               {formatNumber(fee)} ₽
             </span>
@@ -658,7 +664,7 @@ function OpenPositionForm({
             side === 'long' ? 'bg-success hover:bg-success/90' : 'bg-destructive hover:bg-destructive/90'
           )}
         >
-          Открыть {side === 'long' ? 'Long' : 'Short'} {pair}
+          {side === 'long' ? t('margin.form.submitLong') : t('margin.form.submitShort')} {pair}
         </Button>
       </div>
     </div>
@@ -667,35 +673,36 @@ function OpenPositionForm({
 
 // ─── RiskMetricsCard ────────────────────────────────────────────────────────
 function RiskMetricsCard({ dragHandle }: { dragHandle: ReactNode }) {
+  const { t } = useI18n()
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-card border border-border rounded-md overflow-hidden">
       <div className="px-2.5 py-1.5 border-b border-border flex items-center gap-1.5 shrink-0">
         {dragHandle}
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
           <ShieldAlert className="w-3.5 h-3.5 text-warning" />
-          Параметры риска
+          {t('margin.params.title')}
         </span>
       </div>
       <div className="p-3 space-y-2 text-xs overflow-y-auto scrollbar-thin">
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Начальная маржа</span>
-          <span className="font-mono tabular-nums">1 / плечо</span>
+          <span className="text-muted-foreground">{t('margin.params.initial')}</span>
+          <span className="font-mono tabular-nums">{t('margin.params.initialValue')}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Поддерживающая маржа</span>
+          <span className="text-muted-foreground">{t('margin.params.maint')}</span>
           <span className="font-mono tabular-nums">0.5%</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Комиссия тейкера</span>
+          <span className="text-muted-foreground">{t('margin.params.feeTaker')}</span>
           <span className="font-mono tabular-nums">0.06%</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Макс. плечо</span>
+          <span className="text-muted-foreground">{t('margin.params.maxLeverage')}</span>
           <span className="font-mono tabular-nums">{MAX_LEVERAGE}x</span>
         </div>
         <div className="pt-2 border-t border-border space-y-1.5">
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            Формула ликвидации
+            {t('margin.params.liqFormula')}
           </div>
           <div className="font-mono text-[10px] text-muted-foreground leading-relaxed">
             <div>Long: P × (1 − 1/L + 0.005)</div>
@@ -705,8 +712,7 @@ function RiskMetricsCard({ dragHandle }: { dragHandle: ReactNode }) {
         <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground pt-2 border-t border-border">
           <Info className="w-3 h-3 mt-0.5 shrink-0" />
           <span>
-            При маржин-уровне 100% позиция автоматически ликвидируется. Вы теряете всю
-            предоставленную маржу.
+            {t('margin.params.liqDesc')}
           </span>
         </div>
       </div>
@@ -722,6 +728,7 @@ function PositionRow({
   pos: MarginPosition
   onClose: (id: string) => void
 }) {
+  const { t: tPos } = useI18n()
   const isLong = pos.side === 'long'
   const pnl = pos.unrealizedPnl
   const pnlPct = pos.unrealizedPnlPct
@@ -820,7 +827,7 @@ function PositionRow({
           className="h-6 text-[10px] px-2 py-0 w-full"
           onClick={() => onClose(pos.id)}
         >
-          Закрыть
+          {tPos('margin.positions.close')}
         </Button>
       </div>
     </div>
@@ -836,6 +843,7 @@ function OpenPositionsTable({
   positions: MarginPosition[]
   onClose: (id: string) => void
 }) {
+  const { t } = useI18n()
   const open = positions.filter((p) => p.status === 'OPEN')
   const mounted = useMounted()
   // First-paint skeleton: render before store hydrates (mounted false)
@@ -846,7 +854,7 @@ function OpenPositionsTable({
         {dragHandle}
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
           <Activity className="w-3.5 h-3.5 text-primary" />
-          Открытые позиции
+          {t('margin.positions.title')}
           {open.length > 0 && (
             <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
               {open.length}
@@ -863,22 +871,22 @@ function OpenPositionsTable({
       ) : open.length === 0 ? (
         <div className="px-3 py-10 text-center">
           <CheckCircle2 className="w-7 h-7 mx-auto text-muted-foreground/40 mb-2" />
-          <p className="text-sm text-muted-foreground">Нет открытых позиций</p>
+          <p className="text-sm text-muted-foreground">{t('margin.positions.empty')}</p>
           <p className="text-[11px] text-muted-foreground/70 mt-1">
-            Откройте Long или Short в форме ниже
+            {t('margin.positions.emptyHint')}
           </p>
         </div>
       ) : (
         <>
           <div className="hidden md:grid grid-cols-12 gap-2 px-2.5 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border shrink-0">
-            <span className="col-span-2">Пара / Напр.</span>
-            <span className="col-span-1">Размер</span>
-            <span className="col-span-1">Вход</span>
-            <span className="col-span-1">Тек.</span>
+            <span className="col-span-2">{t('margin.positions.col.pairDir')}</span>
+            <span className="col-span-1">{t('margin.positions.col.size')}</span>
+            <span className="col-span-1">{t('margin.positions.col.entry')}</span>
+            <span className="col-span-1">{t('margin.positions.col.current')}</span>
             <span className="col-span-3">PnL</span>
-            <span className="col-span-1">Маржа</span>
-            <span className="col-span-1">Ликв.</span>
-            <span className="col-span-2">Маржин-колл</span>
+            <span className="col-span-1">{t('margin.positions.col.margin')}</span>
+            <span className="col-span-1">{t('margin.positions.col.liq')}</span>
+            <span className="col-span-2">{t('margin.positions.col.call')}</span>
           </div>
           <ScrollArea className="flex-1 min-h-0 scrollbar-thin">
             <div className="flex flex-col">
@@ -901,6 +909,7 @@ function PositionHistory({
   dragHandle: ReactNode
   positions: MarginPosition[]
 }) {
+  const { t } = useI18n()
   const closed = positions.filter((p) => p.status !== 'OPEN')
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-card border border-border rounded-md overflow-hidden">
@@ -908,25 +917,25 @@ function PositionHistory({
         {dragHandle}
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
           <XCircle className="w-3.5 h-3.5 text-muted-foreground" />
-          История позиций
+          {t('margin.history.title')}
         </span>
       </div>
       {closed.length === 0 ? (
         <div className="px-3 py-8 text-center">
-          <p className="text-sm text-muted-foreground">История пуста</p>
+          <p className="text-sm text-muted-foreground">{t('margin.history.empty')}</p>
           <p className="text-[11px] text-muted-foreground/70 mt-1">
-            Здесь появятся закрытые и ликвидированные позиции
+            {t('margin.history.emptyHint')}
           </p>
         </div>
       ) : (
         <ScrollArea className="flex-1 min-h-0 scrollbar-thin">
           <div className="flex flex-col">
             <div className="hidden md:grid grid-cols-12 gap-2 px-2.5 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
-              <span className="col-span-2">Пара / Напр.</span>
-              <span className="col-span-2">PnL реализ.</span>
-              <span className="col-span-5">Вход → Выход</span>
-              <span className="col-span-2">Статус</span>
-              <span className="col-span-1 text-right">Время</span>
+              <span className="col-span-2">{t('margin.history.col.pairDir')}</span>
+              <span className="col-span-2">{t('margin.history.col.pnlReal')}</span>
+              <span className="col-span-5">{t('margin.history.col.entryExit')}</span>
+              <span className="col-span-2">{t('margin.history.col.status')}</span>
+              <span className="col-span-1 text-right">{t('margin.history.col.time')}</span>
             </div>
             {closed.map((p) => {
               const isLong = p.side === 'long'
@@ -971,7 +980,7 @@ function PositionHistory({
                           : 'bg-destructive/20 text-destructive'
                       )}
                     >
-                      {p.status === 'CLOSED' ? 'Закрыта' : 'Ликвидация'}
+                      {p.status === 'CLOSED' ? t('margin.history.closed') : t('margin.history.liquidated')}
                     </Badge>
                   </div>
                   <div className="col-span-6 md:col-span-1 text-right text-muted-foreground text-[10px]">
@@ -1028,6 +1037,7 @@ function SortableBlock({
   id: BlockId
   render: (dragHandle: ReactNode) => ReactNode
 }) {
+  const { t } = useI18n()
   const { attributes, listeners, setNodeRef, isDragging, isOver } = useSortable({ id })
   const dragHandle = (
     <button
@@ -1035,8 +1045,8 @@ function SortableBlock({
       {...attributes}
       {...listeners}
       className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-primary touch-none flex items-center justify-center shrink-0"
-      aria-label="Перетащить блок"
-      title="Перетащите, чтобы изменить порядок"
+      aria-label={t('margin.drag.aria')}
+      title={t('margin.drag.title')}
     >
       <GripVertical className="w-3.5 h-3.5" />
     </button>
@@ -1145,6 +1155,7 @@ function ColumnPanelGroup({
 
 // ─── Main MarginView ────────────────────────────────────────────────────────
 export function MarginView() {
+  const { t } = useI18n()
   const [selectedPair, setSelectedPair] = useState<string>('BTC/RUB')
   const [tickers, setTickers] = useState<CoinTicker[]>([])
   const [livePrice, setLivePrice] = useState<number>(0)
@@ -1165,8 +1176,8 @@ export function MarginView() {
   useEffect(() => {
     let mounted = true
     const load = async () => {
-      const t = await fetchTickers()
-      if (mounted) setTickers(t)
+      const tt = await fetchTickers()
+      if (mounted) setTickers(tt)
     }
     load()
     const interval = setInterval(load, 5000)
@@ -1177,7 +1188,7 @@ export function MarginView() {
   }, [])
 
   const base = selectedPair.split('/')[0]
-  const ticker = useMemo(() => tickers.find((t) => t.symbol === base) ?? null, [tickers, base])
+  const ticker = useMemo(() => tickers.find((tk) => tk.symbol === base) ?? null, [tickers, base])
 
   // Smooth jitter for the live price ticker feel (1.2s)
   const tickerSymbol = ticker?.symbol
@@ -1255,12 +1266,12 @@ export function MarginView() {
     const pos = marginPositions.find((p) => p.id === id)
     if (!pos) return
     if (livePrice <= 0) {
-      toast.error('Нет актуальной цены для закрытия')
+      toast.error(t('margin.close.toast.noPrice'))
       return
     }
     closeMarginPosition(id, livePrice)
-    toast.success(`${pos.side === 'long' ? 'Long' : 'Short'} ${pos.pair} закрыт по рынку`, {
-      description: `Цена ${livePrice.toLocaleString('ru-RU', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })} ₽`,
+    toast.success(`${pos.side === 'long' ? 'Long' : 'Short'} ${pos.pair} ${t('margin.close.toast.closedPrefix')}`, {
+      description: `${t('margin.close.toast.priceWord')} ${livePrice.toLocaleString('ru-RU', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })} ₽`,
     })
   }
 
@@ -1338,14 +1349,12 @@ export function MarginView() {
 
   return (
     <div className="flex-1 bg-background">
-      <div className="mx-auto max-w-[1600px] px-2 lg:px-3 py-2">
+      <div className="px-2 lg:px-3 py-2">
         {/* Risk warning banner (fixed outside resizable area) */}
         <div className="mb-2 flex items-start gap-2 px-2.5 py-1.5 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive">
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <p className="text-[11px] leading-relaxed">
-            <span className="font-semibold">Внимание:</span> маржинальная торговля сопряжена с
-            высоким риском. При маржин-колле позиция ликвидируется, а маржа полностью
-            утрачивается. Используйте умеренное плечо и устанавливайте стопы.
+            <span className="font-semibold">{t('margin.risk.warn')}</span> {t('margin.risk.warnBody')}
           </p>
         </div>
 
@@ -1419,7 +1428,7 @@ export function MarginView() {
               {formatPercent(change24h)}
             </span>
             <span className="text-[9px] uppercase tracking-wider text-muted-foreground hidden sm:inline">
-              24ч
+              {t('margin.chart.24h')}
             </span>
           </div>
 
@@ -1430,12 +1439,12 @@ export function MarginView() {
                 <TooltipTrigger asChild>
                   <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-muted/40 border border-border">
                     <Zap className="w-3.5 h-3.5 text-primary" />
-                    <span className="text-[11px] font-medium hidden sm:inline">Маржа активна</span>
+                    <span className="text-[11px] font-medium hidden sm:inline">{t('margin.activate.active')}</span>
                     <Switch checked={marginActivated} onCheckedChange={setMarginActivated} />
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  Активация маржинального счёта
+                  {t('margin.activate.title')}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -1445,10 +1454,10 @@ export function MarginView() {
               size="sm"
               onClick={layout.reset}
               className="h-8 gap-1.5 text-[11px] text-muted-foreground hover:text-primary"
-              title="Сбросить layout"
+              title={t('margin.reset.button')}
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">Сбросить layout</span>
+              <span className="hidden lg:inline">{t('margin.reset.button')}</span>
             </Button>
           </div>
         </div>
@@ -1529,18 +1538,17 @@ export function MarginView() {
                   <ShieldAlert className="w-8 h-8 text-warning" />
                 </div>
                 <h3 className="text-lg font-semibold mb-2">
-                  Маржинальная торговля деактивирована
+                  {t('margin.deactivated')}
                 </h3>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">
-                  Активируйте маржу, чтобы открывать позиции с плечом. Убедитесь, что вы понимаете
-                  риски маржинальной торговли перед использованием.
+                  {t('margin.deactivatedDesc')}
                 </p>
                 <Button
                   onClick={() => setMarginActivated(true)}
                   className="bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   <Zap className="w-4 h-4 mr-1.5" />
-                  Активировать маржу
+                  {t('margin.activateBtn')}
                 </Button>
               </Card>
             </motion.div>

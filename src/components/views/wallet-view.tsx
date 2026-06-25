@@ -18,6 +18,7 @@ import {
   Network,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
+import { useI18n } from '@/lib/use-i18n'
 import { useApi, apiPost } from '@/lib/use-api'
 import { fetchTickers, getUsdRubRate } from '@/lib/market'
 import type { Balance, CoinTicker, Transaction, TxType } from '@/lib/types'
@@ -45,21 +46,30 @@ import { BalanceCardSkeleton, TxRowSkeleton } from '@/components/page-skeleton'
 const ASSETS = ['USDT', 'BTC', 'ETH', 'RUB'] as const
 type Asset = (typeof ASSETS)[number]
 
-const NETWORKS_BY_ASSET: Record<Asset, { id: string; label: string }[]> = {
-  BTC: [{ id: 'BTC', label: 'Bitcoin Network' }],
-  ETH: [
-    { id: 'ERC-20', label: 'Ethereum (ERC-20)' },
-    { id: 'BEP-20', label: 'BNB Smart Chain (BEP-20)' },
-  ],
-  USDT: [
-    { id: 'TRC-20', label: 'Tron (TRC-20) • низкая комиссия' },
-    { id: 'ERC-20', label: 'Ethereum (ERC-20)' },
-    { id: 'BEP-20', label: 'BNB Smart Chain (BEP-20)' },
-  ],
-  RUB: [
-    { id: 'SBP', label: 'СБП — мгновенно, 0%' },
-    { id: 'BANK', label: 'Банковский перевод (р/с)' },
-  ],
+const NETWORKS_BY_ASSET: Record<Asset, { id: string }[]> = {
+  BTC: [{ id: 'BTC' }],
+  ETH: [{ id: 'ERC-20' }, { id: 'BEP-20' }],
+  USDT: [{ id: 'TRC-20' }, { id: 'ERC-20' }, { id: 'BEP-20' }],
+  RUB: [{ id: 'SBP' }, { id: 'BANK' }],
+}
+
+function networkLabel(id: string, t: (k: string) => string): string {
+  switch (id) {
+    case 'TRC-20':
+      return t('wallet.network.trc20')
+    case 'SBP':
+      return t('wallet.network.sbp')
+    case 'BANK':
+      return t('wallet.network.bank')
+    case 'BTC':
+      return t('wallet.network.btc')
+    case 'ERC-20':
+      return t('wallet.network.eth')
+    case 'BEP-20':
+      return t('wallet.network.bnb')
+    default:
+      return id
+  }
 }
 
 const NETWORK_FEES: Record<string, number> = {
@@ -84,7 +94,7 @@ function txIcon(type: TxType) {
   }
 }
 
-function statusBadge(status: string) {
+function statusBadge(status: string, t: (k: string) => string) {
   const map: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     COMPLETED: 'default',
     PENDING: 'secondary',
@@ -95,20 +105,21 @@ function statusBadge(status: string) {
     PENDING: 'bg-warning/15 text-warning border-warning/30',
     FAILED: 'bg-destructive/15 text-destructive border-destructive/30',
   }
-  const label: Record<string, string> = {
-    COMPLETED: 'Выполнено',
-    PENDING: 'В ожидании',
-    FAILED: 'Отклонено',
+  const labelKey: Record<string, string> = {
+    COMPLETED: 'wallet.tx.completed',
+    PENDING: 'wallet.tx.pending',
+    FAILED: 'wallet.tx.failed',
   }
   return (
     <Badge variant={map[status] ?? 'outline'} className={cn('border', cls[status] ?? '')}>
-      {label[status] ?? status}
+      {labelKey[status] ? t(labelKey[status]) : status}
     </Badge>
   )
 }
 
 // ─── Total balance card ─────────────────────────────────────────────────────
 function TotalBalanceCard({ balances }: { balances: Balance[] }) {
+  const { t } = useI18n()
   const [tickers, setTickers] = useState<CoinTicker[]>([])
   const [usdRub, setUsdRub] = useState<number>(92.5)
 
@@ -145,7 +156,7 @@ function TotalBalanceCard({ balances }: { balances: Balance[] }) {
         <div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider mb-1.5">
             <WalletIcon className="w-3.5 h-3.5 text-primary" />
-            Общая стоимость портфеля
+            {t('wallet.totalValue')}
           </div>
           <div className="text-3xl font-mono font-bold tabular-nums">
             {formatPrice(totalRub, 'rub')}
@@ -161,7 +172,7 @@ function TotalBalanceCard({ balances }: { balances: Balance[] }) {
             onClick={() => document.getElementById('wallet-tab-deposit')?.click()}
           >
             <ArrowDownToLine className="w-4 h-4" />
-            Пополнить
+            {t('wallet.deposit')}
           </Button>
           <Button
             variant="outline"
@@ -169,7 +180,7 @@ function TotalBalanceCard({ balances }: { balances: Balance[] }) {
             onClick={() => document.getElementById('wallet-tab-withdraw')?.click()}
           >
             <ArrowUpFromLine className="w-4 h-4" />
-            Вывести
+            {t('wallet.withdraw')}
           </Button>
         </div>
       </div>
@@ -179,6 +190,7 @@ function TotalBalanceCard({ balances }: { balances: Balance[] }) {
 
 // ─── Assets tab ─────────────────────────────────────────────────────────────
 function AssetsTab({ balances }: { balances: Balance[] }) {
+  const { t } = useI18n()
   const [tickers, setTickers] = useState<CoinTicker[]>([])
   const [usdRub, setUsdRub] = useState<number>(92.5)
 
@@ -210,10 +222,10 @@ function AssetsTab({ balances }: { balances: Balance[] }) {
     <Card className="overflow-hidden">
       <ScrollArea className="max-h-[640px]">
         <div className="grid grid-cols-12 px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border bg-muted/30">
-          <span className="col-span-4">Актив</span>
-          <span className="col-span-3 text-right">Доступно</span>
-          <span className="col-span-3 text-right">≈ RUB</span>
-          <span className="col-span-2 text-right">≈ USD</span>
+          <span className="col-span-4">{t('wallet.col.asset')}</span>
+          <span className="col-span-3 text-right">{t('wallet.col.available')}</span>
+          <span className="col-span-3 text-right">{t('wallet.col.rubValue')}</span>
+          <span className="col-span-2 text-right">{t('wallet.col.usdValue')}</span>
         </div>
         {balances.map((b) => {
           const rub = b.amount * priceRub(b.asset)
@@ -229,12 +241,12 @@ function AssetsTab({ balances }: { balances: Balance[] }) {
                   <div className="font-semibold text-sm">{b.asset}</div>
                   <div className="text-[11px] text-muted-foreground">
                     {b.asset === 'RUB'
-                      ? 'Российский рубль'
+                      ? t('wallet.asset.rub')
                       : b.asset === 'USDT'
-                        ? 'Tether USD'
+                        ? t('wallet.asset.usdt')
                         : b.asset === 'BTC'
-                          ? 'Bitcoin'
-                          : 'Ethereum'}
+                          ? t('wallet.asset.btc')
+                          : t('wallet.asset.eth')}
                   </div>
                 </div>
               </div>
@@ -257,6 +269,7 @@ function AssetsTab({ balances }: { balances: Balance[] }) {
 
 // ─── Deposit tab ────────────────────────────────────────────────────────────
 function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
+  const { t } = useI18n()
   const generateDepositAddress = useAppStore((s) => s.generateDepositAddress)
   const depositAddress = useAppStore((s) => s.depositAddress)
   const [asset, setAsset] = useState<Asset>('USDT')
@@ -288,7 +301,7 @@ function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
     // Mirror address into store so it persists for the UI session
     useAppStore.setState({ depositAddress: addr })
     setLoading(false)
-    toast.success('Адрес пополнения сгенерирован', {
+    toast.success(t('wallet.deposit.toast.generated'), {
       description: `${asset} • ${network}`,
     })
     onDeposited?.()
@@ -299,10 +312,10 @@ function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
     try {
       await navigator.clipboard.writeText(depositAddress)
       setCopied(true)
-      toast.success('Адрес скопирован')
+      toast.success(t('wallet.deposit.toast.copied'))
       setTimeout(() => setCopied(false), 1500)
     } catch {
-      toast.error('Не удалось скопировать')
+      toast.error(t('wallet.deposit.toast.copyFailed'))
     }
   }
 
@@ -313,7 +326,7 @@ function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
       <Card className="p-4 space-y-4">
         <div className="space-y-1.5">
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-            Актив для пополнения
+            {t('wallet.deposit.asset')}
           </Label>
           <div className="grid grid-cols-4 gap-2">
             {ASSETS.map((a) => (
@@ -336,7 +349,7 @@ function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
 
         <div className="space-y-1.5">
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-            Сеть
+            {t('wallet.deposit.network')}
           </Label>
           <div className="space-y-1.5">
             {NETWORKS_BY_ASSET[asset].map((n) => (
@@ -356,7 +369,7 @@ function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
                     network === n.id ? 'text-primary' : 'text-muted-foreground'
                   )}
                 />
-                <span className="text-sm flex-1">{n.label}</span>
+                <span className="text-sm flex-1">{networkLabel(n.id, t)}</span>
                 {network === n.id && <Check className="w-4 h-4 text-primary" />}
               </button>
             ))}
@@ -373,18 +386,18 @@ function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
           ) : (
             <QrCode className="w-4 h-4" />
           )}
-          {depositAddress ? 'Сгенерировать новый адрес' : 'Сгенерировать адрес'}
+          {depositAddress ? t('wallet.deposit.regenerateBtn') : t('wallet.deposit.generateBtn')}
         </Button>
       </Card>
 
       <Card className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-            Адрес пополнения
+            {t('wallet.deposit.addressTitle')}
           </Label>
           {depositAddress && (
             <Badge className="bg-success/15 text-success border-success/30">
-              Активен
+              {t('wallet.deposit.active')}
             </Badge>
           )}
         </div>
@@ -393,10 +406,10 @@ function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
           <div className="flex flex-col items-center justify-center py-10 text-center">
             <QrCode className="w-9 h-9 text-muted-foreground/40 mb-2.5" />
             <p className="text-sm text-muted-foreground">
-              Нажмите «Сгенерировать адрес»
+              {t('wallet.deposit.emptyHint')}
             </p>
             <p className="text-[11px] text-muted-foreground/70 mt-1">
-              Адрес привязан к вашему аккаунту
+              {t('wallet.deposit.bound')}
             </p>
           </div>
         ) : (
@@ -419,7 +432,7 @@ function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
                   isRub ? 'TINKOFF:' + depositAddress : depositAddress
                 )}`}
-                alt="QR-код адреса пополнения"
+                alt={t('wallet.deposit.qrAlt')}
                 width={180}
                 height={180}
                 className="rounded-lg border border-border bg-white p-2"
@@ -430,22 +443,26 @@ function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
 
             <div className="space-y-1.5 text-xs">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Актив</span>
+                <span className="text-muted-foreground">{t('wallet.deposit.assetLabel')}</span>
                 <span className="font-medium">{asset}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Сеть</span>
+                <span className="text-muted-foreground">{t('wallet.deposit.networkLabel')}</span>
                 <span className="font-medium">{network}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Мин. подтверждения</span>
+                <span className="text-muted-foreground">{t('wallet.deposit.confirmations')}</span>
                 <span className="font-medium">
-                  {isRub ? 'Мгновенно (СБП)' : network === 'BTC' ? '3 блоков' : '12 блоков'}
+                  {isRub
+                    ? t('wallet.deposit.confirmationsSbp')
+                    : network === 'BTC'
+                      ? t('wallet.deposit.confirmationsBtc')
+                      : t('wallet.deposit.confirmationsDefault')}
                 </span>
               </div>
               {!isRub && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Мин. сумма</span>
+                  <span className="text-muted-foreground">{t('wallet.deposit.minAmount')}</span>
                   <span className="font-medium">
                     {network === 'BTC' ? '0.0001 BTC' : '1 USDT / 0.001 ETH'}
                   </span>
@@ -456,8 +473,7 @@ function DepositTab({ onDeposited }: { onDeposited?: () => void }) {
             <div className="rounded-lg bg-warning/10 border border-warning/30 px-3 py-2 text-[11px] text-warning flex gap-2">
               <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
               <span>
-                Отправляйте только {asset} по сети {network}. Отправка других активов
-                или сетей приведёт к необратимой потере средств.
+                {t('wallet.deposit.warning')} {asset} {t('wallet.deposit.warningMid')} {network}. {t('wallet.deposit.warningEnd')}
               </span>
             </div>
           </>
@@ -475,6 +491,7 @@ function WithdrawTab({
   balances: Balance[]
   onWithdrawn?: () => void
 }) {
+  const { t } = useI18n()
   const withdraw = useAppStore((s) => s.withdraw)
   const [tickers, setTickers] = useState<CoinTicker[]>([])
   const [usdRub, setUsdRub] = useState<number>(92.5)
@@ -529,19 +546,19 @@ function WithdrawTab({
 
   const handleSubmit = async () => {
     if (amountNum <= 0) {
-      toast.error('Введите сумму вывода')
+      toast.error(t('wallet.withdraw.toast.amountRequired'))
       return
     }
     if (amountNum > available) {
-      toast.error('Недостаточно средств')
+      toast.error(t('wallet.withdraw.toast.insufficient'))
       return
     }
     if (!address.trim()) {
-      toast.error('Укажите адрес получателя')
+      toast.error(t('wallet.withdraw.toast.addressRequired'))
       return
     }
     if (twofa.length < 6) {
-      toast.error('Введите 2FA-код (6 цифр)')
+      toast.error(t('wallet.withdraw.toast.2faRequired'))
       return
     }
     try {
@@ -556,7 +573,7 @@ function WithdrawTab({
     }
     // Apply local optimistic update + notification + toast regardless
     withdraw(asset, amountNum, address)
-    toast.success('Заявка на вывод создана', {
+    toast.success(t('wallet.withdraw.toast.created'), {
       description: `${formatAmount(amountNum, asset)} → ${address.slice(0, 12)}...`,
     })
     setAmount('')
@@ -570,7 +587,7 @@ function WithdrawTab({
       <Card className="p-4 space-y-4">
         <div className="space-y-1.5">
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-            Актив для вывода
+            {t('wallet.withdraw.asset')}
           </Label>
           <div className="grid grid-cols-4 gap-2">
             {ASSETS.map((a) => (
@@ -593,7 +610,7 @@ function WithdrawTab({
 
         <div className="space-y-1.5">
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-            Сеть вывода
+            {t('wallet.withdraw.network')}
           </Label>
           <div className="space-y-1.5">
             {NETWORKS_BY_ASSET[asset].map((n) => (
@@ -613,9 +630,9 @@ function WithdrawTab({
                     network === n.id ? 'text-primary' : 'text-muted-foreground'
                   )}
                 />
-                <span className="text-sm flex-1">{n.label}</span>
+                <span className="text-sm flex-1">{networkLabel(n.id, t)}</span>
                 <span className="text-[11px] text-muted-foreground">
-                  комиссия {fee} {asset === 'BTC' ? 'BTC' : asset === 'RUB' ? '₽' : 'USDT'}
+                  {t('wallet.withdraw.feeWord')} {fee} {asset === 'BTC' ? 'BTC' : asset === 'RUB' ? '₽' : 'USDT'}
                 </span>
               </button>
             ))}
@@ -625,16 +642,16 @@ function WithdrawTab({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-              Адрес получателя
+              {t('wallet.withdraw.addressLabel')}
             </Label>
             <span className="text-[11px] text-muted-foreground">
-              Доступно: <span className="font-mono">{formatAmount(available, asset)}</span>
+              {t('wallet.withdraw.availableWord')} <span className="font-mono">{formatAmount(available, asset)}</span>
             </span>
           </div>
           <Input
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            placeholder={asset === 'RUB' ? 'Номер счёта / телефон СБП' : '0x... / bc1q...'}
+            placeholder={asset === 'RUB' ? t('wallet.withdraw.addressPlaceholderRub') : t('wallet.withdraw.addressPlaceholderCrypto')}
             className="font-mono text-sm h-10"
           />
         </div>
@@ -642,7 +659,7 @@ function WithdrawTab({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-              Сумма вывода
+              {t('wallet.withdraw.amountLabel')}
             </Label>
             <Button
               variant="ghost"
@@ -669,17 +686,14 @@ function WithdrawTab({
           {isLargeAmount && (
             <div className="rounded-lg bg-warning/10 border border-warning/30 px-3 py-2 text-[11px] text-warning flex gap-2">
               <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>
-                Сумма превышает 100 000 ₽ — потребуется дополнительное подтверждение
-                оператором (мультифакторная проверка, до 2 часов).
-              </span>
+              <span>{t('wallet.withdraw.largeWarn')}</span>
             </div>
           )}
         </div>
 
         <div className="space-y-1.5">
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-            2FA-код (Google Authenticator)
+            {t('wallet.withdraw.2faLabel')}
           </Label>
           <Input
             value={twofa}
@@ -693,10 +707,10 @@ function WithdrawTab({
         <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
           <div className="flex items-center gap-2">
             <Switch checked={whitelist} onCheckedChange={setWhitelist} />
-            <span className="text-xs">Белый список адресов</span>
+            <span className="text-xs">{t('wallet.withdraw.whitelist')}</span>
           </div>
           <span className="text-[10px] text-muted-foreground">
-            {whitelist ? 'Включён' : 'Выключен'}
+            {whitelist ? t('wallet.withdraw.whitelistOn') : t('wallet.withdraw.whitelistOff')}
           </span>
         </div>
 
@@ -705,42 +719,42 @@ function WithdrawTab({
           className="w-full h-10 bg-destructive text-white hover:bg-destructive/90 gap-2"
         >
           <ArrowUpFromLine className="w-4 h-4" />
-          Запросить вывод
+          {t('wallet.withdraw.submit')}
         </Button>
       </Card>
 
       <Card className="p-4 space-y-3 h-fit">
         <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Сводка вывода
+          {t('wallet.withdraw.summary')}
         </div>
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Сумма</span>
+            <span className="text-muted-foreground">{t('wallet.withdraw.amountLabel2')}</span>
             <span className="font-mono tabular-nums">{formatAmount(amountNum, asset)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Комиссия сети</span>
+            <span className="text-muted-foreground">{t('wallet.withdraw.networkFee')}</span>
             <span className="font-mono tabular-nums text-destructive">
               −{fee} {asset === 'BTC' ? 'BTC' : asset === 'RUB' ? '₽' : 'USDT'}
             </span>
           </div>
           <Separator />
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Получит адресат</span>
+            <span className="text-muted-foreground">{t('wallet.withdraw.receive')}</span>
             <span className="font-mono tabular-nums text-success">
               {formatAmount(receive, asset)}
             </span>
           </div>
           <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">≈ RUB</span>
+            <span className="text-muted-foreground">{t('wallet.col.rubValue')}</span>
             <span className="font-mono tabular-nums">{formatPrice(amountRub, 'rub')}</span>
           </div>
         </div>
         <Separator />
         <div className="text-[11px] text-muted-foreground space-y-1.5">
-          <p>• Вывод поступит в течение 1–30 минут (кроме BTC — до 60 минут).</p>
-          <p>• Заявки обрабатываются в порядке очереди.</p>
-          <p>• Лимиты: 600 000 ₽/сутки (KYC Lv.2).</p>
+          <p>{t('wallet.withdraw.note1')}</p>
+          <p>{t('wallet.withdraw.note2')}</p>
+          <p>{t('wallet.withdraw.note3')}</p>
         </div>
       </Card>
     </div>
@@ -749,13 +763,14 @@ function WithdrawTab({
 
 // ─── History tab ────────────────────────────────────────────────────────────
 function HistoryTab({ transactions }: { transactions: Transaction[] }) {
+  const { t } = useI18n()
   if (transactions.length === 0) {
     return (
       <Card className="p-10 text-center">
         <History className="w-9 h-9 mx-auto text-muted-foreground/40 mb-2.5" />
-        <p className="text-sm text-muted-foreground">История операций пуста</p>
+        <p className="text-sm text-muted-foreground">{t('wallet.history.empty')}</p>
         <p className="text-[11px] text-muted-foreground/70 mt-1">
-          Пополните кошелёк или совершите сделку, чтобы увидеть записи
+          {t('wallet.history.emptyHint')}
         </p>
       </Card>
     )
@@ -781,22 +796,22 @@ function HistoryTab({ transactions }: { transactions: Transaction[] }) {
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium capitalize">
                     {tx.type === 'deposit'
-                      ? 'Пополнение'
+                      ? t('wallet.tx.deposit')
                       : tx.type === 'withdrawal'
-                        ? 'Вывод'
+                        ? t('wallet.tx.withdrawal')
                         : tx.type === 'trade'
-                          ? 'Сделка'
+                          ? t('wallet.tx.trade')
                           : tx.type === 'payment'
-                            ? 'Платёж'
-                            : 'Комиссия'}
+                            ? t('wallet.tx.payment')
+                            : t('wallet.tx.fee')}
                   </span>
                   <Badge variant="outline" className="text-[10px] h-5">
                     {tx.asset}
                   </Badge>
-                  {statusBadge(tx.status)}
+                  {statusBadge(tx.status, t)}
                 </div>
                 <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-2">
-                  <span>{timeAgo(new Date()) === 'только что' ? tx.time : tx.time}</span>
+                  <span>{timeAgo(new Date()) === t('wallet.justNow') ? tx.time : tx.time}</span>
                   {tx.address && (
                     <span className="font-mono truncate max-w-[200px]">→ {tx.address}</span>
                   )}
@@ -824,6 +839,7 @@ function HistoryTab({ transactions }: { transactions: Transaction[] }) {
 
 // ─── Main WalletView ────────────────────────────────────────────────────────
 export function WalletView() {
+  const { t } = useI18n()
   // Refresh trigger — bump to force a re-fetch from /api/wallet
   const [refreshKey, setRefreshKey] = useState(0)
   const walletUrl = refreshKey ? `/api/wallet?t=${refreshKey}` : '/api/wallet'
@@ -860,9 +876,9 @@ export function WalletView() {
               <WalletIcon className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Кошелёк</h1>
+              <h1 className="text-xl font-bold tracking-tight">{t('wallet.header.title')}</h1>
               <p className="text-xs text-muted-foreground">
-                Кастодия активов • hot/warm/cold 5/15/80
+                {t('wallet.header.subtitle')}
               </p>
             </div>
           </div>
@@ -874,7 +890,7 @@ export function WalletView() {
           </div>
           <Card className="overflow-hidden">
             <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border bg-muted/30">
-              Последние операции
+              {t('wallet.recent')}
             </div>
             {Array.from({ length: 4 }).map((_, i) => (
               <TxRowSkeleton key={i} />
@@ -893,9 +909,9 @@ export function WalletView() {
             <WalletIcon className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight">Кошелёк</h1>
+            <h1 className="text-xl font-bold tracking-tight">{t('wallet.header.title')}</h1>
             <p className="text-xs text-muted-foreground">
-              Кастодия активов • hot/warm/cold 5/15/80
+              {t('wallet.header.subtitle')}
             </p>
           </div>
         </div>
@@ -906,19 +922,19 @@ export function WalletView() {
           <TabsList className="h-9 bg-muted/60 p-1">
             <TabsTrigger value="assets" className="gap-1.5">
               <WalletIcon className="w-3.5 h-3.5" />
-              Активы
+              {t('wallet.tabs.assets')}
             </TabsTrigger>
             <TabsTrigger value="deposit" id="wallet-tab-deposit" className="gap-1.5">
               <ArrowDownToLine className="w-3.5 h-3.5" />
-              Пополнить
+              {t('wallet.tabs.deposit')}
             </TabsTrigger>
             <TabsTrigger value="withdraw" id="wallet-tab-withdraw" className="gap-1.5">
               <ArrowUpFromLine className="w-3.5 h-3.5" />
-              Вывести
+              {t('wallet.tabs.withdraw')}
             </TabsTrigger>
             <TabsTrigger value="history" className="gap-1.5">
               <History className="w-3.5 h-3.5" />
-              История
+              {t('wallet.tabs.history')}
             </TabsTrigger>
           </TabsList>
           <TabsContent value="assets" className="mt-3">

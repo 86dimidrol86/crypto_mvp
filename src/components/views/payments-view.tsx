@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/lib/store'
+import { useI18n } from '@/lib/use-i18n'
 import { useApi, apiPost, apiPatch } from '@/lib/use-api'
 import { useMounted } from '@/lib/use-mounted'
 import type { Corridor, CrossBorderPayment, PaymentStatus } from '@/lib/types'
@@ -78,24 +79,35 @@ const STATUS_FLOW: PaymentStatus[] = [
   'SETTLED',
 ]
 
-const STATUS_LABEL: Record<PaymentStatus, string> = {
-  INITIATED: 'Инициирован',
-  CC_PENDING: 'Валютный контроль',
-  LIQUIDITY: 'Ликвидность',
-  CONVERTING: 'Конвертация',
-  SENDING: 'Отправка',
-  SETTLED: 'Зачислен',
-  FAILED: 'Ошибка',
+const STATUS_LABEL_KEY: Record<PaymentStatus, string> = {
+  INITIATED: 'payments.status.INITIATED',
+  CC_PENDING: 'payments.status.CC_PENDING',
+  LIQUIDITY: 'payments.status.LIQUIDITY',
+  CONVERTING: 'payments.status.CONVERTING',
+  SENDING: 'payments.status.SENDING',
+  SETTLED: 'payments.status.SETTLED',
+  FAILED: 'payments.status.FAILED',
 }
 
-const STATUS_DESCRIPTION: Record<PaymentStatus, string> = {
-  INITIATED: 'Платёж создан, ожидает проверки',
-  CC_PENDING: 'Проверка 173-ФЗ, формирование УФЭД',
-  LIQUIDITY: 'Резервирование ликвидности в коридоре',
-  CONVERTING: 'Конвертация RUB → валюта получателя',
-  SENDING: 'Отправка через банк-корреспондент',
-  SETTLED: 'Средства зачислены бенефициару',
-  FAILED: 'Платёж отклонён',
+const STATUS_DESCRIPTION_KEY: Record<PaymentStatus, string> = {
+  INITIATED: 'payments.desc.INITIATED',
+  CC_PENDING: 'payments.desc.CC_PENDING',
+  LIQUIDITY: 'payments.desc.LIQUIDITY',
+  CONVERTING: 'payments.desc.CONVERTING',
+  SENDING: 'payments.desc.SENDING',
+  SETTLED: 'payments.desc.SETTLED',
+  FAILED: 'payments.desc.FAILED',
+}
+
+function corridorName(id: string, t: (k: string) => string): string {
+  const key = `payments.corridor.${id.toLowerCase()}`
+  return t(key)
+}
+
+function corridorEta(id: string, t: (k: string) => string): string {
+  const idx = CORRIDORS.findIndex((c) => c.id === id)
+  if (idx < 0) return ''
+  return t(`payments.corridor.eta-${idx + 1}`)
 }
 
 function statusIndex(status: PaymentStatus): number {
@@ -104,6 +116,7 @@ function statusIndex(status: PaymentStatus): number {
 }
 
 function PaymentStepper({ payment }: { payment: CrossBorderPayment }) {
+  const { t } = useI18n()
   const current = statusIndex(payment.status)
   const failed = payment.status === 'FAILED'
   return (
@@ -136,11 +149,11 @@ function PaymentStepper({ payment }: { payment: CrossBorderPayment }) {
                   !done && !active && 'text-muted-foreground'
                 )}
               >
-                {STATUS_LABEL[s]}
+                {t(STATUS_LABEL_KEY[s])}
               </div>
               {(active || (isLast && done)) && (
                 <div className="text-[10px] text-muted-foreground mt-0.5">
-                  {STATUS_DESCRIPTION[s]}
+                  {t(STATUS_DESCRIPTION_KEY[s])}
                 </div>
               )}
             </div>
@@ -153,7 +166,7 @@ function PaymentStepper({ payment }: { payment: CrossBorderPayment }) {
             className="absolute -left-5 top-0.5 w-2.5 h-2.5 rounded-full bg-destructive ring-4 ring-background"
             aria-hidden
           />
-          <div className="text-xs font-medium text-destructive">Ошибка</div>
+          <div className="text-xs font-medium text-destructive">{t('payments.status.FAILED')}</div>
         </li>
       )}
     </ol>
@@ -161,6 +174,7 @@ function PaymentStepper({ payment }: { payment: CrossBorderPayment }) {
 }
 
 function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
+  const { t } = useI18n()
   const createPayment = useAppStore((s) => s.createPayment)
   const updatePaymentStatus = useAppStore((s) => s.updatePaymentStatus)
   const pushNotification = useAppStore((s) => s.pushNotification)
@@ -171,7 +185,7 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
   const [beneficiary, setBeneficiary] = useState('')
   const [account, setAccount] = useState('')
   const [swift, setSwift] = useState('')
-  const [purpose, setPurpose] = useState('Оплата услуг по контракту № 2026/04-12')
+  const [purpose, setPurpose] = useState(t('payments.form.defaultPurpose'))
   const [submitting, setSubmitting] = useState(false)
 
   const corridor = CORRIDORS.find((c) => c.id === corridorId)!
@@ -187,19 +201,19 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
 
   const handleSubmit = async () => {
     if (amountNum <= 0) {
-      toast.error('Введите сумму платежа')
+      toast.error(t('payments.toast.amountRequired'))
       return
     }
     if (!beneficiary.trim()) {
-      toast.error('Укажите наименование бенефициара')
+      toast.error(t('payments.toast.beneficiaryRequired'))
       return
     }
     if (!account.trim()) {
-      toast.error('Укажите счёт / IBAN бенефициара')
+      toast.error(t('payments.toast.accountRequired'))
       return
     }
     if (!swift.trim()) {
-      toast.error('Укажите SWIFT/BIC банка получателя')
+      toast.error(t('payments.toast.swiftRequired'))
       return
     }
     setSubmitting(true)
@@ -229,7 +243,7 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
       beneficiary: beneficiary.trim(),
       purpose: purpose.trim(),
     })
-    toast.success('Платёж создан', {
+    toast.success(t('payments.toast.created'), {
       description: `${formatNumber(amountNum)} ${corridor.from} → ${corridor.to}`,
     })
     setSubmitting(false)
@@ -251,7 +265,7 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
           apiPatch('/api/payments', { id: apiId, status: 'SETTLED' }).catch(() => {})
         }
         pushNotification(
-          'Платёж зачислен',
+          t('payments.toast.settled'),
           `${formatNumber(amountNum)} ${corridor.from} → ${formatNumber(receiveAmount)} ${corridor.to}`
         )
         onCreated?.()
@@ -262,7 +276,7 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
       if (apiId) {
         apiPatch('/api/payments', { id: apiId, status: next }).catch(() => {})
       }
-      pushNotification(`Статус: ${STATUS_LABEL[next]}`, STATUS_DESCRIPTION[next])
+      pushNotification(`${t('payments.toast.statusUpdate')} ${t(STATUS_LABEL_KEY[next])}`, t(STATUS_DESCRIPTION_KEY[next]))
     }, 3500)
   }
 
@@ -274,16 +288,16 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
             <Send className="w-5 h-5" />
           </div>
           <div>
-            <CardTitle className="text-base">Новый платёж</CardTitle>
+            <CardTitle className="text-base">{t('payments.form.title')}</CardTitle>
             <CardDescription className="text-xs">
-              Валютный перевод за рубеж • 173-ФЗ
+              {t('payments.form.subtitle')}
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Коридор</Label>
+          <Label className="text-xs text-muted-foreground">{t('payments.form.corridor')}</Label>
           <Select value={corridorId} onValueChange={setCorridorId}>
             <SelectTrigger className="w-full h-10">
               <SelectValue />
@@ -292,9 +306,9 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
               {CORRIDORS.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   <span className="text-base mr-1.5">{c.flag}</span>
-                  <span className="flex-1">{c.name}</span>
+                  <span className="flex-1">{corridorName(c.id, t)}</span>
                   <Badge variant="outline" className="ml-2 text-[10px]">
-                    {c.eta}
+                    {corridorEta(c.id, t)}
                   </Badge>
                 </SelectItem>
               ))}
@@ -303,7 +317,7 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Сумма перевода</Label>
+          <Label className="text-xs text-muted-foreground">{t('payments.form.amount')}</Label>
           <div className="relative">
             <Input
               inputMode="decimal"
@@ -320,16 +334,16 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Бенефициар</Label>
+            <Label className="text-xs text-muted-foreground">{t('payments.form.beneficiary')}</Label>
             <Input
               value={beneficiary}
               onChange={(e) => setBeneficiary(e.target.value)}
-              placeholder="ООО «Торговый дом»"
+              placeholder={t('payments.form.beneficiaryPlaceholder')}
               className="bg-input/40"
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Счёт / IBAN</Label>
+            <Label className="text-xs text-muted-foreground">{t('payments.form.account')}</Label>
             <Input
               value={account}
               onChange={(e) => setAccount(e.target.value)}
@@ -340,7 +354,7 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">SWIFT / BIC банка</Label>
+          <Label className="text-xs text-muted-foreground">{t('payments.form.swift')}</Label>
           <Input
             value={swift}
             onChange={(e) => setSwift(e.target.value.toUpperCase())}
@@ -350,7 +364,7 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Назначение платежа</Label>
+          <Label className="text-xs text-muted-foreground">{t('payments.form.purpose')}</Label>
           <Textarea
             value={purpose}
             onChange={(e) => setPurpose(e.target.value)}
@@ -362,20 +376,20 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
         {/* Live computed summary */}
         <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Курс</span>
+            <span className="text-muted-foreground">{t('payments.form.rate')}</span>
             <span className="font-mono">
               1 {corridor.from} = {corridor.rate} {corridor.to}
             </span>
           </div>
           <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Комиссия коридора ({(corridor.fee * 100).toFixed(1)}%)</span>
+            <span className="text-muted-foreground">{t('payments.form.corridorFee')} ({(corridor.fee * 100).toFixed(1)}%)</span>
             <span className="font-mono text-muted-foreground">
               −{formatNumber(feeAmount)} {corridor.from}
             </span>
           </div>
           <Separator />
           <div className="flex items-center justify-between">
-            <span className="sm:text-muted-foreground">Получит бенефициар</span>
+            <span className="sm:text-muted-foreground">{t('payments.form.receive')}</span>
             <span className="text-lg font-mono font-bold text-primary tabular-nums">
               {formatNumber(receiveAmount)} {corridor.to}
             </span>
@@ -384,7 +398,7 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
             <span className="flex items-center gap-1 text-muted-foreground">
               <Clock className="w-3 h-3" /> ETA
             </span>
-            <span className="font-medium">{corridor.eta}</span>
+            <span className="font-medium">{corridorEta(corridor.id, t)}</span>
           </div>
         </div>
 
@@ -398,7 +412,7 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
           ) : (
             <Send className="w-4 h-4" />
           )}
-          Создать платёж
+          {t('payments.form.submit')}
         </Button>
       </CardContent>
     </Card>
@@ -406,6 +420,7 @@ function NewPaymentForm({ onCreated }: { onCreated?: () => void }) {
 }
 
 function CorridorsCard() {
+  const { t } = useI18n()
   return (
     <Card className="bg-card/60 backdrop-blur">
       <CardHeader>
@@ -415,9 +430,9 @@ function CorridorsCard() {
               <Globe2 className="w-5 h-5" />
             </div>
             <div>
-              <CardTitle className="text-base">Активные коридоры</CardTitle>
+              <CardTitle className="text-base">{t('payments.corridors.title')}</CardTitle>
               <CardDescription className="text-xs">
-                6 направлений • ликвидность в реальном времени
+                {t('payments.corridors.subtitle')}
               </CardDescription>
             </div>
           </div>
@@ -436,7 +451,7 @@ function CorridorsCard() {
             <div className="flex items-center gap-2.5 min-w-0">
               <span className="text-xl leading-none">{c.flag}</span>
               <div className="min-w-0">
-                <div className="text-sm font-medium truncate">{c.name}</div>
+                <div className="text-sm font-medium truncate">{corridorName(c.id, t)}</div>
                 <div className="text-[11px] text-muted-foreground font-mono">
                   1 {c.from} = {c.rate} {c.to}
                 </div>
@@ -448,7 +463,7 @@ function CorridorsCard() {
               </div>
               <div className="text-[10px] text-muted-foreground flex items-center gap-1 justify-end">
                 <Clock className="w-2.5 h-2.5" />
-                {c.eta}
+                {corridorEta(c.id, t)}
               </div>
             </div>
           </div>
@@ -465,6 +480,7 @@ function MyPayments({
   apiPayments: CrossBorderPayment[] | null
   loading: boolean
 }) {
+  const { t } = useI18n()
   const storePayments = useAppStore((s) => s.payments)
   const mounted = useMounted()
   // Prefer API payments when present; fall back to store for resilience.
@@ -525,11 +541,11 @@ function MyPayments({
               <Receipt className="w-5 h-5" />
             </div>
             <div>
-              <CardTitle className="text-base">Мои платежи</CardTitle>
+              <CardTitle className="text-base">{t('payments.mine.title')}</CardTitle>
               <CardDescription className="text-xs">
                 {payments.length > 0
-                  ? `${payments.length} ${payments.length === 1 ? 'платёж' : 'платежей'}`
-                  : 'Нет активных платежей'}
+                  ? `${payments.length} ${payments.length === 1 ? t('payments.mine.countSingular') : t('payments.mine.countPlural')}`
+                  : t('payments.mine.emptyActive')}
               </CardDescription>
             </div>
           </div>
@@ -541,15 +557,17 @@ function MyPayments({
             <div className="w-12 h-12 rounded-2xl bg-muted/40 flex items-center justify-center mb-2.5">
               <Send className="w-6 h-6 text-muted-foreground" />
             </div>
-            <div className="text-sm font-medium">Платежей пока нет</div>
+            <div className="text-sm font-medium">{t('payments.mine.emptyTitle')}</div>
             <div className="text-xs text-muted-foreground mt-1 max-w-xs">
-              Создайте первый кросс-бордер платёж — статус будет обновляться в реальном времени.
+              {t('payments.mine.emptyHint')}
             </div>
           </div>
         ) : (
           <div className="space-y-2.5 max-h-[520px] overflow-y-auto scrollbar-thin pr-1">
             {payments.map((p, i) => {
-              const flag = CORRIDORS.find((c) => c.name === p.corridor)?.flag || '🌐'
+              const corridorObj = CORRIDORS.find((c) => c.name === p.corridor) || CORRIDORS.find((c) => c.id === p.corridor)
+              const flag = corridorObj?.flag || '🌐'
+              const corridorDisplay = corridorObj ? corridorName(corridorObj.id, t) : p.corridor
               return (
                 <motion.div
                   key={p.id}
@@ -564,7 +582,7 @@ function MyPayments({
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate">{p.beneficiary}</div>
                         <div className="text-[11px] text-muted-foreground">
-                          {p.corridor} • {mounted ? timeAgo(p.createdAt) : ''}
+                          {corridorDisplay} • {mounted ? timeAgo(p.createdAt) : ''}
                         </div>
                       </div>
                     </div>
@@ -579,13 +597,13 @@ function MyPayments({
                           'border-primary/40 text-primary bg-primary/10'
                       )}
                     >
-                      {STATUS_LABEL[p.status]}
+                      {t(STATUS_LABEL_KEY[p.status])}
                     </Badge>
                   </div>
 
                   <div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 mb-2.5">
-                    <div className="text-[11px] text-muted-foreground">Отправлено</div>
-                    <div className="text-[11px] text-muted-foreground text-right">Получено</div>
+                    <div className="text-[11px] text-muted-foreground">{t('payments.mine.sent')}</div>
+                    <div className="text-[11px] text-muted-foreground text-right">{t('payments.mine.received')}</div>
                     <div className="text-sm font-mono font-semibold">
                       {formatNumber(p.amount)} {p.fromCurrency}
                     </div>
@@ -606,6 +624,7 @@ function MyPayments({
 }
 
 function RegulatoryNote() {
+  const { t } = useI18n()
   return (
     <Card className="bg-gradient-to-r from-primary/5 via-card to-card border-primary/20">
       <CardContent className="flex items-start gap-3 p-4">
@@ -614,24 +633,23 @@ function RegulatoryNote() {
         </div>
         <div className="text-sm">
           <div className="font-semibold mb-1 flex items-center gap-2">
-            Валютный контроль 173-ФЗ
+            {t('payments.regulatory.title')}
             <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
-              АВТО-ДОКУМЕНТЫ
+              {t('payments.regulatory.badge')}
             </Badge>
           </div>
           <p className="text-muted-foreground text-xs leading-relaxed">
-            Все платежи проходят валютный контроль (173-ФЗ). Паспорт сделки и УФЭД
-            формируются автоматически и доступны в Data Room регулятора.
+            {t('payments.regulatory.desc')}
           </p>
           <div className="flex flex-wrap gap-2.5 mt-2.5 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1">
-              <FileText className="w-3 h-3 text-primary" /> Паспорт сделки
+              <FileText className="w-3 h-3 text-primary" /> {t('payments.regulatory.dealPassport')}
             </span>
             <span className="flex items-center gap-1">
-              <FileText className="w-3 h-3 text-primary" /> УФЭД
+              <FileText className="w-3 h-3 text-primary" /> {t('payments.regulatory.ufed')}
             </span>
             <span className="flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3 text-success" /> Отчётность ЦБ
+              <CheckCircle2 className="w-3 h-3 text-success" /> {t('payments.regulatory.cbReport')}
             </span>
           </div>
         </div>
@@ -641,6 +659,7 @@ function RegulatoryNote() {
 }
 
 export function PaymentsView() {
+  const { t } = useI18n()
   // Refresh trigger — bump after a payment is created to refetch from /api/payments
   const [refreshKey, setRefreshKey] = useState(0)
   const paymentsUrl = refreshKey ? `/api/payments?t=${refreshKey}` : '/api/payments'
@@ -665,28 +684,28 @@ export function PaymentsView() {
                 CROSS-BORDER
               </Badge>
               <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                173-ФЗ
+                {t('payments.header.173fz')}
               </Badge>
             </div>
             <h1 className="text-xl lg:text-2xl font-bold tracking-tight">
-              Кросс-бордер платежи
+              {t('payments.header.title')}
             </h1>
             <p className="text-xs text-muted-foreground mt-1">
-              Валютный контроль 173-ФЗ • автоформируемые документы
+              {t('payments.header.subtitle')}
             </p>
           </div>
           <div className="flex items-center gap-2.5">
             <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-muted/40 border border-border">
               <Building2 className="w-4 h-4 text-primary" />
               <div className="text-xs">
-                <div className="text-muted-foreground">Банк-корреспондент</div>
+                <div className="text-muted-foreground">{t('payments.header.correspondent')}</div>
                 <div className="font-semibold"> Gazprombank (RUB)</div>
               </div>
             </div>
             <div className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-muted/40 border border-border">
               <Banknote className="w-4 h-4 text-success" />
               <div className="text-xs">
-                <div className="text-muted-foreground">Ликвидность 24ч</div>
+                <div className="text-muted-foreground">{t('payments.header.liquidity24')}</div>
                 <div className="font-semibold">$8.4M</div>
               </div>
             </div>

@@ -28,7 +28,9 @@ export const metadata: Metadata = {
     "USDT",
   ],
   icons: {
-    icon: "/logo.svg",
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
   },
 };
 

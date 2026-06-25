@@ -29,6 +29,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/lib/use-i18n'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -37,11 +38,11 @@ import { KpiCardSkeleton, ChartSkeleton } from '@/components/page-skeleton'
 
 type Period = '1h' | '24h' | '7d' | '30d'
 
-const PERIODS: { id: Period; label: string }[] = [
-  { id: '1h', label: '1ч' },
-  { id: '24h', label: '24ч' },
-  { id: '7d', label: '7д' },
-  { id: '30d', label: '30д' },
+const PERIODS: { id: Period; labelKey: string }[] = [
+  { id: '1h', labelKey: 'analytics.period.1h' },
+  { id: '24h', labelKey: 'analytics.period.24h' },
+  { id: '7d', labelKey: 'analytics.period.7d' },
+  { id: '30d', labelKey: 'analytics.period.30d' },
 ]
 
 interface AnalyticsData {
@@ -72,6 +73,7 @@ interface StatCardProps {
 }
 
 function StatCard({ title, value, delta, icon: Icon, color, positive = true }: StatCardProps) {
+  const { t } = useI18n()
   const up = delta >= 0
   return (
     <Card className="p-4">
@@ -105,13 +107,14 @@ function StatCard({ title, value, delta, icon: Icon, color, positive = true }: S
           {up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
           {formatPercent(delta)}
         </span>
-        <span className="text-muted-foreground">{positive ? 'за период' : ''}</span>
+        <span className="text-muted-foreground">{positive ? t('analytics.positiveForPeriod') : ''}</span>
       </div>
     </Card>
   )
 }
 
 export function AnalyticsView() {
+  const { t } = useI18n()
   const [period, setPeriod] = useState<Period>('24h')
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -157,11 +160,11 @@ export function AnalyticsView() {
           <div>
             <h1 className="text-xl lg:text-2xl font-bold flex items-center gap-2.5">
               <BarChart3 className="w-6 h-6 text-primary" />
-              Аналитика
+              {t('analytics.title')}
             </h1>
             <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
               <Database className="w-3.5 h-3.5 text-success" />
-              Метрики из БД платформы {data && <span className="text-success">• обновлено {new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>}
+              {t('analytics.subtitle')} {data && <span className="text-success">{t('analytics.subtitleUpdated')} {new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>}
             </p>
           </div>
           <div className="flex gap-1 bg-muted/60 p-1 rounded-xl">
@@ -176,7 +179,7 @@ export function AnalyticsView() {
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
-                {p.label}
+                {t(p.labelKey)}
               </button>
             ))}
           </div>
@@ -201,12 +204,12 @@ export function AnalyticsView() {
             {data && (
               <Card className="p-2.5 mb-3 bg-success/5 border-success/20">
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-xs">
-                  <span className="text-muted-foreground">Источник данных: <span className="text-success font-medium">Prisma + Binance API</span></span>
-                  <span className="text-muted-foreground">Сделок в БД: <span className="font-mono text-foreground">{data.summary.totalTrades}</span></span>
-                  <span className="text-muted-foreground">Пользователей: <span className="font-mono text-foreground">{data.summary.totalUsers}</span></span>
-                  <span className="text-muted-foreground">Платежей: <span className="font-mono text-foreground">{data.summary.totalPayments}</span></span>
-                  <span className="text-muted-foreground">P2P сделок: <span className="font-mono text-foreground">{data.summary.p2pDeals}</span></span>
-                  <span className="text-muted-foreground">Комиссий собрано: <span className="font-mono text-primary">{formatPrice(data.summary.totalFees, 'rub')}</span></span>
+                  <span className="text-muted-foreground">{t('analytics.sourceData')} <span className="text-success font-medium">{t('analytics.sourceValue')}</span></span>
+                  <span className="text-muted-foreground">{t('analytics.tradesInDb')} <span className="font-mono text-foreground">{data.summary.totalTrades}</span></span>
+                  <span className="text-muted-foreground">{t('analytics.usersWord')} <span className="font-mono text-foreground">{data.summary.totalUsers}</span></span>
+                  <span className="text-muted-foreground">{t('analytics.paymentsWord')} <span className="font-mono text-foreground">{data.summary.totalPayments}</span></span>
+                  <span className="text-muted-foreground">{t('analytics.p2pWord')} <span className="font-mono text-foreground">{data.summary.p2pDeals}</span></span>
+                  <span className="text-muted-foreground">{t('analytics.feesCollected')} <span className="font-mono text-primary">{formatPrice(data.summary.totalFees, 'rub')}</span></span>
                 </div>
               </Card>
             )}
@@ -214,28 +217,28 @@ export function AnalyticsView() {
             {/* Stats row */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
               <StatCard
-                title="Объём торгов"
+                title={t('analytics.kpi.volume')}
                 value={formatPrice(stats.volume, 'rub')}
                 delta={stats.volumeDelta}
                 icon={CircleDollarSign}
                 color="bg-primary/15 text-primary"
               />
               <StatCard
-                title="Активные пользователи"
+                title={t('analytics.kpi.users')}
                 value={formatNumber(stats.users, 0)}
                 delta={stats.usersDelta}
                 icon={Users}
                 color="bg-sky-500/15 text-sky-400"
               />
               <StatCard
-                title="Открытые позиции"
+                title={t('analytics.kpi.positions')}
                 value={formatNumber(stats.positions, 0)}
                 delta={stats.positionsDelta}
                 icon={Activity}
                 color="bg-violet-400/15 text-violet-400"
               />
               <StatCard
-                title="Средний PnL"
+                title={t('analytics.kpi.pnl')}
                 value={formatPercent(stats.pnl)}
                 delta={stats.pnlDelta}
                 icon={TrendingUp}
@@ -269,8 +272,8 @@ export function AnalyticsView() {
               <Card className="p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <h2 className="font-semibold">Торговые пары</h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">Распределение объёма</p>
+                    <h2 className="font-semibold">{t('analytics.pairs.title')}</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">{t('analytics.pairs.subtitle')}</p>
                   </div>
                   <Layers className="w-4 h-4 text-muted-foreground" />
                 </div>
@@ -313,9 +316,9 @@ export function AnalyticsView() {
               <Card className="p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <h2 className="font-semibold">Объём торгов</h2>
+                    <h2 className="font-semibold">{t('analytics.volume.title')}</h2>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Период: {PERIODS.find((p) => p.id === period)?.label}
+                      {t('analytics.periodWord')} {t(PERIODS.find((p) => p.id === period)?.labelKey || '')}
                     </p>
                   </div>
                   <Badge variant="outline" className="gap-1.5 border-primary/30 text-primary">
@@ -345,7 +348,7 @@ export function AnalyticsView() {
                       />
                       <Tooltip
                         contentStyle={tooltipStyle}
-                        formatter={(v: number) => [formatPrice(v, 'rub'), 'Объём']}
+                        formatter={(v: number) => [formatPrice(v, 'rub'), t('analytics.volumeWord')]}
                       />
                       <Bar dataKey="volume" fill="#F0B90B" radius={[4, 4, 0, 0]} maxBarSize={28} />
                     </BarChart>
@@ -356,9 +359,9 @@ export function AnalyticsView() {
               <Card className="p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <h2 className="font-semibold">Активные пользователи</h2>
+                    <h2 className="font-semibold">{t('analytics.users.title')}</h2>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Период: {PERIODS.find((p) => p.id === period)?.label}
+                      {t('analytics.periodWord')} {t(PERIODS.find((p) => p.id === period)?.labelKey || '')}
                     </p>
                   </div>
                   <Badge variant="outline" className="gap-1.5 border-sky-400/30 text-sky-400">
@@ -388,7 +391,7 @@ export function AnalyticsView() {
                       />
                       <Tooltip
                         contentStyle={tooltipStyle}
-                        formatter={(v: number) => [formatNumber(v, 0), 'Пользователей']}
+                        formatter={(v: number) => [formatNumber(v, 0), t('analytics.usersWord2')]}
                       />
                       <Line
                         type="monotone"
@@ -410,12 +413,12 @@ export function AnalyticsView() {
                 <div>
                   <h2 className="font-semibold flex items-center gap-2">
                     <Globe2 className="w-4 h-4 text-primary" />
-                    Топ коридоров кросс-бордер
+                    {t('analytics.corridors.title')}
                   </h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">Объём за последние 24 часа</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t('analytics.corridors.subtitle')}</p>
                 </div>
                 <Button variant="outline" size="sm" className="text-primary border-primary/30">
-                  Все коридоры
+                  {t('analytics.corridors.all')}
                 </Button>
               </div>
               <div className="h-[280px]">
@@ -445,7 +448,7 @@ export function AnalyticsView() {
                     />
                     <Tooltip
                       contentStyle={tooltipStyle}
-                      formatter={(v: number) => [formatPrice(v, 'rub'), 'Объём']}
+                      formatter={(v: number) => [formatPrice(v, 'rub'), t('analytics.volumeWord')]}
                     />
                     <Bar dataKey="volume" radius={[0, 4, 4, 0]} maxBarSize={26}>
                       {corridors.map((c) => (
@@ -481,9 +484,9 @@ export function AnalyticsView() {
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                  Данные из БД обновляются каждые 15 секунд
+                  {t('analytics.footer.refresh')}
                 </div>
-                <div>Источник: Prisma (SQLite) • Binance API для котировок • ЦБ РФ для USD/RUB</div>
+                <div>{t('analytics.footer.source')}</div>
               </div>
             </Card>
           </>

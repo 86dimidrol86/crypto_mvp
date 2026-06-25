@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/lib/store'
+import { useI18n } from '@/lib/use-i18n'
 import { useMounted } from '@/lib/use-mounted'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -52,17 +53,17 @@ import {
 import { StepSkeleton } from '@/components/page-skeleton'
 
 const STEPS = [
-  { id: 0, title: 'Телефон', icon: Phone, desc: 'Подтверждение номера' },
-  { id: 1, title: 'Документ', icon: FileText, desc: 'Загрузка и OCR' },
-  { id: 2, title: 'Селфи', icon: Camera, desc: 'Liveness-проверка' },
-  { id: 3, title: 'Адрес-идентификатор', icon: Fingerprint, desc: 'Привязка адресов (ФЗ-1194918-8)' },
-  { id: 4, title: 'Квалификация', icon: GraduationCap, desc: 'Тест инвестора' },
+  { id: 0, titleKey: 'kyc.step.phone', icon: Phone, descKey: 'kyc.step.phoneDesc' },
+  { id: 1, titleKey: 'kyc.step.document', icon: FileText, descKey: 'kyc.step.documentDesc' },
+  { id: 2, titleKey: 'kyc.step.selfie', icon: Camera, descKey: 'kyc.step.selfieDesc' },
+  { id: 3, titleKey: 'kyc.step.address', icon: Fingerprint, descKey: 'kyc.step.addressDesc' },
+  { id: 4, titleKey: 'kyc.step.qualification', icon: GraduationCap, descKey: 'kyc.step.qualificationDesc' },
 ] as const
 
 const DOC_TYPES = [
-  { value: 'passport_rf', label: 'Паспорт РФ' },
-  { value: 'foreign_passport', label: 'Загранпаспорт' },
-  { value: 'driver_license', label: 'Вод. удостоверение' },
+  { value: 'passport_rf', labelKey: 'kyc.doc.passportRf' },
+  { value: 'foreign_passport', labelKey: 'kyc.doc.foreignPassport' },
+  { value: 'driver_license', labelKey: 'kyc.doc.driverLicense' },
 ]
 
 function generateAid(): string {
@@ -74,6 +75,7 @@ function generateAid(): string {
 }
 
 function PhoneStep({ done, onNext }: { done: boolean; onNext: () => void }) {
+  const { t } = useI18n()
   const [phone, setPhone] = useState('+7 ')
   const [codeSent, setCodeSent] = useState(false)
   const [otp, setOtp] = useState('')
@@ -82,26 +84,26 @@ function PhoneStep({ done, onNext }: { done: boolean; onNext: () => void }) {
 
   const sendCode = () => {
     if (phone.replace(/\D/g, '').length < 11) {
-      toast.error('Введите корректный номер телефона')
+      toast.error(t('kyc.toast.phoneInvalid'))
       return
     }
     setSending(true)
     setTimeout(() => {
       setSending(false)
       setCodeSent(true)
-      toast.success('SMS-код отправлен', { description: 'Используйте код 0000 (демо)' })
+      toast.success(t('kyc.toast.smsSent'), { description: t('kyc.toast.smsDemo') })
     }, 900)
   }
 
   const verify = () => {
     if (otp.length < 4) {
-      toast.error('Введите 4-значный код')
+      toast.error(t('kyc.toast.codeInvalid'))
       return
     }
     setVerifying(true)
     setTimeout(() => {
       setVerifying(false)
-      toast.success('Телефон подтверждён')
+      toast.success(t('kyc.toast.phoneConfirmed'))
       onNext()
     }, 800)
   }
@@ -110,7 +112,7 @@ function PhoneStep({ done, onNext }: { done: boolean; onNext: () => void }) {
     return (
       <div className="flex items-center gap-2 text-sm text-success">
         <CheckCircle2 className="w-4 h-4" />
-        Телефон подтверждён • {phone}
+        {t('kyc.phone.confirmed')} {phone}
       </div>
     )
   }
@@ -118,7 +120,7 @@ function PhoneStep({ done, onNext }: { done: boolean; onNext: () => void }) {
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">Номер телефона</Label>
+        <Label className="text-xs text-muted-foreground">{t('kyc.phone.label')}</Label>
         <Input
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
@@ -134,12 +136,12 @@ function PhoneStep({ done, onNext }: { done: boolean; onNext: () => void }) {
           className="w-full h-10 gap-2"
         >
           {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
-          Отправить код
+          {t('kyc.phone.sendCode')}
         </Button>
       ) : (
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">SMS-код (4 цифры)</Label>
+            <Label className="text-xs text-muted-foreground">{t('kyc.phone.codeLabel')}</Label>
             <Input
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
@@ -147,7 +149,7 @@ function PhoneStep({ done, onNext }: { done: boolean; onNext: () => void }) {
               className="bg-input/40 font-mono tracking-[0.5em] text-center h-10 text-base"
               placeholder="••••"
             />
-            <p className="text-[10px] text-muted-foreground">Демо-код: 0000</p>
+            <p className="text-[10px] text-muted-foreground">{t('kyc.phone.demoCode')}</p>
           </div>
           <Button
             onClick={verify}
@@ -155,7 +157,7 @@ function PhoneStep({ done, onNext }: { done: boolean; onNext: () => void }) {
             className="w-full h-10 bg-primary text-primary-foreground hover:bg-primary/90 gap-2"
           >
             {verifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
-            Подтвердить
+            {t('kyc.phone.confirm')}
           </Button>
         </div>
       )}
@@ -164,6 +166,7 @@ function PhoneStep({ done, onNext }: { done: boolean; onNext: () => void }) {
 }
 
 function DocumentStep({ done, onNext }: { done: boolean; onNext: () => void }) {
+  const { t } = useI18n()
   const [docType, setDocType] = useState('passport_rf')
   const [uploaded, setUploaded] = useState(false)
   const [ocrStatus, setOcrStatus] = useState<'idle' | 'processing' | 'done'>('idle')
@@ -173,15 +176,16 @@ function DocumentStep({ done, onNext }: { done: boolean; onNext: () => void }) {
     setOcrStatus('processing')
     setTimeout(() => {
       setOcrStatus('done')
-      toast.success('OCR завершён', { description: 'Данные извлечены и проверены' })
+      toast.success(t('kyc.doc.toast.ocrDone'), { description: t('kyc.doc.toast.ocrDesc') })
     }, 1800)
   }
 
   if (done) {
+    const docLabel = DOC_TYPES.find((d) => d.value === docType)
     return (
       <div className="flex items-center gap-2 text-sm text-success">
         <CheckCircle2 className="w-4 h-4" />
-        Документ верифицирован • {DOC_TYPES.find((d) => d.value === docType)?.label}
+        {t('kyc.doc.confirmed')} {docLabel ? t(docLabel.labelKey) : docType}
       </div>
     )
   }
@@ -189,7 +193,7 @@ function DocumentStep({ done, onNext }: { done: boolean; onNext: () => void }) {
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">Тип документа</Label>
+        <Label className="text-xs text-muted-foreground">{t('kyc.doc.typeLabel')}</Label>
         <Select value={docType} onValueChange={setDocType}>
           <SelectTrigger className="w-full h-10 bg-input/40">
             <SelectValue />
@@ -197,7 +201,7 @@ function DocumentStep({ done, onNext }: { done: boolean; onNext: () => void }) {
           <SelectContent>
             {DOC_TYPES.map((d) => (
               <SelectItem key={d.value} value={d.value}>
-                {d.label}
+                {t(d.labelKey)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -212,8 +216,8 @@ function DocumentStep({ done, onNext }: { done: boolean; onNext: () => void }) {
           <div className="w-10 h-10 rounded-2xl bg-muted/40 group-hover:bg-primary/10 flex items-center justify-center transition">
             <Upload className="w-5 h-5 text-muted-foreground group-hover:text-primary" />
           </div>
-          <div className="text-sm font-medium">Загрузить фото документа</div>
-          <div className="text-[11px] text-muted-foreground">JPG / PNG / HEIC • до 10 МБ</div>
+          <div className="text-sm font-medium">{t('kyc.doc.uploadTitle')}</div>
+          <div className="text-[11px] text-muted-foreground">{t('kyc.doc.uploadHint')}</div>
         </button>
       ) : (
         <div className="space-y-3">
@@ -223,7 +227,7 @@ function DocumentStep({ done, onNext }: { done: boolean; onNext: () => void }) {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-xs font-medium truncate">{docType}_front.jpg</div>
-              <div className="text-[10px] text-muted-foreground">2.4 МБ • загружено</div>
+              <div className="text-[10px] text-muted-foreground">{t('kyc.doc.uploadedSize')}</div>
             </div>
             <CheckCircle2 className="w-4 h-4 text-success" />
           </div>
@@ -231,13 +235,13 @@ function DocumentStep({ done, onNext }: { done: boolean; onNext: () => void }) {
             {ocrStatus === 'processing' && (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-                <span className="text-muted-foreground">OCR-распознавание документа…</span>
+                <span className="text-muted-foreground">{t('kyc.doc.ocrProgress')}</span>
               </>
             )}
             {ocrStatus === 'done' && (
               <>
                 <CheckCircle2 className="w-3.5 h-3.5 text-success" />
-                <span className="text-success">Данные извлечены: ФИО, серия/номер, адрес</span>
+                <span className="text-success">{t('kyc.doc.ocrDone')}</span>
               </>
             )}
           </div>
@@ -246,7 +250,7 @@ function DocumentStep({ done, onNext }: { done: boolean; onNext: () => void }) {
               onClick={onNext}
               className="w-full h-10 bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              Продолжить
+              {t('kyc.doc.continue')}
             </Button>
           )}
         </div>
@@ -256,6 +260,7 @@ function DocumentStep({ done, onNext }: { done: boolean; onNext: () => void }) {
 }
 
 function SelfieStep({ done, onNext }: { done: boolean; onNext: () => void }) {
+  const { t } = useI18n()
   const [stage, setStage] = useState<'idle' | 'scanning' | 'done'>('idle')
   const [progress, setProgress] = useState(0)
 
@@ -267,7 +272,7 @@ function SelfieStep({ done, onNext }: { done: boolean; onNext: () => void }) {
         if (p >= 100) {
           clearInterval(interval)
           setStage('done')
-          toast.success('Liveness-проверка пройдена')
+          toast.success(t('kyc.selfie.toast.passed'))
           return 100
         }
         return p + 10
@@ -279,7 +284,7 @@ function SelfieStep({ done, onNext }: { done: boolean; onNext: () => void }) {
     return (
       <div className="flex items-center gap-2 text-sm text-success">
         <CheckCircle2 className="w-4 h-4" />
-        Liveness пройдена • биометрия закреплена
+        {t('kyc.selfie.passed')}
       </div>
     )
   }
@@ -297,9 +302,9 @@ function SelfieStep({ done, onNext }: { done: boolean; onNext: () => void }) {
           )}
         </div>
         <div className="text-sm">
-          <div className="font-medium">Селфи с документом</div>
+          <div className="font-medium">{t('kyc.selfie.title')}</div>
           <div className="text-xs text-muted-foreground mt-0.5">
-            Liveness-проверка: моргание, поворот головы, 3D-карта лица
+            {t('kyc.selfie.desc')}
           </div>
         </div>
       </div>
@@ -308,7 +313,7 @@ function SelfieStep({ done, onNext }: { done: boolean; onNext: () => void }) {
         <div className="space-y-2">
           <Progress value={progress} className="h-2" />
           <div className="text-xs text-muted-foreground text-center font-mono">
-            Анализ биометрии… {progress}%
+            {t('kyc.selfie.analyzing')} {progress}%
           </div>
         </div>
       )}
@@ -321,11 +326,11 @@ function SelfieStep({ done, onNext }: { done: boolean; onNext: () => void }) {
         >
           {stage === 'done' ? (
             <>
-              <CheckCircle2 className="w-4 h-4" /> Проверка пройдена
+              <CheckCircle2 className="w-4 h-4" /> {t('kyc.selfie.passedTitle')}
             </>
           ) : (
             <>
-              <ScanFace className="w-4 h-4" /> Начать проверку liveness
+              <ScanFace className="w-4 h-4" /> {t('kyc.selfie.startBtn')}
             </>
           )}
         </Button>
@@ -337,7 +342,7 @@ function SelfieStep({ done, onNext }: { done: boolean; onNext: () => void }) {
           variant="outline"
           className="w-full h-10 gap-2"
         >
-          Продолжить
+          {t('kyc.selfie.continue')}
           <ChevronRight className="w-4 h-4" />
         </Button>
       )}
@@ -346,13 +351,14 @@ function SelfieStep({ done, onNext }: { done: boolean; onNext: () => void }) {
 }
 
 function AddressBindingStep({ done, onNext }: { done: boolean; onNext: () => void }) {
+  const { t } = useI18n()
   const [agreed, setAgreed] = useState(false)
 
   if (done) {
     return (
       <div className="flex items-center gap-2 text-sm text-success">
         <CheckCircle2 className="w-4 h-4" />
-        Согласие получено • адрес-идентификаторы привязываются к верифицированной личности
+        {t('kyc.address.consent')}
       </div>
     )
   }
@@ -362,27 +368,25 @@ function AddressBindingStep({ done, onNext }: { done: boolean; onNext: () => voi
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-2">
         <div className="flex items-center gap-2 text-sm font-medium text-primary">
           <Fingerprint className="w-4 h-4" />
-          Адрес-идентификатор (ФЗ-1194918-8)
+          {t('kyc.address.title')}
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Каждый криптоадрес на платформе привязывается к верифицированной личности
-          пользователя. Это требование закона 1194918-8 для противодействия
-          отмыванию доходов и идентификации владельцев активов.
+          {t('kyc.address.desc')}
         </p>
       </div>
 
       <div className="space-y-2 text-xs text-muted-foreground">
         <div className="flex items-start gap-2">
           <CheckCircle2 className="w-3.5 h-3.5 text-success mt-0.5 shrink-0" />
-          <span>1 адрес = 1 личность (или юр. лицо)</span>
+          <span>{t('kyc.address.b1')}</span>
         </div>
         <div className="flex items-start gap-2">
           <CheckCircle2 className="w-3.5 h-3.5 text-success mt-0.5 shrink-0" />
-          <span>Реестр адрес-идентификаторов доступен регулятору 24/7</span>
+          <span>{t('kyc.address.b2')}</span>
         </div>
         <div className="flex items-start gap-2">
           <CheckCircle2 className="w-3.5 h-3.5 text-success mt-0.5 shrink-0" />
-          <span>Анонимные переводы запрещены</span>
+          <span>{t('kyc.address.b3')}</span>
         </div>
       </div>
 
@@ -393,8 +397,7 @@ function AddressBindingStep({ done, onNext }: { done: boolean; onNext: () => voi
           className="mt-0.5"
         />
         <span className="text-xs leading-relaxed">
-          Согласен с привязкой адрес-идентификаторов к моей верифицированной личности
-          и обработкой персональных данных в соответствии с 152-ФЗ.
+          {t('kyc.address.consentLabel')}
         </span>
       </label>
 
@@ -404,13 +407,14 @@ function AddressBindingStep({ done, onNext }: { done: boolean; onNext: () => voi
         className="w-full h-10 bg-primary text-primary-foreground hover:bg-primary/90 gap-2"
       >
         <Lock className="w-4 h-4" />
-        Принять и продолжить
+        {t('kyc.address.accept')}
       </Button>
     </div>
   )
 }
 
 function QualificationStep({ onDone }: { onDone: () => void }) {
+  const { t } = useI18n()
   const [path, setPath] = useState<'none' | 'test' | 'assets'>('none')
   const [testOpen, setTestOpen] = useState(false)
   const [testProgress, setTestProgress] = useState(0)
@@ -425,8 +429,8 @@ function QualificationStep({ onDone }: { onDone: () => void }) {
         if (p >= 25) {
           clearInterval(interval)
           setTestOpen(false)
-          toast.success('Тест пройден', {
-            description: '25/25 верных ответов • квалификация подтверждена',
+          toast.success(t('kyc.qualification.toast.testPassed'), {
+            description: t('kyc.qualification.toast.testDesc'),
           })
           setTimeout(onDone, 400)
           return 25
@@ -441,8 +445,8 @@ function QualificationStep({ onDone }: { onDone: () => void }) {
     setAssetsVerifying(true)
     setTimeout(() => {
       setAssetsVerifying(false)
-      toast.success('Активы подтверждены', {
-        description: 'Брокерский отчёт ≥ 3 000 000 ₽ загружен',
+      toast.success(t('kyc.qualification.toast.assetsConfirmed'), {
+        description: t('kyc.qualification.toast.assetsDesc'),
       })
       setTimeout(onDone, 400)
     }, 1800)
@@ -453,11 +457,10 @@ function QualificationStep({ onDone }: { onDone: () => void }) {
       <div className="rounded-xl border border-warning/30 bg-warning/5 p-3 space-y-1.5">
         <div className="flex items-center gap-2 text-sm font-medium text-warning">
           <AlertTriangle className="w-4 h-4" />
-          Квалификация инвестора
+          {t('kyc.qualification.title')}
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Неквалифицированные инвесторы ограничены суммой 300 000 ₽/год на
-          криптоактивы. Подтвердите квалификацию для снятия лимита.
+          {t('kyc.qualification.desc')}
         </p>
       </div>
 
@@ -476,9 +479,9 @@ function QualificationStep({ onDone }: { onDone: () => void }) {
             <GraduationCap className="w-5 h-5" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium">Пройти тест</div>
+            <div className="text-sm font-medium">{t('kyc.qualification.testTitle')}</div>
             <div className="text-[11px] text-muted-foreground mt-0.5">
-              25 вопросов по рискам крипторынка • ≥80% верных
+              {t('kyc.qualification.testDesc')}
             </div>
           </div>
           <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary mt-1" />
@@ -498,9 +501,9 @@ function QualificationStep({ onDone }: { onDone: () => void }) {
             <Award className="w-5 h-5" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium">Подтвердить активы ≥3 млн ₽</div>
+            <div className="text-sm font-medium">{t('kyc.qualification.assetsTitle')}</div>
             <div className="text-[11px] text-muted-foreground mt-0.5">
-              Брокерский отчёт или выписка из реестра
+              {t('kyc.qualification.assetsDesc')}
             </div>
           </div>
           {assetsVerifying ? (
@@ -516,16 +519,16 @@ function QualificationStep({ onDone }: { onDone: () => void }) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <GraduationCap className="w-4 h-4 text-primary" />
-              Тест квалификации инвестора
+              {t('kyc.qualification.testHeader')}
             </DialogTitle>
             <DialogDescription>
-              Демонстрационный режим • автоматическое прохождение
+              {t('kyc.qualification.testSub')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <Progress value={(testProgress / 25) * 100} className="h-2" />
             <div className="text-xs text-muted-foreground text-center font-mono">
-              Вопрос {testProgress} из 25
+              {t('kyc.qualification.question')} {testProgress} {t('kyc.qualification.of')} 25
             </div>
           </div>
           <DialogFooter>
@@ -534,7 +537,7 @@ function QualificationStep({ onDone }: { onDone: () => void }) {
               onClick={() => setTestOpen(false)}
               className="h-9"
             >
-              Отмена
+              {t('common.cancel')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -544,12 +547,13 @@ function QualificationStep({ onDone }: { onDone: () => void }) {
 }
 
 function VerifiedCard() {
+  const { t } = useI18n()
   const setKyc = useAppStore((s) => s.setKyc)
   const [aid] = useState(() => generateAid())
 
   const reVerify = () => {
     setKyc(0, 'UNINITIATED')
-    toast.info('Начата повторная верификация')
+    toast.info(t('kyc.reverify.toast'))
   }
 
   return (
@@ -561,24 +565,23 @@ function VerifiedCard() {
           </div>
           <Badge variant="outline" className="border-success/40 text-success mb-2.5 gap-1.5">
             <Sparkles className="w-3 h-3" />
-            ВЕРИФИКАЦИЯ ПРОЙДЕНА
+            {t('kyc.done.badge')}
           </Badge>
-          <h2 className="text-xl font-bold">Уровень 2 • Полный доступ</h2>
+          <h2 className="text-xl font-bold">{t('kyc.done.title')}</h2>
           <p className="text-xs text-muted-foreground mt-1.5">
-            Вам доступны все инструменты платформы, включая маржинальную торговлю
-            и кросс-бордер платежи без лимитов.
+            {t('kyc.done.desc')}
           </p>
 
           <div className="w-full grid grid-cols-2 gap-2.5 mt-4">
             <div className="p-2.5 rounded-xl border border-border bg-muted/30">
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                Уровень KYC
+                {t('kyc.done.kycLevel')}
               </div>
               <div className="text-base font-bold text-success mt-0.5">Lv. 2</div>
             </div>
             <div className="p-2.5 rounded-xl border border-border bg-muted/30">
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                Адрес-идентификатор
+                {t('kyc.done.addressId')}
               </div>
               <div className="text-xs font-mono font-bold mt-0.5 break-all">{aid}</div>
             </div>
@@ -586,16 +589,16 @@ function VerifiedCard() {
 
           <div className="w-full flex flex-wrap justify-center gap-2 mt-4">
             <Badge variant="outline" className="text-[10px] border-border">
-              <CheckCircle2 className="w-3 h-3 text-success mr-1" /> Телефон
+              <CheckCircle2 className="w-3 h-3 text-success mr-1" /> {t('kyc.done.phoneOk')}
             </Badge>
             <Badge variant="outline" className="text-[10px] border-border">
-              <CheckCircle2 className="w-3 h-3 text-success mr-1" /> Паспорт РФ
+              <CheckCircle2 className="w-3 h-3 text-success mr-1" /> {t('kyc.done.passportOk')}
             </Badge>
             <Badge variant="outline" className="text-[10px] border-border">
               <CheckCircle2 className="w-3 h-3 text-success mr-1" /> Liveness
             </Badge>
             <Badge variant="outline" className="text-[10px] border-border">
-              <CheckCircle2 className="w-3 h-3 text-success mr-1" /> Квалификация
+              <CheckCircle2 className="w-3 h-3 text-success mr-1" /> {t('kyc.done.qualificationOk')}
             </Badge>
           </div>
 
@@ -605,7 +608,7 @@ function VerifiedCard() {
             className="mt-4 gap-2 h-10"
           >
             <RefreshCw className="w-4 h-4" />
-            Пройти верификацию заново
+            {t('kyc.done.reverify')}
           </Button>
         </div>
       </CardContent>
@@ -614,6 +617,7 @@ function VerifiedCard() {
 }
 
 function EsiaButton({ onFastTrack }: { onFastTrack: () => void }) {
+  const { t } = useI18n()
   const [loading, setLoading] = useState(false)
 
   const handleClick = () => {
@@ -636,30 +640,31 @@ function EsiaButton({ onFastTrack }: { onFastTrack: () => void }) {
       ) : (
         <Landmark className="w-4 h-4 text-primary" />
       )}
-      Войти через Госуслуги (ЕСИА)
+      {t('kyc.gosuslugi.btn')}
     </Button>
   )
 }
 
 function ComplianceBadges() {
+  const { t } = useI18n()
   return (
     <Card className="bg-card/40">
       <CardContent className="p-3.5">
         <div className="flex items-center gap-2 mb-2.5">
           <ShieldCheck className="w-4 h-4 text-success" />
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Соответствие законодательству
+            {t('kyc.gosuslugi.lawTitle')}
           </span>
         </div>
         <div className="flex flex-wrap gap-2">
           <Badge variant="outline" className="text-[10px] border-border gap-1">
-            <FileText className="w-3 h-3" /> 152-ФЗ (ПДн)
+            <FileText className="w-3 h-3" /> {t('kyc.gosuslugi.law1')}
           </Badge>
           <Badge variant="outline" className="text-[10px] border-border gap-1">
-            <FileText className="w-3 h-3" /> 115-ФЗ (AML)
+            <FileText className="w-3 h-3" /> {t('kyc.gosuslugi.law2')}
           </Badge>
           <Badge variant="outline" className="text-[10px] border-border gap-1">
-            <FileText className="w-3 h-3" /> 1194918-8 (ЦРА)
+            <FileText className="w-3 h-3" /> {t('kyc.gosuslugi.law3')}
           </Badge>
         </div>
       </CardContent>
@@ -668,6 +673,7 @@ function ComplianceBadges() {
 }
 
 export function KycView() {
+  const { t } = useI18n()
   const kycLevel = useAppStore((s) => s.kycLevel)
   const kycStatus = useAppStore((s) => s.kycStatus)
   const setKyc = useAppStore((s) => s.setKyc)
@@ -687,8 +693,8 @@ export function KycView() {
   }
 
   const handleEsia = () => {
-    toast.success('Данные получены из ЕСИА', {
-      description: 'Телефон, паспорт и селфи заполнены автоматически',
+    toast.success(t('kyc.gosuslugi.toast.dataReceived'), {
+      description: t('kyc.gosuslugi.toast.dataDesc'),
     })
     setCompletedSteps(new Set([0, 1, 2]))
     setStep(3)
@@ -698,11 +704,11 @@ export function KycView() {
   const handleQualificationDone = () => {
     setKyc(2, 'ACTIVE')
     pushNotification(
-      'Верификация завершена',
-      'Уровень 2 активирован. Доступны все инструменты платформы.'
+      t('kyc.gosuslugi.toast.doneTitle'),
+      t('kyc.gosuslugi.toast.doneDesc')
     )
-    toast.success('Верификация завершена', {
-      description: 'Уровень 2 • полный доступ к платформе',
+    toast.success(t('kyc.gosuslugi.toast.successTitle'), {
+      description: t('kyc.gosuslugi.toast.successDesc'),
     })
   }
 
@@ -715,9 +721,9 @@ export function KycView() {
               <ShieldCheck className="w-3 h-3" />
               KYC LEVEL 2
             </Badge>
-            <h1 className="text-xl lg:text-2xl font-bold tracking-tight">Верификация</h1>
+            <h1 className="text-xl lg:text-2xl font-bold tracking-tight">{t('kyc.header.title')}</h1>
             <p className="text-xs text-muted-foreground mt-1">
-              Личность подтверждена • статус: {kycStatus}
+              {t('kyc.header.statusVerified')} {kycStatus}
             </p>
           </header>
           <VerifiedCard />
@@ -741,12 +747,12 @@ export function KycView() {
                 KYC / AML
               </Badge>
               <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                Уровень {kycLevel}
+                {t('kyc.header.level')} {kycLevel}
               </Badge>
             </div>
-            <h1 className="text-xl lg:text-2xl font-bold tracking-tight">Верификация</h1>
+            <h1 className="text-xl lg:text-2xl font-bold tracking-tight">{t('kyc.header.title')}</h1>
             <p className="text-xs text-muted-foreground mt-1">
-              5 шагов для полного доступа • ~5 минут через Госуслуги
+              {t('kyc.header.subtitleGuest')}
             </p>
           </div>
           <EsiaButton onFastTrack={handleEsia} />
@@ -758,10 +764,10 @@ export function KycView() {
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <Fingerprint className="w-4 h-4 text-primary" />
-                Прогресс
+                {t('kyc.progress')}
               </CardTitle>
               <CardDescription className="text-xs">
-                Шаг {Math.min(step + 1, STEPS.length)} из {STEPS.length}
+                {t('kyc.stepWord')} {Math.min(step + 1, STEPS.length)} {t('kyc.of')} {STEPS.length}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -802,10 +808,10 @@ export function KycView() {
                             completed && 'text-foreground'
                           )}
                         >
-                          {s.title}
+                          {t(s.titleKey)}
                         </div>
                         <div className="text-[10px] text-muted-foreground truncate">
-                          {s.desc}
+                          {t(s.descKey)}
                         </div>
                       </div>
                     </li>
@@ -834,9 +840,9 @@ export function KycView() {
                           </div>
                           <div>
                             <CardTitle className="text-base">
-                              Шаг {i + 1}. {s.title}
+                              {t('kyc.stepTitle')} {i + 1}. {t(s.titleKey)}
                             </CardTitle>
-                            <CardDescription className="text-xs mt-0.5">{s.desc}</CardDescription>
+                            <CardDescription className="text-xs mt-0.5">{t(s.descKey)}</CardDescription>
                           </div>
                         </div>
                         <Badge variant="outline" className="text-[10px] shrink-0">
@@ -865,7 +871,7 @@ export function KycView() {
                             onClick={() => setStep(i + 1)}
                             className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
                           >
-                            Далее
+                            {t('kyc.next')}
                             <ChevronRight className="w-4 h-4" />
                           </Button>
                         </div>
@@ -878,7 +884,7 @@ export function KycView() {
                             className="gap-1 text-muted-foreground"
                           >
                             <ChevronLeft className="w-4 h-4" />
-                            Назад
+                            {t('kyc.back')}
                           </Button>
                         </div>
                       )}

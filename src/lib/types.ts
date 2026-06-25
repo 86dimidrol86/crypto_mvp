@@ -16,6 +16,7 @@ export type ViewId =
   | 'admin'
   | 'profile'
   | 'auth'
+  | 'help'
 
 // ─── News & Announcements ───────────────────────────────────────────────────
 export type NewsCategory = 'Регуляторика' | 'Рынок' | 'Платформа' | 'Партнёрство'

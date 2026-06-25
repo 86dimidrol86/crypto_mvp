@@ -28,6 +28,7 @@ import {
   Download,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
+import { useI18n } from '@/lib/use-i18n'
 import { fetchTickers, jitterPrice } from '@/lib/market'
 import { useLiveMarket } from '@/lib/use-live-market'
 import type { CoinTicker, OrderSide, OrderType, Trade } from '@/lib/types'
@@ -71,11 +72,11 @@ const DEFAULT_LEFT_ORDER: BlockId[] = ['chart', 'trades']
 const DEFAULT_RIGHT_ORDER: BlockId[] = ['book', 'form', 'mytrades']
 
 const BLOCK_TITLES: Record<BlockId, string> = {
-  chart: 'График',
-  trades: 'Сделки',
-  book: 'Стакан',
-  form: 'Ордер',
-  mytrades: 'Мои сделки',
+  chart: 'trade.tabs.chart',
+  trades: 'trade.tabs.trades',
+  book: 'trade.tabs.book',
+  form: 'trade.tabs.form',
+  mytrades: 'trade.tabs.mytrades',
 }
 
 const DEFAULT_SIZES = {
@@ -239,7 +240,7 @@ function useTradeLayout() {
     setLeftSizes(DEFAULT_SIZES.left)
     setRightSizes(DEFAULT_SIZES.right)
     setColumns(DEFAULT_SIZES.columns)
-    toast.success('Layout сброшен к значениям по умолчанию')
+    toast.success(t('trade.reset.toast'))
   }, [])
 
   return {
@@ -308,6 +309,7 @@ function SortableBlock({
   id: BlockId
   render: (dragHandle: ReactNode) => ReactNode
 }) {
+  const { t } = useI18n()
   const { attributes, listeners, setNodeRef, isDragging, isOver } = useSortable({ id })
   const dragHandle = (
     <button
@@ -315,8 +317,8 @@ function SortableBlock({
       {...attributes}
       {...listeners}
       className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-primary touch-none flex items-center justify-center shrink-0"
-      aria-label="Перетащить блок"
-      title="Перетащите, чтобы изменить порядок"
+      aria-label={t('trade.drag.aria')}
+      title={t('trade.drag.title')}
     >
       <GripVertical className="w-3.5 h-3.5" />
     </button>
@@ -425,6 +427,7 @@ function ColumnPanelGroup({
 
 // ─── Block: Chart (TradingView iframe, auto-reloads on significant resize) ─
 function ChartBlock({ dragHandle, symbol }: { dragHandle: ReactNode; symbol: string }) {
+  const { t } = useI18n()
   const containerRef = useRef<HTMLDivElement>(null)
   const [reloadKey, setReloadKey] = useState(0)
 
@@ -457,7 +460,7 @@ function ChartBlock({ dragHandle, symbol }: { dragHandle: ReactNode; symbol: str
       <div className="px-2 py-1 border-b border-border flex items-center gap-1.5 shrink-0">
         {dragHandle}
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          График
+          {t('trade.tabs.chart')}
         </span>
         <span className="ml-auto text-[10px] text-muted-foreground font-mono">
           {symbol.replace('BINANCE:', '')}
@@ -539,6 +542,7 @@ interface DepthChartProps {
 }
 
 function DepthChart({ asks, bids, midPrice }: DepthChartProps) {
+  const { t } = useI18n()
   const W = 320
   const H = 60
   const PAD = 2
@@ -546,7 +550,7 @@ function DepthChart({ asks, bids, midPrice }: DepthChartProps) {
   if (asks.length === 0 || bids.length === 0 || midPrice <= 0) {
     return (
       <div className="h-[60px] flex items-center justify-center text-[10px] text-muted-foreground">
-        Загрузка глубины…
+        {t('trade.depth.loading')}
       </div>
     )
   }
@@ -647,6 +651,7 @@ function OrderBook({
   connected: boolean
   dragHandle: ReactNode
 }) {
+  const { t } = useI18n()
   const levels = useMemo(() => {
     if (liveBook && liveBook.asks.length > 0) {
       const asks = liveBook.asks.slice(0, 12)
@@ -686,16 +691,16 @@ function OrderBook({
         <div className="flex items-center gap-1.5 min-w-0">
           {dragHandle}
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Стакан
+            {t('trade.book.title')}
           </span>
           {connected && <LiveBadge />}
         </div>
         <span className="text-[10px] text-muted-foreground font-mono">{pair}</span>
       </div>
       <div className="grid grid-cols-3 px-2 py-1 text-[9px] uppercase tracking-wider text-muted-foreground shrink-0">
-        <span>Цена ₽</span>
-        <span className="text-right">Объём</span>
-        <span className="text-right">Сумма</span>
+        <span>{t('trade.book.price')}</span>
+        <span className="text-right">{t('trade.book.volume')}</span>
+        <span className="text-right">{t('trade.book.sum')}</span>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
         <div className="flex flex-col-reverse">
@@ -724,7 +729,7 @@ function OrderBook({
           <ArrowDownRight className="w-3 h-3 text-muted-foreground" />
         </div>
         <div className="text-right">
-          <div className="text-[9px] text-muted-foreground leading-tight">Спред</div>
+          <div className="text-[9px] text-muted-foreground leading-tight">{t('trade.book.spread')}</div>
           <div className="text-[10px] font-mono tabular-nums leading-tight">
             {spread.toLocaleString('ru-RU', { maximumFractionDigits: decimals })}
             <span className="text-muted-foreground ml-1">({spreadPct.toFixed(3)}%)</span>
@@ -748,7 +753,7 @@ function OrderBook({
       <div className="border-t border-border px-2 pt-1 pb-1.5 shrink-0">
         <div className="flex items-center justify-between mb-0.5">
           <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
-            Глубина
+            {t('trade.depth.title')}
           </span>
           <div className="flex items-center gap-2 text-[9px] text-muted-foreground">
             <span className="flex items-center gap-0.5">
@@ -787,6 +792,7 @@ function RecentTrades({
   connected: boolean
   dragHandle: ReactNode
 }) {
+  const { t } = useI18n()
   const [mockTrades, setMockTrades] = useState<RecentTrade[]>([])
 
   useEffect(() => {
@@ -845,16 +851,16 @@ function RecentTrades({
         <div className="flex items-center gap-1.5 min-w-0">
           {dragHandle}
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Сделки
+            {t('trade.recent.title')}
           </span>
           {connected && <LiveBadge />}
         </div>
         <span className="text-[10px] text-muted-foreground font-mono">{pair}</span>
       </div>
       <div className="grid grid-cols-3 px-2 py-1 text-[9px] uppercase tracking-wider text-muted-foreground border-b border-border shrink-0">
-        <span>Цена ₽</span>
-        <span className="text-right">Объём</span>
-        <span className="text-right">Время</span>
+        <span>{t('trade.recent.price')}</span>
+        <span className="text-right">{t('trade.recent.volume')}</span>
+        <span className="text-right">{t('trade.recent.time')}</span>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
         <div className="flex flex-col">
@@ -895,6 +901,7 @@ function OrderForm({
 }) {
   const balances = useAppStore((s) => s.balances)
   const placeOrder = useAppStore((s) => s.placeOrder)
+  const { t } = useI18n()
   const [side, setSide] = useState<OrderSide>('buy')
   const [orderType, setOrderType] = useState<OrderType>('limit')
   const [inputPrice, setInputPrice] = useState<string>('')
@@ -949,19 +956,19 @@ function OrderForm({
 
   const handleSubmit = () => {
     if (qty <= 0) {
-      toast.error('Введите количество')
+      toast.error(t('trade.toast.qtyRequired'))
       return
     }
     if (orderType === 'limit' && effectivePrice <= 0) {
-      toast.error('Введите корректную цену')
+      toast.error(t('trade.toast.priceInvalid'))
       return
     }
     if (side === 'buy' && total > quoteBalance) {
-      toast.error('Недостаточно средств для покупки')
+      toast.error(t('trade.toast.insufficientRub'))
       return
     }
     if (side === 'sell' && qty > baseBalance) {
-      toast.error(`Недостаточно ${base} для продажи`)
+      toast.error(`${t('trade.toast.insufficientBase')} ${base} ${t('trade.toast.toSell')}`)
       return
     }
     const trade: Trade = placeOrder({
@@ -972,12 +979,12 @@ function OrderForm({
       quantity: qty,
     })
     toast.success(
-      `${side === 'buy' ? 'Куплено' : 'Продано'} ${qty} ${base} по ${effectivePrice.toLocaleString(
+      `${side === 'buy' ? t('trade.toast.bought') : t('trade.toast.sold')} ${qty} ${base} ${t('trade.toast.by')} ${effectivePrice.toLocaleString(
         'ru-RU',
         { minimumFractionDigits: decimals, maximumFractionDigits: decimals }
       )} ₽`,
       {
-        description: `Сумма ${formatNumber(total)} ₽ • комиссия ${formatNumber(fee)} ₽ • ${trade.time}`,
+        description: `${t('trade.toast.desc')} ${formatNumber(total)} ₽ • ${t('trade.toast.feeWord')} ${formatNumber(fee)} ₽ • ${trade.time}`,
       }
     )
     setInputQty('')
@@ -989,7 +996,7 @@ function OrderForm({
       <div className="px-2 py-1 border-b border-border flex items-center gap-1.5 shrink-0">
         {dragHandle}
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Ордер
+          {t('trade.form.title')}
         </span>
         <span className="ml-auto text-[10px] text-muted-foreground font-mono">{pair}</span>
       </div>
@@ -1004,7 +1011,7 @@ function OrderForm({
               : 'bg-muted/60 text-muted-foreground hover:bg-muted'
           )}
         >
-          Купить {base}
+          {t('trade.form.buy')} {base}
         </button>
         <button
           onClick={() => setSide('sell')}
@@ -1015,7 +1022,7 @@ function OrderForm({
               : 'bg-muted/60 text-muted-foreground hover:bg-muted'
           )}
         >
-          Продать {base}
+          {t('trade.form.sell')} {base}
         </button>
       </div>
 
@@ -1028,7 +1035,7 @@ function OrderForm({
               orderType === 'limit' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'
             )}
           >
-            Лимит
+            {t('trade.form.limit')}
           </button>
           <button
             onClick={() => setOrderType('market')}
@@ -1037,12 +1044,12 @@ function OrderForm({
               orderType === 'market' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'
             )}
           >
-            Маркет
+            {t('trade.form.market')}
           </button>
         </div>
 
         <div className="flex items-center justify-between text-[11px]">
-          <span className="text-muted-foreground">Доступно</span>
+          <span className="text-muted-foreground">{t('trade.form.available')}</span>
           <span className="font-mono tabular-nums">
             {formatNumber(available, 6)} {side === 'buy' ? quote : base}
           </span>
@@ -1050,7 +1057,7 @@ function OrderForm({
 
         <div className="space-y-0.5">
           <label className="text-[9px] uppercase tracking-wider text-muted-foreground">
-            Цена {orderType === 'market' && '(рыночная)'}
+            {t('trade.form.price')} {orderType === 'market' && `(${t('trade.form.priceMarket').replace(/^[^(]*\(/, '').replace(/\)$/, '')})`}
           </label>
           <div className="relative">
             <Input
@@ -1059,7 +1066,7 @@ function OrderForm({
               value={orderType === 'market' ? '' : inputPrice}
               onChange={(e) => setInputPrice(e.target.value)}
               disabled={orderType === 'market'}
-              placeholder={orderType === 'market' ? 'По рынку' : ''}
+              placeholder={orderType === 'market' ? t('trade.form.pricePlaceholder') : ''}
               className="pr-10 font-mono tabular-nums h-8 text-xs"
             />
             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
@@ -1070,7 +1077,7 @@ function OrderForm({
 
         <div className="space-y-0.5">
           <label className="text-[9px] uppercase tracking-wider text-muted-foreground">
-            Количество
+            {t('trade.form.quantity')}
           </label>
           <div className="relative">
             <Input
@@ -1115,7 +1122,7 @@ function OrderForm({
 
       <div className="px-2 pb-2 pt-1 shrink-0 border-t border-border space-y-1">
         <div className="flex justify-between items-start text-[11px]">
-          <span className="text-muted-foreground pt-0.5">Объём</span>
+          <span className="text-muted-foreground pt-0.5">{t('trade.form.amount')}</span>
           <div className="text-right">
             <div className="font-mono tabular-nums">
               {formatNumber(qty, 6)} {base}
@@ -1126,20 +1133,20 @@ function OrderForm({
           </div>
         </div>
         <div className="flex justify-between text-[11px]">
-          <span className="text-muted-foreground">Итого</span>
+          <span className="text-muted-foreground">{t('trade.form.total')}</span>
           <span className="font-mono tabular-nums">
             {formatNumber(total)} {quote}
           </span>
         </div>
         <div className="flex justify-between text-[11px]">
           <span className="flex items-center gap-1 text-foreground/70">
-            Комиссия 0.2%
+            {t('trade.form.fee')}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Info className="w-3 h-3 cursor-help text-muted-foreground hover:text-primary transition" />
               </TooltipTrigger>
               <TooltipContent side="top" className="text-xs max-w-[220px]">
-                Taker-комиссия 0.2% от суммы сделки. Для maker-ордеров (ликвидность) — 0.06%.
+                {t('trade.form.feeInfo')}
               </TooltipContent>
             </Tooltip>
           </span>
@@ -1154,11 +1161,11 @@ function OrderForm({
             side === 'buy' ? 'bg-success hover:bg-success/90' : 'bg-destructive hover:bg-destructive/90'
           )}
         >
-          {side === 'buy' ? 'Купить' : 'Продать'} {base}
+          {side === 'buy' ? t('trade.form.submitBuy') : t('trade.form.submitSell')} {base}
         </Button>
         {ticker && (
           <div className="text-[10px] text-muted-foreground text-center">
-            ≈ {formatPrice(ticker.priceUsd, 'usd')} за 1 {base}
+            ≈ {formatPrice(ticker.priceUsd, 'usd')} {t('trade.form.approx')} {base}
           </div>
         )}
       </div>
@@ -1233,11 +1240,11 @@ function MyTrades({ pair, dragHandle }: { pair: string; dragHandle: ReactNode })
 
   const handleCsv = () => {
     if (orders.length === 0) {
-      toast.error('Нет сделок для экспорта')
+      toast.error(t('trade.mytrades.exportEmpty'))
       return
     }
     downloadTradesCsv(orders)
-    toast.success(`Экспортировано ${orders.length} сделок в CSV`)
+    toast.success(`${t('trade.mytrades.exported')} ${orders.length} ${t('trade.mytrades.exportedSuffix')}`)
   }
 
   const FilterBtn = ({
@@ -1267,7 +1274,7 @@ function MyTrades({ pair, dragHandle }: { pair: string; dragHandle: ReactNode })
       <div className="px-2 py-1 border-b border-border flex items-center gap-1.5 shrink-0">
         {dragHandle}
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Мои сделки
+          {t('trade.mytrades.title')}
         </span>
         <span className="text-[10px] text-muted-foreground/70 font-mono">{pair}</span>
         <div className="ml-auto flex items-center gap-1">
@@ -1277,14 +1284,14 @@ function MyTrades({ pair, dragHandle }: { pair: string; dragHandle: ReactNode })
                 <button
                   onClick={handleCsv}
                   className="p-1 rounded hover:bg-muted/60 text-muted-foreground hover:text-primary transition disabled:opacity-40"
-                  aria-label="Скачать CSV"
+                  aria-label={t('trade.mytrades.downloadAria')}
                   disabled={orders.length === 0}
                 >
                   <Download className="w-3.5 h-3.5" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">
-                Скачать CSV (все сделки: {orders.length})
+                {t('trade.mytrades.download')} {orders.length})
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -1295,25 +1302,25 @@ function MyTrades({ pair, dragHandle }: { pair: string; dragHandle: ReactNode })
       <div className="px-2 py-1 border-b border-border/60 flex items-center gap-2 shrink-0 flex-wrap">
         <div className="flex items-center gap-0.5">
           <FilterBtn active={sideFilter === 'all'} onClick={() => setSideFilter('all')}>
-            Все
+            {t('trade.mytrades.filterAll')}
           </FilterBtn>
           <FilterBtn active={sideFilter === 'buy'} onClick={() => setSideFilter('buy')}>
-            Покупки
+            {t('trade.mytrades.filterBuys')}
           </FilterBtn>
           <FilterBtn active={sideFilter === 'sell'} onClick={() => setSideFilter('sell')}>
-            Продажи
+            {t('trade.mytrades.filterSells')}
           </FilterBtn>
         </div>
         <span className="w-px h-3 bg-border" />
         <div className="flex items-center gap-0.5">
           <FilterBtn active={dateFilter === 'today'} onClick={() => setDateFilter('today')}>
-            Сегодня
+            {t('trade.mytrades.filterToday')}
           </FilterBtn>
           <FilterBtn active={dateFilter === '7d'} onClick={() => setDateFilter('7d')}>
-            7д
+            {t('trade.mytrades.filter7d')}
           </FilterBtn>
           <FilterBtn active={dateFilter === 'all'} onClick={() => setDateFilter('all')}>
-            Всё
+            {t('trade.mytrades.filterAllTime')}
           </FilterBtn>
         </div>
         <div className="ml-auto text-[10px] text-muted-foreground font-mono tabular-nums">
@@ -1328,12 +1335,12 @@ function MyTrades({ pair, dragHandle }: { pair: string; dragHandle: ReactNode })
               <CandlestickChart className="w-5 h-5 text-primary" />
             </div>
             <p className="text-[11px] font-semibold text-foreground/80">
-              {pairOrders.length === 0 ? 'Пока нет сделок' : 'Ничего не найдено'}
+              {pairOrders.length === 0 ? t('trade.mytrades.empty') : t('common.notFound')}
             </p>
             <p className="text-[10px] text-muted-foreground leading-snug">
               {pairOrders.length === 0
-                ? 'Создайте ордер в форме выше, чтобы увидеть историю здесь'
-                : 'Измените фильтры, чтобы увидеть больше записей'}
+                ? t('trade.mytrades.emptyHint')
+                : t('trade.mytrades.emptyFilter')}
             </p>
           </div>
         </div>
@@ -1354,7 +1361,7 @@ function MyTrades({ pair, dragHandle }: { pair: string; dragHandle: ReactNode })
                         isBuy ? 'bg-success/20 text-success' : 'bg-destructive/20 text-destructive'
                       )}
                     >
-                      {isBuy ? 'Купить' : 'Продать'}
+                      {isBuy ? t('trade.form.submitBuy') : t('trade.form.submitSell')}
                     </Badge>
                   </div>
                   <div className="col-span-3 font-mono tabular-nums">
@@ -1488,7 +1495,7 @@ export function TradeView() {
 
   return (
     <div className="flex-1 bg-background">
-      <div className="mx-auto max-w-[1600px] px-2 lg:px-3 py-2">
+      <div className="px-2 lg:px-3 py-2">
         {/* Top pair bar (compact) */}
         <div className="flex flex-wrap items-center gap-2 lg:gap-4 mb-2 p-2 bg-card border border-border rounded-lg">
           <DropdownMenu>
@@ -1552,13 +1559,13 @@ export function TradeView() {
               {formatPercent(change24h)}
             </span>
             <span className="text-[9px] uppercase tracking-wider text-muted-foreground hidden sm:inline">
-              24ч
+              {t('trade.chart.24h')}
             </span>
           </div>
 
           <div className="hidden md:flex items-center gap-3 ml-auto text-[11px]">
             <div>
-              <span className="text-muted-foreground">Макс: </span>
+              <span className="text-muted-foreground">{t('trade.chart.max')}</span>
               <span className="font-mono tabular-nums">
                 {ticker?.high24h
                   ? formatPrice(ticker.high24h * (livePrice / ticker.priceRub || 1), 'rub')
@@ -1566,7 +1573,7 @@ export function TradeView() {
               </span>
             </div>
             <div>
-              <span className="text-muted-foreground">Мин: </span>
+              <span className="text-muted-foreground">{t('trade.chart.min')}</span>
               <span className="font-mono tabular-nums">
                 {ticker?.low24h
                   ? formatPrice(ticker.low24h * (livePrice / ticker.priceRub || 1), 'rub')
@@ -1574,7 +1581,7 @@ export function TradeView() {
               </span>
             </div>
             <div>
-              <span className="text-muted-foreground">Объём: </span>
+              <span className="text-muted-foreground">{t('trade.chart.vol')}</span>
               <span className="font-mono tabular-nums">{formatPrice(volume24h, 'rub')}</span>
             </div>
           </div>
@@ -1584,10 +1591,10 @@ export function TradeView() {
             size="sm"
             onClick={layout.reset}
             className="md:ml-0 ml-auto h-8 gap-1.5 text-[11px] text-muted-foreground hover:text-primary"
-            title="Сбросить layout"
+            title={t('trade.reset')}
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Сбросить layout</span>
+            <span className="hidden sm:inline">{t('trade.reset')}</span>
           </Button>
         </div>
 

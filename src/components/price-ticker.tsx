@@ -6,6 +6,7 @@ import { fetchTickers } from '@/lib/market'
 import type { CoinTicker } from '@/lib/types'
 import { formatPrice } from '@/lib/format'
 import { useAppStore } from '@/lib/store'
+import { useI18n } from '@/lib/use-i18n'
 import { cn } from '@/lib/utils'
 import { useMounted } from '@/lib/use-mounted'
 
@@ -16,6 +17,7 @@ export function PriceTicker() {
   const setSelectedPair = useAppStore((s) => s.setSelectedPair)
   const setView = useAppStore((s) => s.setView)
   const mounted = useMounted()
+  const { t } = useI18n()
 
   useEffect(() => {
     let mounted = true
@@ -96,7 +98,7 @@ export function PriceTicker() {
         ) : (
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground py-0.5">
             <span className="inline-block w-2 h-2 rounded-full bg-primary/40 animate-pulse" />
-            Загрузка котировок…
+            {t('header.loading')}
           </div>
         )}
       </div>

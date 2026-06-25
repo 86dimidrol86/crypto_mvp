@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/lib/store'
+import { useI18n } from '@/lib/use-i18n'
 import { useApi, apiPatch } from '@/lib/use-api'
 import { useMounted } from '@/lib/use-mounted'
 import type {
@@ -37,41 +38,41 @@ import { AlertCardSkeleton } from '@/components/page-skeleton'
 
 const SEVERITY_CONFIG: Record<
   AlertSeverity,
-  { color: string; stripe: string; bg: string; label: string }
+  { color: string; stripe: string; bg: string; labelKey: string }
 > = {
   CRITICAL: {
     color: 'text-destructive',
     stripe: 'bg-destructive',
     bg: 'bg-destructive/10',
-    label: 'Критический',
+    labelKey: 'compliance.severity.critical',
   },
   HIGH: {
     color: 'text-orange-400',
     stripe: 'bg-orange-500',
     bg: 'bg-orange-500/10',
-    label: 'Высокий',
+    labelKey: 'compliance.severity.high',
   },
   MEDIUM: {
     color: 'text-warning',
     stripe: 'bg-warning',
     bg: 'bg-warning/10',
-    label: 'Средний',
+    labelKey: 'compliance.severity.medium',
   },
   LOW: {
     color: 'text-sky-400',
     stripe: 'bg-sky-500',
     bg: 'bg-sky-500/10',
-    label: 'Низкий',
+    labelKey: 'compliance.severity.low',
   },
 }
 
-const STATUS_LABEL: Record<AlertStatus, string> = {
-  OPEN: 'Открыт',
-  REVIEWING: 'На рассмотрении',
-  APPROVED: 'Одобрен',
-  REJECTED: 'Отклонён',
-  ESCALATED: 'Эскалирован',
-  SAR: 'SAR-отчёт',
+const STATUS_LABEL_KEY: Record<AlertStatus, string> = {
+  OPEN: 'compliance.status.OPEN',
+  REVIEWING: 'compliance.status.REVIEWING',
+  APPROVED: 'compliance.status.APPROVED',
+  REJECTED: 'compliance.status.REJECTED',
+  ESCALATED: 'compliance.status.ESCALATED',
+  SAR: 'compliance.status.SAR',
 }
 
 const STATUS_COLOR: Record<AlertStatus, string> = {
@@ -83,13 +84,21 @@ const STATUS_COLOR: Record<AlertStatus, string> = {
   SAR: 'border-violet-500/40 text-violet-400 bg-violet-500/10',
 }
 
-const TYPE_LABEL: Record<string, string> = {
-  STRUCTURING: 'Структурирование',
-  VELOCITY: 'Скорость операций',
-  SANCTION: 'Санкционный список',
-  THRESHOLD: 'Превышение порога',
-  MIXING: 'Миксер',
-  PEP: 'PEP-лицо',
+const TYPE_LABEL_KEY: Record<string, string> = {
+  STRUCTURING: 'compliance.type.STRUCTURING',
+  VELOCITY: 'compliance.type.VELOCITY',
+  SANCTION: 'compliance.type.SANCTION',
+  THRESHOLD: 'compliance.type.THRESHOLD',
+  MIXING: 'compliance.type.MIXING',
+  PEP: 'compliance.type.PEP',
+}
+
+function timeAgoShort(iso: string, t: (k: string) => string): string {
+  const sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (sec < 60) return `${sec}${t('compliance.time.sec')}`
+  if (sec < 3600) return `${Math.floor(sec / 60)}${t('compliance.time.min')}`
+  if (sec < 86400) return `${Math.floor(sec / 3600)}${t('compliance.time.hour')}`
+  return `${Math.floor(sec / 86400)}${t('compliance.time.day')}`
 }
 
 function StatCard({
@@ -143,6 +152,7 @@ function AlertListItem({
   active: boolean
   onClick: () => void
 }) {
+  const { t } = useI18n()
   const sev = SEVERITY_CONFIG[alert.severity]
   const mounted = useMounted()
   return (
@@ -166,14 +176,14 @@ function AlertListItem({
               variant="outline"
               className={cn('text-[9px] uppercase shrink-0', sev.color, sev.bg, 'border-current/30')}
             >
-              {alert.severity}
+              {t(sev.labelKey)}
             </Badge>
             <span className="text-[11px] text-muted-foreground truncate">
-              {TYPE_LABEL[alert.type] || alert.type}
+              {TYPE_LABEL_KEY[alert.type] ? t(TYPE_LABEL_KEY[alert.type]) : alert.type}
             </span>
           </div>
           <Badge variant="outline" className={cn('text-[9px] shrink-0', STATUS_COLOR[alert.status])}>
-            {STATUS_LABEL[alert.status]}
+            {t(STATUS_LABEL_KEY[alert.status])}
           </Badge>
         </div>
         <div className="flex items-end justify-between gap-2">
@@ -194,7 +204,7 @@ function AlertListItem({
           </span>
           <span className="text-[10px] text-muted-foreground flex items-center gap-1">
             <Clock className="w-2.5 h-2.5" />
-            {mounted ? timeAgoShort(alert.createdAt) : ''}
+            {mounted ? timeAgoShort(alert.createdAt, t) : ''}
           </span>
         </div>
       </div>
@@ -202,19 +212,12 @@ function AlertListItem({
   )
 }
 
-function timeAgoShort(iso: string): string {
-  const sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-  if (sec < 60) return `${sec}с`
-  if (sec < 3600) return `${Math.floor(sec / 60)}м`
-  if (sec < 86400) return `${Math.floor(sec / 3600)}ч`
-  return `${Math.floor(sec / 86400)}д`
-}
-
 function ShapExplainer({ alert }: { alert: ComplianceAlert }) {
+  const { t } = useI18n()
   if (!alert.shap || alert.shap.length === 0) {
     return (
       <div className="text-xs text-muted-foreground italic">
-        SHAP-объяснения недоступны для данного алерта.
+        {t('compliance.shap.empty')}
       </div>
     )
   }
@@ -264,10 +267,10 @@ function ShapExplainer({ alert }: { alert: ComplianceAlert }) {
       })}
       <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1.5 border-t border-border/60">
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-sm bg-destructive/70" /> ↑ повышает риск
+          <span className="w-2 h-2 rounded-sm bg-destructive/70" /> ↑ {t('compliance.shap.increase')}
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-sm bg-success/70" /> ↓ снижает риск
+          <span className="w-2 h-2 rounded-sm bg-success/70" /> ↓ {t('compliance.shap.decrease')}
         </span>
       </div>
     </div>
@@ -281,6 +284,7 @@ function AlertDetail({
   alert: ComplianceAlert
   onReviewed?: () => void
 }) {
+  const { t } = useI18n()
   const reviewAlert = useAppStore((s) => s.reviewAlert)
   const pushNotification = useAppStore((s) => s.pushNotification)
   const mounted = useMounted()
@@ -290,7 +294,7 @@ function AlertDetail({
   const isOpen = alert.status === 'OPEN' || alert.status === 'REVIEWING'
   const isCritical = alert.severity === 'CRITICAL'
 
-  const handleAction = async (status: AlertStatus, label: string, toastMsg?: string) => {
+  const handleAction = async (status: AlertStatus, labelKey: string, toastKey?: string) => {
     // Persist review decision via API (resilience: still mirror locally on failure)
     try {
       await apiPatch('/api/compliance', { id: alert.id, status })
@@ -298,11 +302,11 @@ function AlertDetail({
       // Ignore API error — local store update is still applied
     }
     reviewAlert(alert.id, status)
-    pushNotification(`Алерт ${label}`, `${TYPE_LABEL[alert.type] || alert.type} • ${alert.ruleId}`)
-    if (toastMsg) {
-      toast.success(toastMsg)
+    pushNotification(`${t('compliance.toast.alertWord')} ${t(labelKey)}`, `${TYPE_LABEL_KEY[alert.type] ? t(TYPE_LABEL_KEY[alert.type]) : alert.type} • ${alert.ruleId}`)
+    if (toastKey) {
+      toast.success(t(toastKey))
     } else {
-      toast.success(`Алерт переведён в статус: ${STATUS_LABEL[status]}`)
+      toast.success(`${t('compliance.toast.statusChanged')} ${t(STATUS_LABEL_KEY[status])}`)
     }
     onReviewed?.()
   }
@@ -323,7 +327,7 @@ function AlertDetail({
             </div>
             <div className="min-w-0">
               <CardTitle className="text-base truncate">
-                {TYPE_LABEL[alert.type] || alert.type}
+                {TYPE_LABEL_KEY[alert.type] ? t(TYPE_LABEL_KEY[alert.type]) : alert.type}
               </CardTitle>
               <CardDescription className="text-xs font-mono mt-0.5">
                 {alert.ruleId || '—'} • {alert.entityType}
@@ -332,10 +336,10 @@ function AlertDetail({
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
             <Badge variant="outline" className={cn('text-[10px]', STATUS_COLOR[alert.status])}>
-              {STATUS_LABEL[alert.status]}
+              {t(STATUS_LABEL_KEY[alert.status])}
             </Badge>
             <Badge variant="outline" className={cn('text-[10px] uppercase', sev.color, sev.bg)}>
-              {alert.severity}
+              {t(sev.labelKey)}
             </Badge>
           </div>
         </div>
@@ -364,7 +368,7 @@ function AlertDetail({
         <div className="grid grid-cols-2 gap-2.5 text-xs">
           <div className="p-2.5 rounded-lg border border-border bg-muted/20">
             <div className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">
-              Тип сущности
+              {t('compliance.detail.entityType')}
             </div>
             <div className="font-medium capitalize">{alert.entityType}</div>
             {alert.entityId && (
@@ -375,11 +379,11 @@ function AlertDetail({
           </div>
           <div className="p-2.5 rounded-lg border border-border bg-muted/20">
             <div className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">
-              Создан
+              {t('compliance.detail.created')}
             </div>
             <div className="font-medium">{mounted ? new Date(alert.createdAt).toLocaleString('ru-RU') : '—'}</div>
             <div className="text-[10px] text-muted-foreground mt-0.5">
-              {mounted ? `${timeAgoShort(alert.createdAt)} назад` : ''}
+              {mounted ? `${timeAgoShort(alert.createdAt, t)} ${t('compliance.time.ago')}` : ''}
             </div>
           </div>
         </div>
@@ -394,9 +398,9 @@ function AlertDetail({
                 <Brain className="w-3.5 h-3.5" />
               </div>
               <div>
-                <div className="text-sm font-medium">SHAP объяснение</div>
+                <div className="text-sm font-medium">{t('compliance.detail.shapTitle')}</div>
                 <div className="text-[10px] text-muted-foreground">
-                  ML-интерпретация решения • для регулятора
+                  {t('compliance.detail.shapSubtitle')}
                 </div>
               </div>
             </div>
@@ -411,34 +415,34 @@ function AlertDetail({
         {isOpen && (
           <div className="space-y-2 pt-1.5">
             <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Действия
+              {t('compliance.actions.title')}
             </div>
             <div className="grid grid-cols-2 gap-2">
               <Button
                 size="sm"
-                onClick={() => handleAction('APPROVED', 'одобрен')}
+                onClick={() => handleAction('APPROVED', 'compliance.actions.approveToast')}
                 className="h-9 gap-1.5 bg-success text-success-foreground hover:bg-success/90"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                Одобрить
+                {t('compliance.actions.approve')}
               </Button>
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleAction('REJECTED', 'отклонён')}
+                onClick={() => handleAction('REJECTED', 'compliance.actions.rejectToast')}
                 className="h-9 gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10"
               >
                 <XCircle className="w-3.5 h-3.5" />
-                Отклонить
+                {t('compliance.actions.reject')}
               </Button>
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleAction('ESCALATED', 'эскалирован')}
+                onClick={() => handleAction('ESCALATED', 'compliance.actions.escalateToast')}
                 className="h-9 gap-1.5 border-orange-500/40 text-orange-400 hover:bg-orange-500/10"
               >
                 <ArrowUpRight className="w-3.5 h-3.5" />
-                Эскалировать
+                {t('compliance.actions.escalate')}
               </Button>
               <Button
                 size="sm"
@@ -446,14 +450,14 @@ function AlertDetail({
                 onClick={() =>
                   handleAction(
                     'SAR',
-                    'переведён в SAR',
-                    'SAR-отчёт сформирован для Росфинмониторинга'
+                    'compliance.actions.sarToast1',
+                    'compliance.actions.sarToast2'
                   )
                 }
                 className="h-9 gap-1.5 border-violet-500/40 text-violet-400 hover:bg-violet-500/10"
               >
                 <FileWarning className="w-3.5 h-3.5" />
-                SAR-отчёт
+                {t('compliance.actions.sar')}
               </Button>
             </div>
           </div>
@@ -463,7 +467,7 @@ function AlertDetail({
           <div className="flex items-center gap-2 p-2.5 rounded-lg border border-border bg-muted/20 text-xs">
             <Lock className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-muted-foreground">
-              Алерт обработан • действия заблокированы
+              {t('compliance.actions.handled')}
             </span>
           </div>
         )}
@@ -473,11 +477,10 @@ function AlertDetail({
             <ShieldX className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
             <div className="text-xs">
               <div className="font-medium text-destructive">
-                Критический алерт — требуется карантин
+                {t('compliance.actions.criticalQuarantine')}
               </div>
               <div className="text-muted-foreground mt-0.5">
-                Перевод в карантин замораживает связанный актив до 2-факторного
-                подтверждения (Compliance + Risk Manager).
+                {t('compliance.actions.quarantineDesc')}
               </div>
             </div>
           </div>
@@ -488,16 +491,16 @@ function AlertDetail({
 }
 
 function EmptyDetail() {
+  const { t } = useI18n()
   return (
     <Card className="bg-card/40 border-dashed">
       <CardContent className="flex flex-col items-center justify-center py-16 text-center">
         <div className="w-14 h-14 rounded-2xl bg-muted/40 flex items-center justify-center mb-3">
           <Scale className="w-6 h-6 text-muted-foreground" />
         </div>
-        <div className="text-sm font-medium">Выберите алерт</div>
+        <div className="text-sm font-medium">{t('compliance.empty.title')}</div>
         <div className="text-xs text-muted-foreground mt-1 max-w-xs">
-          Кликните по элементу списка слева, чтобы увидеть детали, SHAP-объяснение
-          и доступные действия.
+          {t('compliance.empty.desc')}
         </div>
       </CardContent>
     </Card>
@@ -505,6 +508,7 @@ function EmptyDetail() {
 }
 
 function QuarantineCard({ alerts }: { alerts: ComplianceAlert[] }) {
+  const { t } = useI18n()
   const criticalOpen = alerts.filter(
     (a) => a.severity === 'CRITICAL' && (a.status === 'OPEN' || a.status === 'REVIEWING')
   ).length
@@ -518,22 +522,20 @@ function QuarantineCard({ alerts }: { alerts: ComplianceAlert[] }) {
           </div>
           <div className="text-sm">
             <div className="font-semibold mb-0.5 flex items-center gap-2">
-              Карантин активов (m-of-n)
+              {t('compliance.quarantine.title')}
               <Badge variant="outline" className="text-[10px] border-destructive/30 text-destructive">
                 2-of-2
               </Badge>
             </div>
             <p className="text-muted-foreground text-xs leading-relaxed max-w-xl">
-              Критические алерты блокируют связанный актив до 2-факторного подтверждения
-              (Compliance Officer + Risk Manager). Подтверждение фиксируется в
-              WORM-аудите и доступно регулятору.
+              {t('compliance.quarantine.desc')}
             </p>
             <div className="flex flex-wrap gap-2.5 mt-2 text-[11px] text-muted-foreground">
               <span className="flex items-center gap-1">
-                <ShieldAlert className="w-3 h-3" /> Критических в работе: {criticalOpen}
+                <ShieldAlert className="w-3 h-3" /> {t('compliance.quarantine.criticalInWork')} {criticalOpen}
               </span>
               <span className="flex items-center gap-1">
-                <FileText className="w-3 h-3" /> Авто-отчёт в Росфинмониторинг
+                <FileText className="w-3 h-3" /> {t('compliance.quarantine.autoReport')}
               </span>
             </div>
           </div>
@@ -543,13 +545,13 @@ function QuarantineCard({ alerts }: { alerts: ComplianceAlert[] }) {
           className="shrink-0 border-destructive/40 text-destructive hover:bg-destructive/10 gap-2"
           disabled={criticalOpen === 0}
           onClick={() =>
-            toast.success('Перевод в карантин', {
-              description: 'Актив заморожен до 2-факторного подтверждения',
+            toast.success(t('compliance.quarantine.toast.title'), {
+              description: t('compliance.quarantine.toast.desc'),
             })
           }
         >
           <Lock className="w-4 h-4" />
-          Перевести в карантин
+          {t('compliance.quarantine.btn')}
         </Button>
       </CardContent>
     </Card>
@@ -557,6 +559,7 @@ function QuarantineCard({ alerts }: { alerts: ComplianceAlert[] }) {
 }
 
 export function ComplianceView() {
+  const { t } = useI18n()
   const storeAlerts = useAppStore((s) => s.alerts)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -625,23 +628,23 @@ export function ComplianceView() {
                 AML CONSOLE
               </Badge>
               <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                115-ФЗ
+                {t('compliance.header.115fz')}
               </Badge>
               <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                Росфинмониторинг
+                {t('compliance.header.rosfin')}
               </Badge>
               {!showSkeleton && stats.openCount > 0 && (
                 <Badge variant="destructive" className="text-[10px] gap-1">
                   <Activity className="w-3 h-3" />
-                  {stats.openCount} активных
+                  {stats.openCount} {t('compliance.header.activeWord')}
                 </Badge>
               )}
             </div>
             <h1 className="text-xl lg:text-2xl font-bold tracking-tight">
-              Комплаенс-консоль
+              {t('compliance.header.title')}
             </h1>
             <p className="text-xs text-muted-foreground mt-1">
-              AML-мониторинг • 115-ФЗ • Росфинмониторинг
+              {t('compliance.header.subtitle')}
             </p>
           </div>
         </header>
@@ -651,28 +654,28 @@ export function ComplianceView() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <StatCard
               icon={AlertTriangle}
-              label="Открытые алерты"
+              label={t('compliance.kpi.openAlerts')}
               value={stats.openCount}
-              sub={`${alerts.length} всего в системе`}
+              sub={`${alerts.length} ${t('compliance.kpi.openAlertsSub')}`}
               tone="warning"
             />
             <StatCard
               icon={ShieldAlert}
-              label="Критические"
+              label={t('compliance.kpi.critical')}
               value={stats.criticalCount}
-              sub="требуют немедленного действия"
+              sub={t('compliance.kpi.criticalSub')}
               tone="danger"
             />
             <StatCard
               icon={Activity}
-              label="Средний risk score"
+              label={t('compliance.kpi.avgRisk')}
               value={`${stats.avgRisk}%`}
-              sub="по открытым алертам"
+              sub={t('compliance.kpi.avgRiskSub')}
               tone={stats.avgRisk > 70 ? 'danger' : 'warning'}
             />
             <StatCard
               icon={CheckCircle2}
-              label="Обработано сегодня"
+              label={t('compliance.kpi.handledToday')}
               value={stats.processedToday}
               sub="APPROVED / REJECTED / SAR"
               tone="success"
@@ -688,7 +691,7 @@ export function ComplianceView() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Activity className="w-4 h-4 text-primary" />
-                  Лента алертов
+                  {t('compliance.feed.title')}
                 </CardTitle>
                 <Badge variant="outline" className="text-[10px]">
                   {showSkeleton ? '—' : sortedAlerts.length}
@@ -705,9 +708,9 @@ export function ComplianceView() {
                   <div className="w-12 h-12 rounded-2xl bg-success/10 flex items-center justify-center mb-2.5">
                     <CheckCircle2 className="w-6 h-6 text-success" />
                   </div>
-                  <div className="text-sm font-medium">Нет алертов</div>
+                  <div className="text-sm font-medium">{t('compliance.feed.empty')}</div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    AML-мониторинг не выявил подозрительной активности
+                    {t('compliance.feed.emptyHint')}
                   </div>
                 </div>
               ) : (
@@ -736,10 +739,9 @@ export function ComplianceView() {
                 <div className="w-14 h-14 rounded-2xl bg-muted/40 flex items-center justify-center mb-3">
                   <Scale className="w-6 h-6 text-muted-foreground" />
                 </div>
-                <div className="text-sm font-medium">Загрузка деталей алерта…</div>
+                <div className="text-sm font-medium">{t('compliance.detail.loading')}</div>
                 <div className="text-xs text-muted-foreground mt-1 max-w-xs">
-                  Данные комплаенс-консоли загружаются из БД. SHAP-объяснение и действия
-                  появятся через мгновение.
+                  {t('compliance.detail.loadingHint')}
                 </div>
               </CardContent>
             </Card>
@@ -757,15 +759,15 @@ export function ComplianceView() {
         <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[11px] text-muted-foreground pt-1.5">
           <span className="flex items-center gap-1.5">
             <Brain className="w-3 h-3 text-violet-400" />
-            ML-модель: Gradient Boosting • SHAP v0.45
+            {t('compliance.footer.ml')}
           </span>
           <span className="flex items-center gap-1.5">
             <FileText className="w-3 h-3 text-primary" />
-            WORM-аудит • Merkle Root 0x8f3a…b2c1
+            {t('compliance.footer.worm')}
           </span>
           <span className="flex items-center gap-1.5">
             <CheckCircle2 className="w-3 h-3 text-success" />
-            Отчётность в Росфинмониторинг 24/7
+            {t('compliance.footer.report')}
           </span>
         </div>
       </div>

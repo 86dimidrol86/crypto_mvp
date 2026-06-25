@@ -78,7 +78,9 @@ interface AppState {
   isAuthed: boolean
   userEmail: string | null
   userName: string | null
-  login: (email: string, name?: string) => void
+  userRole: string
+  userId: string | null
+  login: (email: string, name?: string, role?: string, id?: string) => void
   logout: () => void
 
   // kyc
@@ -425,9 +427,17 @@ export const useAppStore = create<AppState>()(
       isAuthed: false,
       userEmail: null,
       userName: null,
-      login: (email, name) =>
-        set({ isAuthed: true, userEmail: email, userName: name || email.split('@')[0] }),
-      logout: () => set({ isAuthed: false, userEmail: null, userName: null }),
+      userRole: 'USER',
+      userId: null,
+      login: (email, name, role, id) =>
+        set({
+          isAuthed: true,
+          userEmail: email,
+          userName: name || email.split('@')[0],
+          userRole: role || 'USER',
+          userId: id || null,
+        }),
+      logout: () => set({ isAuthed: false, userEmail: null, userName: null, userRole: 'USER', userId: null }),
 
       kycLevel: 0,
       kycStatus: 'UNINITIATED',
@@ -813,6 +823,8 @@ export const useAppStore = create<AppState>()(
         isAuthed: s.isAuthed,
         userEmail: s.userEmail,
         userName: s.userName,
+        userRole: s.userRole,
+        userId: s.userId,
         kycLevel: s.kycLevel,
         kycStatus: s.kycStatus,
         balances: s.balances,

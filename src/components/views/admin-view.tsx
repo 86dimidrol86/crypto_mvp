@@ -32,6 +32,7 @@ import {
 } from 'recharts'
 import { toast } from 'sonner'
 import { useApi } from '@/lib/use-api'
+import { useI18n } from '@/lib/use-i18n'
 import { useMounted } from '@/lib/use-mounted'
 import { useAppStore } from '@/lib/store'
 import { formatNumber, formatPrice, timeAgo } from '@/lib/format'
@@ -121,14 +122,14 @@ const tooltipStyle = {
   color: 'var(--foreground)',
 }
 
-const PAYMENT_STATUS_LABEL: Record<string, string> = {
-  INITIATED: 'Инициирован',
-  CC_PENDING: 'Проверка КС',
-  LIQUIDITY: 'Ликвидность',
-  CONVERTING: 'Конвертация',
-  SENDING: 'Отправка',
-  SETTLED: 'Исполнен',
-  FAILED: 'Ошибка',
+const PAYMENT_STATUS_LABEL_KEY: Record<string, string> = {
+  INITIATED: 'admin.status.INITIATED',
+  CC_PENDING: 'admin.status.CC_PENDING',
+  LIQUIDITY: 'admin.status.LIQUIDITY',
+  CONVERTING: 'admin.status.CONVERTING',
+  SENDING: 'admin.status.SENDING',
+  SETTLED: 'admin.status.SETTLED',
+  FAILED: 'admin.status.FAILED',
 }
 
 const PAYMENT_STATUS_COLOR: Record<string, string> = {
@@ -141,13 +142,13 @@ const PAYMENT_STATUS_COLOR: Record<string, string> = {
   FAILED: 'border-destructive/40 text-destructive bg-destructive/10',
 }
 
-const ALERT_STATUS_LABEL: Record<string, string> = {
-  OPEN: 'Открыт',
-  REVIEWING: 'На рассмотрении',
-  APPROVED: 'Одобрен',
-  REJECTED: 'Отклонён',
-  ESCALATED: 'Эскалирован',
-  SAR: 'SAR-отчёт',
+const ALERT_STATUS_LABEL_KEY: Record<string, string> = {
+  OPEN: 'admin.status.OPEN',
+  REVIEWING: 'admin.status.REVIEWING',
+  APPROVED: 'admin.status.APPROVED',
+  REJECTED: 'admin.status.REJECTED',
+  ESCALATED: 'admin.status.ESCALATED',
+  SAR: 'admin.status.SAR',
 }
 
 const ALERT_STATUS_COLOR: Record<string, string> = {
@@ -161,42 +162,42 @@ const ALERT_STATUS_COLOR: Record<string, string> = {
 
 const SEVERITY_CONFIG: Record<
   string,
-  { color: string; stripe: string; bg: string; label: string }
+  { color: string; stripe: string; bg: string; labelKey: string }
 > = {
   CRITICAL: {
     color: 'text-destructive',
     stripe: 'bg-destructive',
     bg: 'bg-destructive/10',
-    label: 'Критический',
+    labelKey: 'admin.severity.critical',
   },
   HIGH: {
     color: 'text-orange-400',
     stripe: 'bg-orange-500',
     bg: 'bg-orange-500/10',
-    label: 'Высокий',
+    labelKey: 'admin.severity.high',
   },
   MEDIUM: {
     color: 'text-warning',
     stripe: 'bg-warning',
     bg: 'bg-warning/10',
-    label: 'Средний',
+    labelKey: 'admin.severity.medium',
   },
   LOW: {
     color: 'text-sky-400',
     stripe: 'bg-sky-500',
     bg: 'bg-sky-500/10',
-    label: 'Низкий',
+    labelKey: 'admin.severity.low',
   },
 }
 
-const TYPE_LABEL: Record<string, string> = {
-  STRUCTURING: 'Структурирование',
-  VELOCITY: 'Скорость операций',
-  SANCTION: 'Санкционный список',
-  THRESHOLD: 'Превышение порога',
-  PATTERN: 'Нетипичный паттерн',
-  MIXING: 'Миксер',
-  PEP: 'PEP-лицо',
+const TYPE_LABEL_KEY: Record<string, string> = {
+  STRUCTURING: 'admin.type.STRUCTURING',
+  VELOCITY: 'admin.type.VELOCITY',
+  SANCTION: 'admin.type.SANCTION',
+  THRESHOLD: 'admin.type.THRESHOLD',
+  PATTERN: 'admin.type.PATTERN',
+  MIXING: 'admin.type.MIXING',
+  PEP: 'admin.type.PEP',
 }
 
 const KYC_DONUT_COLORS = ['#64748b', '#F0B90B', '#22c55e']
@@ -230,10 +231,12 @@ function StatCard({
   icon: Icon,
   iconTone,
   delta,
-  deltaSuffix = 'за 24ч',
+  deltaSuffix,
   tone = 'default',
   index = 0,
 }: StatCardProps) {
+  const { t } = useI18n()
+  const effectiveDeltaSuffix = deltaSuffix ?? t('admin.deltaSuffix')
   const toneText =
     tone === 'danger'
       ? 'text-destructive'
@@ -288,7 +291,7 @@ function StatCard({
           )}
           {sub && <span className="text-muted-foreground">{sub}</span>}
           {showDelta && !sub && (
-            <span className="text-muted-foreground">{deltaSuffix}</span>
+            <span className="text-muted-foreground">{effectiveDeltaSuffix}</span>
           )}
         </div>
       </Card>
@@ -298,6 +301,7 @@ function StatCard({
 
 // ─── Recent Trades Table ─────────────────────────────────────────────────────
 function RecentTradesTable({ trades }: { trades: AdminRecentTrade[] }) {
+  const { t } = useI18n()
   const mounted = useMounted()
   return (
     <Card className="bg-card/60 backdrop-blur flex flex-col h-full">
@@ -305,7 +309,7 @@ function RecentTradesTable({ trades }: { trades: AdminRecentTrade[] }) {
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <Activity className="w-4 h-4 text-primary" />
-            Последние сделки
+            {t('admin.trades.title')}
           </CardTitle>
           <Badge variant="outline" className="text-[10px]">
             {trades.length}
@@ -317,16 +321,16 @@ function RecentTradesTable({ trades }: { trades: AdminRecentTrade[] }) {
           <div className="px-4 pb-3">
             {/* Header row */}
             <div className="grid grid-cols-[1fr_0.5fr_1fr_1fr_1.4fr_0.8fr] gap-2 text-[10px] uppercase tracking-wider text-muted-foreground py-2 border-b border-border sticky top-0 bg-card/95 backdrop-blur z-10">
-              <span>Пара</span>
-              <span className="text-center">Сторона</span>
-              <span className="text-right">Цена</span>
-              <span className="text-right">Кол-во</span>
-              <span className="text-right">Сумма</span>
-              <span className="text-right">Время</span>
+              <span>{t('admin.trades.col.pair')}</span>
+              <span className="text-center">{t('admin.trades.col.side')}</span>
+              <span className="text-right">{t('admin.trades.col.price')}</span>
+              <span className="text-right">{t('admin.trades.col.qty')}</span>
+              <span className="text-right">{t('admin.trades.col.sum')}</span>
+              <span className="text-right">{t('admin.trades.col.time')}</span>
             </div>
             {trades.length === 0 ? (
               <div className="py-10 text-center text-sm text-muted-foreground">
-                Сделок пока нет
+                {t('admin.trades.empty')}
               </div>
             ) : (
               trades.map((t, i) => {
@@ -384,10 +388,11 @@ function KycAndPairsCard({
   usersByKycLevel: { level0: number; level1: number; level2: number }
   tradesByPair: { pair: string; count: number; volume: number }[]
 }) {
+  const { t } = useI18n()
   const kycData = [
-    { name: 'Lv.0', value: usersByKycLevel.level0, color: KYC_DONUT_COLORS[0] },
-    { name: 'Lv.1', value: usersByKycLevel.level1, color: KYC_DONUT_COLORS[1] },
-    { name: 'Lv.2', value: usersByKycLevel.level2, color: KYC_DONUT_COLORS[2] },
+    { name: 'Lv.0', value: usersByKycLevel.level0, color: KYC_DONUT_COLORS[0], labelKey: 'admin.kyc.lv0' },
+    { name: 'Lv.1', value: usersByKycLevel.level1, color: KYC_DONUT_COLORS[1], labelKey: 'admin.kyc.lv1' },
+    { name: 'Lv.2', value: usersByKycLevel.level2, color: KYC_DONUT_COLORS[2], labelKey: 'admin.kyc.lv2' },
   ]
   const kycTotal =
     usersByKycLevel.level0 + usersByKycLevel.level1 + usersByKycLevel.level2
@@ -401,7 +406,7 @@ function KycAndPairsCard({
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
           <Users className="w-4 h-4 text-primary" />
-          Распределение KYC
+          {t('admin.kyc.title')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -434,7 +439,7 @@ function KycAndPairsCard({
                 {formatNumber(kycTotal, 0)}
               </div>
               <div className="text-[9px] text-muted-foreground uppercase">
-                всего
+                {t('admin.kyc.total')}
               </div>
             </div>
           </div>
@@ -450,11 +455,7 @@ function KycAndPairsCard({
                     style={{ background: d.color }}
                   />
                   <span className="font-medium">
-                    {i === 0
-                      ? 'Lv.0 — Гость'
-                      : i === 1
-                        ? 'Lv.1 — Документ'
-                        : 'Lv.2 — Полная'}
+                    {t(d.labelKey)}
                   </span>
                 </div>
                 <span className="font-mono tabular-nums text-muted-foreground">
@@ -476,13 +477,13 @@ function KycAndPairsCard({
         <div>
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] text-muted-foreground uppercase tracking-wider">
-              Топ пар по объёму
+              {t('admin.pairs.title')}
             </span>
             <BarChart3 className="w-3.5 h-3.5 text-muted-foreground" />
           </div>
           {tradesByPair.length === 0 ? (
             <div className="py-6 text-center text-xs text-muted-foreground">
-              Нет данных по парам
+              {t('admin.pairs.empty')}
             </div>
           ) : (
             <div className="h-[160px]">
@@ -523,7 +524,7 @@ function KycAndPairsCard({
                   />
                   <Tooltip
                     contentStyle={tooltipStyle}
-                    formatter={(v: number) => [formatPrice(v, 'rub'), 'Объём']}
+                    formatter={(v: number) => [formatPrice(v, 'rub'), t('admin.pairs.volume')]}
                   />
                   <Bar dataKey="volume" radius={[0, 4, 4, 0]} maxBarSize={20}>
                     {tradesByPair.map((p) => (
@@ -551,6 +552,7 @@ function KycAndPairsCard({
 
 // ─── Recent Users List ───────────────────────────────────────────────────────
 function RecentUsersList({ users }: { users: AdminRecentUser[] }) {
+  const { t } = useI18n()
   const mounted = useMounted()
   return (
     <Card className="bg-card/60 backdrop-blur h-full flex flex-col">
@@ -558,7 +560,7 @@ function RecentUsersList({ users }: { users: AdminRecentUser[] }) {
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <Users className="w-4 h-4 text-primary" />
-            Последние пользователи
+            {t('admin.users.title')}
           </CardTitle>
           <Badge variant="outline" className="text-[10px]">
             {users.length}
@@ -570,7 +572,7 @@ function RecentUsersList({ users }: { users: AdminRecentUser[] }) {
           <div className="px-4 pb-3 space-y-1.5">
             {users.length === 0 ? (
               <div className="py-8 text-center text-sm text-muted-foreground">
-                Нет пользователей
+                {t('admin.users.empty')}
               </div>
             ) : (
               users.map((u) => (
@@ -628,6 +630,7 @@ function RecentUsersList({ users }: { users: AdminRecentUser[] }) {
 
 // ─── Recent Payments List ────────────────────────────────────────────────────
 function RecentPaymentsList({ payments }: { payments: AdminRecentPayment[] }) {
+  const { t } = useI18n()
   const mounted = useMounted()
   return (
     <Card className="bg-card/60 backdrop-blur h-full flex flex-col">
@@ -635,7 +638,7 @@ function RecentPaymentsList({ payments }: { payments: AdminRecentPayment[] }) {
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <Send className="w-4 h-4 text-primary" />
-            Последние платежи
+            {t('admin.payments.title')}
           </CardTitle>
           <Badge variant="outline" className="text-[10px]">
             {payments.length}
@@ -647,7 +650,7 @@ function RecentPaymentsList({ payments }: { payments: AdminRecentPayment[] }) {
           <div className="px-4 pb-3 space-y-1.5">
             {payments.length === 0 ? (
               <div className="py-8 text-center text-sm text-muted-foreground">
-                Нет платежей
+                {t('admin.payments.empty')}
               </div>
             ) : (
               payments.map((p) => {
@@ -680,7 +683,7 @@ function RecentPaymentsList({ payments }: { payments: AdminRecentPayment[] }) {
                             'border-border text-muted-foreground'
                         )}
                       >
-                        {PAYMENT_STATUS_LABEL[p.status] || p.status}
+                        {PAYMENT_STATUS_LABEL_KEY[p.status] ? t(PAYMENT_STATUS_LABEL_KEY[p.status]) : p.status}
                       </Badge>
                       <span className="text-[9px] text-muted-foreground">
                         {mounted ? timeAgo(p.createdAt) : ''}
@@ -699,13 +702,14 @@ function RecentPaymentsList({ payments }: { payments: AdminRecentPayment[] }) {
 
 // ─── Incidents / Alerts Table ────────────────────────────────────────────────
 function AlertsTable({ alerts }: { alerts: AdminRecentAlert[] }) {
+  const { t } = useI18n()
   const mounted = useMounted()
   const setView = useAppStore((s) => s.setView)
 
   const handleClick = () => {
     setView('compliance')
-    toast.success('Переход к Комплаенс', {
-      description: 'Открыта AML-консоль для детального разбора',
+    toast.success(t('admin.alerts.toCompliance'), {
+      description: t('admin.alerts.toComplianceDesc'),
     })
   }
 
@@ -715,7 +719,7 @@ function AlertsTable({ alerts }: { alerts: AdminRecentAlert[] }) {
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-destructive" />
-            Инциденты и алерты
+            {t('admin.alerts.title')}
           </CardTitle>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-[10px]">
@@ -728,7 +732,7 @@ function AlertsTable({ alerts }: { alerts: AdminRecentAlert[] }) {
               className="h-7 text-[11px] gap-1 text-primary hover:text-primary hover:bg-primary/10"
             >
               <Scale className="w-3 h-3" />
-              Открыть AML
+              {t('admin.alerts.openAml')}
             </Button>
           </div>
         </div>
@@ -739,9 +743,9 @@ function AlertsTable({ alerts }: { alerts: AdminRecentAlert[] }) {
             <div className="w-12 h-12 rounded-xl bg-success/10 flex items-center justify-center mb-3">
               <ShieldAlert className="w-5 h-5 text-success" />
             </div>
-            <div className="text-sm font-medium">Нет активных алертов</div>
+            <div className="text-sm font-medium">{t('admin.alerts.empty')}</div>
             <div className="text-xs text-muted-foreground mt-1">
-              Система AML-мониторинга работает в штатном режиме
+              {t('admin.alerts.emptyHint')}
             </div>
           </div>
         ) : (
@@ -749,11 +753,11 @@ function AlertsTable({ alerts }: { alerts: AdminRecentAlert[] }) {
             <div className="px-4 pb-3">
               <div className="grid grid-cols-[0.3fr_1.2fr_0.7fr_0.9fr_2fr_0.7fr] gap-2 text-[10px] uppercase tracking-wider text-muted-foreground py-2 border-b border-border sticky top-0 bg-card/95 backdrop-blur z-10">
                 <span>Sev</span>
-                <span>Тип</span>
+                <span>{t('admin.alerts.col.type')}</span>
                 <span className="text-right">Risk</span>
-                <span>Статус</span>
-                <span>Описание</span>
-                <span className="text-right">Время</span>
+                <span>{t('admin.alerts.col.status')}</span>
+                <span>{t('admin.alerts.col.desc')}</span>
+                <span className="text-right">{t('admin.alerts.col.time')}</span>
               </div>
               {alerts.map((a, i) => {
                 const sev = SEVERITY_CONFIG[a.severity] || SEVERITY_CONFIG.MEDIUM
@@ -776,11 +780,11 @@ function AlertsTable({ alerts }: { alerts: AdminRecentAlert[] }) {
                           'inline-block w-2 h-2 rounded-full',
                           sev.stripe
                         )}
-                        title={sev.label}
+                        title={t(sev.labelKey)}
                       />
                     </span>
                     <span className="font-medium truncate">
-                      {TYPE_LABEL[a.type] || a.type}
+                      {TYPE_LABEL_KEY[a.type] ? t(TYPE_LABEL_KEY[a.type]) : a.type}
                     </span>
                     <span
                       className={cn(
@@ -799,7 +803,7 @@ function AlertsTable({ alerts }: { alerts: AdminRecentAlert[] }) {
                             'border-border text-muted-foreground'
                         )}
                       >
-                        {ALERT_STATUS_LABEL[a.status] || a.status}
+                        {ALERT_STATUS_LABEL_KEY[a.status] ? t(ALERT_STATUS_LABEL_KEY[a.status]) : a.status}
                       </Badge>
                     </span>
                     <span className="text-foreground/80 line-clamp-1 text-[11px]">
@@ -821,6 +825,7 @@ function AlertsTable({ alerts }: { alerts: AdminRecentAlert[] }) {
 
 // ─── Main View ───────────────────────────────────────────────────────────────
 export function AdminView() {
+  const { t } = useI18n()
   const mounted = useMounted()
   const [refreshKey, setRefreshKey] = useState(0)
   const url = refreshKey ? `/api/admin/stats?r=${refreshKey}` : '/api/admin/stats'
@@ -828,8 +833,8 @@ export function AdminView() {
 
   const handleRefresh = () => {
     setRefreshKey((k) => k + 1)
-    toast.success('Данные обновлены', {
-      description: 'Метрики пересчитаны из БД платформы',
+    toast.success(t('admin.refresh.toast'), {
+      description: t('admin.refresh.toastDesc'),
     })
   }
 
@@ -849,7 +854,7 @@ export function AdminView() {
                 ADMIN CONSOLE
               </Badge>
               <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                Доступ: Compliance Officer / Admin
+                {t('admin.header.access')}
               </Badge>
               <Badge
                 variant="outline"
@@ -861,14 +866,14 @@ export function AdminView() {
             </div>
             <h1 className="text-2xl lg:text-3xl font-bold tracking-tight flex items-center gap-2.5">
               <BarChart3 className="w-7 h-7 text-primary" />
-              Операционная панель
+              {t('admin.header.title')}
             </h1>
             <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5">
               <Database className="w-3.5 h-3.5 text-success" />
-              Данные из БД реального времени
+              {t('admin.header.subtitle')}
               {generatedAt && mounted && (
                 <span className="text-success">
-                  • обновлено {new Date(generatedAt).toLocaleTimeString('ru-RU', {
+                  {t('admin.header.updatedAt')} {new Date(generatedAt).toLocaleTimeString('ru-RU', {
                     hour: '2-digit',
                     minute: '2-digit',
                     second: '2-digit',
@@ -885,7 +890,7 @@ export function AdminView() {
             className="gap-2 border-primary/30 text-primary hover:bg-primary/10 shrink-0"
           >
             <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
-            Обновить
+            {t('admin.refreshBtn')}
           </Button>
         </header>
 
@@ -902,7 +907,7 @@ export function AdminView() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Activity className="w-4 h-4 text-primary" />
-                    Последние сделки
+                    {t('admin.trades.title')}
                   </CardTitle>
                   <Badge variant="outline" className="text-[10px]">
                     —
@@ -912,12 +917,12 @@ export function AdminView() {
               <CardContent className="p-0">
                 <div className="px-4 pb-3">
                   <div className="grid grid-cols-[1fr_0.5fr_1fr_1fr_1.4fr_0.8fr] gap-2 text-[10px] uppercase tracking-wider text-muted-foreground py-2 border-b border-border">
-                    <span>Пара</span>
-                    <span className="text-center">Сторона</span>
-                    <span className="text-right">Цена</span>
-                    <span className="text-right">Кол-во</span>
-                    <span className="text-right">Сумма</span>
-                    <span className="text-right">Время</span>
+                    <span>{t('admin.trades.col.pair')}</span>
+                    <span className="text-center">{t('admin.trades.col.side')}</span>
+                    <span className="text-right">{t('admin.trades.col.price')}</span>
+                    <span className="text-right">{t('admin.trades.col.qty')}</span>
+                    <span className="text-right">{t('admin.trades.col.sum')}</span>
+                    <span className="text-right">{t('admin.trades.col.time')}</span>
                   </div>
                   <TableSkeleton rows={6} />
                 </div>
@@ -929,43 +934,43 @@ export function AdminView() {
             {/* Row 1 — KPI cards */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               <StatCard
-                title="Пользователи"
+                title={t('admin.kpi.users')}
                 value={stats ? formatNumber(stats.totalUsers, 0) : '—'}
-                sub={stats ? `новых: ${stats.newUsers24h}` : ''}
+                sub={stats ? `${t('admin.kpi.usersSub')} ${stats.newUsers24h}` : ''}
                 icon={Users}
                 iconTone="bg-primary/15 text-primary"
                 delta={stats?.newUsers24h}
                 index={0}
               />
               <StatCard
-                title="Объём 24ч"
+                title={t('admin.kpi.volume24')}
                 value={stats ? formatPrice(stats.volume24h, 'rub') : '—'}
-                sub={stats ? `сделок: ${stats.trades24hCount}` : ''}
+                sub={stats ? `${t('admin.kpi.volume24Sub')} ${stats.trades24hCount}` : ''}
                 icon={CircleDollarSign}
                 iconTone="bg-success/15 text-success"
                 index={1}
               />
               <StatCard
-                title="Сделок 24ч"
+                title={t('admin.kpi.trades24')}
                 value={stats ? formatNumber(stats.trades24hCount, 0) : '—'}
-                sub={stats ? `всего: ${formatNumber(stats.totalTrades, 0)}` : ''}
+                sub={stats ? `${t('admin.kpi.trades24Sub')} ${formatNumber(stats.totalTrades, 0)}` : ''}
                 icon={Activity}
                 iconTone="bg-violet-400/15 text-violet-400"
                 index={2}
               />
               <StatCard
-                title="Открытых алертов"
+                title={t('admin.kpi.openAlerts')}
                 value={stats ? formatNumber(stats.openAlerts, 0) : '—'}
-                sub={stats ? `критических: ${stats.criticalAlerts}` : ''}
+                sub={stats ? `${t('admin.kpi.openAlertsSub')} ${stats.criticalAlerts}` : ''}
                 icon={AlertTriangle}
                 iconTone="bg-destructive/15 text-destructive"
                 tone={stats && stats.criticalAlerts > 0 ? 'danger' : 'warning'}
                 index={3}
               />
               <StatCard
-                title="P2P сделки"
+                title={t('admin.kpi.p2p')}
                 value={stats ? formatNumber(stats.openP2PDeals, 0) : '—'}
-                sub="открытые"
+                sub={t('admin.kpi.p2pSub')}
                 icon={Users}
                 iconTone="bg-orange-500/15 text-orange-400"
                 index={4}
@@ -999,11 +1004,11 @@ export function AdminView() {
               <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-2 p-4 text-[11px] text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                  Авто-обновление каждые 20 секунд
+                  {t('admin.footer.autoRefresh')}
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Database className="w-3 h-3 text-success" />
-                  Источник: Prisma + реальное время
+                  {t('admin.footer.source')}
                 </div>
               </CardContent>
             </Card>

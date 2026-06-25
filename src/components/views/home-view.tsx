@@ -13,9 +13,12 @@ import {
   CheckCircle2,
   Scale,
   Landmark,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react'
 import { motion, useSpring, useTransform } from 'framer-motion'
 import { useAppStore } from '@/lib/store'
+import { useI18n } from '@/lib/use-i18n'
 import { fetchTickers, jitterPrice, getUsdRubRate } from '@/lib/market'
 import type { CoinTicker } from '@/lib/types'
 import { formatPrice, formatPercent } from '@/lib/format'
@@ -48,6 +51,7 @@ function AnimatedNumber({
 function Hero() {
   const setView = useAppStore((s) => s.setView)
   const isAuthed = useAppStore((s) => s.isAuthed)
+  const { t } = useI18n()
   const [tickers, setTickers] = useState<CoinTicker[]>([])
   const [usdRub, setUsdRub] = useState<number>(0)
   const [loading, setLoading] = useState(true)
@@ -97,16 +101,14 @@ function Hero() {
               className="mb-4 gap-1.5 border-primary/30 bg-primary/5 text-primary"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-              ЛЕГАЛЬНАЯ ПЛАТФОРМА РФ • ЗАПУСК 01.07.2026
+              {t('home.badge')}
             </Badge>
             <h1 className="text-3xl lg:text-5xl font-bold tracking-tight leading-[1.05]">
-              Российская криптобиржа{' '}
-              <span className="text-primary whitespace-nowrap">по закону РФ</span>
+              {t('home.heroTitle')}{' '}
+              <span className="text-primary whitespace-nowrap">{t('home.heroTitleAccent')}</span>
             </h1>
             <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-xl">
-              Спот-торги, P2P, кросс-бордер платежи и кастодия в единой
-              экосистеме. Полное соответствие ФЗ-1194918-8, AML и валютному
-              контролю.
+              {t('home.heroDesc')}
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Button
@@ -114,7 +116,7 @@ function Hero() {
                 onClick={() => setView(isAuthed ? 'trade' : 'auth')}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 h-11 px-6 text-base"
               >
-                {isAuthed ? 'Начать торговать' : 'Создать аккаунт'}
+                {isAuthed ? t('home.heroCtaAuthed') : t('home.heroCtaGuest')}
                 <ArrowRight className="w-4 h-4" />
               </Button>
               <Button
@@ -123,18 +125,18 @@ function Hero() {
                 onClick={() => setView('payments')}
                 className="h-11 px-6 text-base"
               >
-                Кросс-бордер платежи
+                {t('home.heroCtaP2P')}
               </Button>
             </div>
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-success" /> Адрес-идентификаторы
+                <CheckCircle2 className="w-3.5 h-3.5 text-success" /> {t('home.feature.addressId')}
               </span>
               <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-success" /> KYC через Госуслуги
+                <CheckCircle2 className="w-3.5 h-3.5 text-success" /> {t('home.feature.gosuslugi')}
               </span>
               <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-success" /> Кастодия ЦБ РФ
+                <CheckCircle2 className="w-3.5 h-3.5 text-success" /> {t('home.feature.custody')}
               </span>
             </div>
           </div>
@@ -146,7 +148,7 @@ function Hero() {
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <div className="text-xs text-muted-foreground">Объём 24ч</div>
+                    <div className="text-xs text-muted-foreground">{t('home.stat.volume')}</div>
                     <div className="text-xl font-bold mt-1 font-mono tabular-nums">
                       <AnimatedNumber
                         value={totalVolumeRub}
@@ -161,7 +163,7 @@ function Hero() {
                     </div>
                     <div className="text-xs text-success mt-0.5 flex items-center gap-1">
                       <TrendingUp className="w-3 h-3" />
-                      Реальные данные Binance
+                      {t('home.stat.realData')}
                     </div>
                   </div>
                   <div>
@@ -175,7 +177,7 @@ function Hero() {
                     <div className="text-xs text-muted-foreground mt-0.5">exchangerate-api</div>
                   </div>
                   <div>
-                    <div className="text-xs text-muted-foreground">Топ роста 24ч</div>
+                    <div className="text-xs text-muted-foreground">{t('home.stat.topGainer')}</div>
                     <div className="text-xl font-bold mt-1 flex items-center gap-2">
                       {topGainer ? (
                         <>
@@ -189,11 +191,11 @@ function Hero() {
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">
-                      {topGainer ? topGainer.name : 'загрузка…'}
+                      {topGainer ? topGainer.name : t('home.stat.loading')}
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-muted-foreground">Топ падения 24ч</div>
+                    <div className="text-xs text-muted-foreground">{t('home.stat.topLoser')}</div>
                     <div className="text-xl font-bold mt-1 flex items-center gap-2">
                       {topLoser ? (
                         <>
@@ -207,13 +209,13 @@ function Hero() {
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">
-                      {topLoser ? topLoser.name : 'загрузка…'}
+                      {topLoser ? topLoser.name : t('home.stat.loading')}
                     </div>
                   </div>
                 </div>
                 <div className="mt-4 pt-4 border-t border-border grid grid-cols-3 gap-3 text-center">
                   <div>
-                    <div className="text-base font-bold text-primary">&lt;10 мс</div>
+                    <div className="text-base font-bold text-primary">{t('home.stat.latency')}</div>
                     <div className="text-[10px] text-muted-foreground">matching latency</div>
                   </div>
                   <div>
@@ -222,7 +224,7 @@ function Hero() {
                   </div>
                   <div>
                     <div className="text-base font-bold text-primary">100K TPS</div>
-                    <div className="text-[10px] text-muted-foreground">пропускная</div>
+                    <div className="text-[10px] text-muted-foreground">{t('home.stat.throughput')}</div>
                   </div>
                 </div>
               </>
@@ -245,15 +247,17 @@ function generateSpark(change: number): number[] {
 function MarketGrid() {
   const setView = useAppStore((s) => s.setView)
   const setSelectedPair = useAppStore((s) => s.setSelectedPair)
+  const { t } = useI18n()
   const [tickers, setTickers] = useState<CoinTicker[]>([])
   const [currency, setCurrency] = useState<'rub' | 'usd'>('rub')
   const [highlight, setHighlight] = useState<Record<string, 'up' | 'down'>>({})
+  const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
     let mounted = true
     const load = async () => {
-      const t = await fetchTickers()
-      if (mounted) setTickers(t)
+      const tt = await fetchTickers()
+      if (mounted) setTickers(tt)
     }
     load()
     const interval = setInterval(load, 12000)
@@ -287,14 +291,17 @@ function MarketGrid() {
     setView('trade')
   }
 
+  // 8 coins in 4-col grid = 2 rows by default; 20 coins = 5 rows expanded
+  const visible = expanded ? tickers.slice(0, 20) : tickers.slice(0, 8)
+
   return (
-    <section className="border-b border-border py-8">
-      <div className="max-w-[1400px] mx-auto px-3 lg:px-5">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+    <section className="border-b border-border py-6">
+      <div className="px-3 lg:px-5">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
           <div>
-            <h2 className="text-xl lg:text-2xl font-bold">Рыночные данные</h2>
-            <p className="text-xs text-muted-foreground mt-1">
-              Реальные котировки Binance • обновление каждые 12 сек
+            <h2 className="text-xl lg:text-2xl font-bold">{t('home.market.title')}</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {t('home.market.subtitle')}
             </p>
           </div>
           <div className="flex gap-1 bg-muted/60 p-1 rounded-xl">
@@ -322,50 +329,61 @@ function MarketGrid() {
         {tickers.length === 0 ? (
           <MarketGridSkeleton count={8} />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {tickers.map((coin) => {
-              const status = highlight[coin.id]
-              const price = currency === 'rub' ? coin.priceRub : coin.priceUsd
-              const up = coin.change24h >= 0
-              return (
-                <Card
-                  key={coin.id}
-                  className={cn(
-                    'p-4 cursor-pointer transition-all hover:border-primary/40 hover:-translate-y-0.5 group',
-                    status === 'up' && 'ring-1 ring-success/40',
-                    status === 'down' && 'ring-1 ring-destructive/40'
-                  )}
-                  onClick={() => goTrade(coin.symbol)}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2.5">
-                      <CoinIcon symbol={coin.symbol} size={36} />
-                      <div>
-                        <div className="font-semibold text-sm">{coin.symbol}</div>
-                        <div className="text-[11px] text-muted-foreground">{coin.name}</div>
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+              {visible.map((coin) => {
+                const status = highlight[coin.id]
+                const price = currency === 'rub' ? coin.priceRub : coin.priceUsd
+                const up = coin.change24h >= 0
+                return (
+                  <Card
+                    key={coin.id}
+                    className={cn(
+                      'p-2.5 cursor-pointer transition-all hover:border-primary/40 hover:-translate-y-0.5 group flex items-center gap-2.5',
+                      status === 'up' && 'ring-1 ring-success/40',
+                      status === 'down' && 'ring-1 ring-destructive/40'
+                    )}
+                    onClick={() => goTrade(coin.symbol)}
+                  >
+                    <CoinIcon symbol={coin.symbol} size={28} className="shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-sm">{coin.symbol}</span>
+                        <span
+                          className={cn(
+                            'flex items-center gap-0.5 text-[10px] font-medium px-1 py-0.5 rounded',
+                            up ? 'text-success bg-success/10' : 'text-destructive bg-destructive/10'
+                          )}
+                        >
+                          {up ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+                          {formatPercent(coin.change24h)}
+                        </span>
+                      </div>
+                      <div className="text-sm font-mono font-bold tabular-nums truncate">
+                        {formatPrice(price, currency)}
                       </div>
                     </div>
-                    <span
-                      className={cn(
-                        'flex items-center gap-0.5 text-xs font-medium px-2 py-0.5 rounded-md',
-                        up ? 'text-success bg-success/10' : 'text-destructive bg-destructive/10'
-                      )}
-                    >
-                      {up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                      {formatPercent(coin.change24h)}
-                    </span>
-                  </div>
-                  <div className="text-xl font-mono font-bold tabular-nums">
-                    {formatPrice(price, currency)}
-                  </div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <Sparkline data={generateSpark(coin.change24h)} width={90} height={28} />
-                    <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition" />
-                  </div>
-                </Card>
-              )
-            })}
-          </div>
+                    <Sparkline data={generateSpark(coin.change24h)} width={48} height={24} />
+                  </Card>
+                )
+              })}
+            </div>
+            {/* Expand / collapse button */}
+            {tickers.length > 8 && (
+              <div className="flex justify-center mt-3">
+                <button
+                  onClick={() => setExpanded((v) => !v)}
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-medium border border-border bg-card hover:border-primary/40 hover:text-primary transition"
+                >
+                  {expanded ? (
+                    <>{t('home.market.showLess')} <ChevronUp className="w-3.5 h-3.5" /></>
+                  ) : (
+                    <>{t('home.market.showAll')} <ChevronDown className="w-3.5 h-3.5" /></>
+                  )}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </section>
@@ -375,59 +393,59 @@ function MarketGrid() {
 const FEATURES = [
   {
     icon: ShieldCheck,
-    title: 'Полное соответствие 115-ФЗ и 1194918-8',
-    desc: 'Адрес-идентификаторы, KYC, AML-мониторинг, квалификационное тестирование инвесторов.',
+    titleKey: 'home.features.f1.title',
+    descKey: 'home.features.f1.desc',
     color: 'text-success',
   },
   {
     icon: Zap,
-    title: 'Высокопроизводительный движок',
-    desc: 'Matching engine на Rust, latency < 10 мс, 100K TPS, price-time FIFO.',
+    titleKey: 'home.features.f2.title',
+    descKey: 'home.features.f2.desc',
     color: 'text-warning',
   },
   {
     icon: Globe2,
-    title: 'Кросс-бордер платежи',
-    desc: 'Коридоры RU-CN, RU-AE, RU-TR, RU-IN. Валютный контроль 173-ФЗ автоматически.',
+    titleKey: 'home.features.f3.title',
+    descKey: 'home.features.f3.desc',
     color: 'text-sky-400',
   },
   {
     icon: Lock,
-    title: 'Кастодия и HSM',
-    desc: 'Hot/Warm/Cold 5/15/80. FSTEC-сертифицированные HSM, 2-of-3 / 3-of-5 multisig.',
+    titleKey: 'home.features.f4.title',
+    descKey: 'home.features.f4.desc',
     color: 'text-violet-400',
   },
   {
     icon: Building2,
-    title: 'Экосистема лицензий ЦБ',
-    desc: 'Биржа + обменник + депозитарий + брокер в едином холдинге.',
+    titleKey: 'home.features.f5.title',
+    descKey: 'home.features.f5.desc',
     color: 'text-primary',
   },
   {
     icon: Scale,
-    title: 'Комплаенс и аудит',
-    desc: 'Event Sourcing + WORM-аудит, Merkle Root, отчётность Росфинмониторингу.',
+    titleKey: 'home.features.f6.title',
+    descKey: 'home.features.f6.desc',
     color: 'text-rose-400',
   },
 ]
 
 function Features() {
+  const { t } = useI18n()
   return (
     <section className="border-b border-border py-8 bg-sidebar/20">
       <div className="max-w-[1400px] mx-auto px-3 lg:px-5">
         <div className="text-center mb-6">
           <Badge variant="outline" className="mb-2 border-primary/30 text-primary">
-            ПРЕИМУЩЕСТВА ПЛАТФОРМЫ
+            {t('home.features.title')}
           </Badge>
-          <h2 className="text-2xl lg:text-3xl font-bold">Почему РусКрипто</h2>
+          <h2 className="text-2xl lg:text-3xl font-bold">{t('home.features.heading')}</h2>
           <p className="text-muted-foreground mt-2 max-w-2xl mx-auto text-sm">
-            Первая легальная криптобиржа на рынке РФ с готовой инфраструктурой
-            для розничных и корпоративных клиентов.
+            {t('home.features.subtitle')}
           </p>
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {FEATURES.map((f) => (
-            <Card key={f.title} className="p-4 hover:border-primary/30 transition group">
+            <Card key={f.titleKey} className="p-4 hover:border-primary/30 transition group">
               <div
                 className={cn(
                   'w-10 h-10 rounded-xl bg-muted/60 flex items-center justify-center mb-3 group-hover:scale-110 transition',
@@ -436,8 +454,8 @@ function Features() {
               >
                 <f.icon className="w-5 h-5" />
               </div>
-              <h3 className="font-semibold text-base mb-1.5">{f.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+              <h3 className="font-semibold text-base mb-1.5">{t(f.titleKey)}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{t(f.descKey)}</p>
             </Card>
           ))}
         </div>
@@ -450,15 +468,16 @@ function Features() {
 function MoversSection() {
   const setView = useAppStore((s) => s.setView)
   const setSelectedPair = useAppStore((s) => s.setSelectedPair)
+  const { t } = useI18n()
   const [tickers, setTickers] = useState<CoinTicker[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let mounted = true
     const load = async () => {
-      const t = await fetchTickers()
+      const tt = await fetchTickers()
       if (mounted) {
-        setTickers(t)
+        setTickers(tt)
         setLoading(false)
       }
     }
@@ -500,9 +519,9 @@ function MoversSection() {
       <div className="max-w-[1400px] mx-auto px-3 lg:px-5">
         <div className="flex items-end justify-between mb-4 flex-wrap gap-3">
           <div>
-            <h2 className="text-xl lg:text-2xl font-bold">Топ роста / Топ падения</h2>
+            <h2 className="text-xl lg:text-2xl font-bold">{t('home.movers.title')}</h2>
             <p className="text-xs text-muted-foreground mt-1">
-              Лидеры и аутсайдеры за 24 часа • обновление каждые 15 сек
+              {t('home.movers.subtitle')}
             </p>
           </div>
           <Badge variant="outline" className="border-primary/30 text-primary gap-1.5">
@@ -525,8 +544,8 @@ function MoversSection() {
                   <TrendingUp className="w-5 h-5 text-success" />
                 </div>
                 <div>
-                  <div className="font-semibold text-base">Топ роста 24ч</div>
-                  <div className="text-[11px] text-muted-foreground">Лидеры рынка</div>
+                  <div className="font-semibold text-base">{t('home.movers.gainersTitle')}</div>
+                  <div className="text-[11px] text-muted-foreground">{t('home.movers.gainersSub')}</div>
                 </div>
               </div>
               <motion.div
@@ -569,8 +588,8 @@ function MoversSection() {
                   <TrendingDown className="w-5 h-5 text-destructive" />
                 </div>
                 <div>
-                  <div className="font-semibold text-base">Топ падения 24ч</div>
-                  <div className="text-[11px] text-muted-foreground">Аутсайдеры рынка</div>
+                  <div className="font-semibold text-base">{t('home.movers.losersTitle')}</div>
+                  <div className="text-[11px] text-muted-foreground">{t('home.movers.losersSub')}</div>
                 </div>
               </div>
               <motion.div
@@ -616,45 +635,45 @@ function MoversSection() {
 const SECURITY_FEATURES = [
   {
     icon: Lock,
-    title: 'Холодное хранение 80%',
-    desc: 'Мультисиг 3-of-5, географическое распределение ключей, air-gapped подпись.',
+    titleKey: 'home.security.s1.title',
+    descKey: 'home.security.s1.desc',
     accent: 'text-primary',
     bg: 'bg-primary/10',
   },
   {
     icon: ShieldCheck,
-    title: 'HSM FSTEC-сертифицирован',
-    desc: 'Аппаратные модули Thales Luna 7, соответствие приказу ФСТЭК №21.',
+    titleKey: 'home.security.s2.title',
+    descKey: 'home.security.s2.desc',
     accent: 'text-success',
     bg: 'bg-success/10',
   },
   {
     icon: Landmark,
-    title: 'Страхование $100M',
-    desc: 'Покрытие Marsh застраховано через Lloyd’s syndicate. Защита от hot-wallet взлома.',
+    titleKey: 'home.security.s3.title',
+    descKey: 'home.security.s3.desc',
     accent: 'text-warning',
     bg: 'bg-warning/10',
   },
 ]
 
 function AssetSecurity() {
+  const { t } = useI18n()
   return (
     <section className="border-b border-border py-8 bg-sidebar/20">
       <div className="max-w-[1400px] mx-auto px-3 lg:px-5">
         <div className="text-center mb-6">
           <Badge variant="outline" className="mb-2 border-primary/30 text-primary gap-1.5">
             <ShieldCheck className="w-3 h-3" />
-            БЕЗОПАСНОСТЬ АКТИВОВ
+            {t('home.security.badge')}
           </Badge>
-          <h2 className="text-xl lg:text-2xl font-bold">Защита клиентских средств</h2>
+          <h2 className="text-xl lg:text-2xl font-bold">{t('home.security.title')}</h2>
           <p className="text-muted-foreground mt-1.5 max-w-2xl mx-auto text-sm">
-            Институциональный уровень защиты: холодное хранение, сертифицированные HSM,
-            страховое покрытие.
+            {t('home.security.desc')}
           </p>
         </div>
         <div className="grid md:grid-cols-3 gap-4">
           {SECURITY_FEATURES.map((f) => (
-            <Card key={f.title} className="p-4 hover:border-primary/30 transition group">
+            <Card key={f.titleKey} className="p-4 hover:border-primary/30 transition group">
               <div
                 className={cn(
                   'w-10 h-10 rounded-xl flex items-center justify-center mb-3 group-hover:scale-110 transition',
@@ -664,8 +683,8 @@ function AssetSecurity() {
               >
                 <f.icon className="w-5 h-5" />
               </div>
-              <h3 className="font-semibold text-base mb-1.5">{f.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+              <h3 className="font-semibold text-base mb-1.5">{t(f.titleKey)}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{t(f.descKey)}</p>
             </Card>
           ))}
         </div>
@@ -676,37 +695,37 @@ function AssetSecurity() {
 
 // ─── Partners & Regulators trust band ────────────────────────────────────────
 const PARTNERS = [
-  { name: 'Банк России', subtitle: 'Регулятор' },
-  { name: 'Росфинмониторинг', subtitle: 'Финразведка' },
-  { name: 'ЦФА-Реестр', subtitle: 'Блокчейн-реестр' },
-  { name: 'СБП', subtitle: 'Платёжная система' },
-  { name: 'Visa', subtitle: 'Карты' },
-  { name: 'Mastercard', subtitle: 'Карты' },
-  { name: 'Chainalysis', subtitle: 'AML-аналитика' },
+  { nameKey: 'home.partners.bank-russia', subtitleKey: 'home.partners.bank-russia-sub' },
+  { nameKey: 'home.partners.rosfin', subtitleKey: 'home.partners.rosfin-sub' },
+  { nameKey: 'home.partners.cfa', subtitleKey: 'home.partners.cfa-sub' },
+  { nameKey: 'home.partners.sbp', subtitleKey: 'home.partners.sbp-sub' },
+  { name: 'Visa', subtitleKey: 'home.partners.visa-sub' },
+  { name: 'Mastercard', subtitleKey: 'home.partners.mc-sub' },
+  { name: 'Chainalysis', subtitleKey: 'home.partners.chainalysis-sub' },
 ]
 
 function PartnersBand() {
+  const { t } = useI18n()
   return (
     <section className="border-b border-border py-6">
       <div className="max-w-[1400px] mx-auto px-3 lg:px-5">
         <div className="text-center mb-4">
-          <h2 className="text-lg lg:text-xl font-bold">Поднадзорность и партнёры</h2>
+          <h2 className="text-lg lg:text-xl font-bold">{t('home.partners.title')}</h2>
           <p className="text-xs text-muted-foreground mt-1">
-            Платформа работает в правовом поле РФ и интегрирована с ключевыми
-            финансовыми и комплаенс-инфраструктурами
+            {t('home.partners.desc')}
           </p>
         </div>
         <Card className="p-4 lg:p-5 bg-card/60 backdrop-blur">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
             {PARTNERS.map((p) => (
               <div
-                key={p.name}
+                key={p.nameKey || p.name}
                 className="flex flex-col items-center justify-center text-center px-2.5 py-3 rounded-xl border border-border/60 bg-muted/30 hover:border-primary/40 hover:bg-primary/5 transition group"
               >
                 <Building2 className="w-5 h-5 text-muted-foreground group-hover:text-primary transition mb-1.5" />
-                <div className="text-xs font-semibold leading-tight">{p.name}</div>
+                <div className="text-xs font-semibold leading-tight">{p.nameKey ? t(p.nameKey) : p.name}</div>
                 <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
-                  {p.subtitle}
+                  {t(p.subtitleKey)}
                 </div>
               </div>
             ))}
@@ -719,6 +738,7 @@ function PartnersBand() {
 
 function CtaBand() {
   const setView = useAppStore((s) => s.setView)
+  const { t } = useI18n()
   return (
     <section className="py-8">
       <div className="max-w-[1400px] mx-auto px-3 lg:px-5">
@@ -726,9 +746,9 @@ function CtaBand() {
           <div className="absolute -bottom-16 -right-16 w-64 h-64 rounded-full bg-primary/10 blur-3xl" />
           <div className="relative flex flex-col lg:flex-row items-center justify-between gap-4">
             <div>
-              <h3 className="text-xl lg:text-2xl font-bold">Готовы начать торговать?</h3>
+              <h3 className="text-xl lg:text-2xl font-bold">{t('home.cta.title')}</h3>
               <p className="text-muted-foreground mt-1.5 text-sm">
-                Верификация за 5 минут через Госуслуги. Демо-режим без рисков.
+                {t('home.cta.desc')}
               </p>
             </div>
             <div className="flex gap-3 shrink-0">
@@ -737,7 +757,7 @@ function CtaBand() {
                 onClick={() => setView('auth')}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 h-11 px-6"
               >
-                Создать аккаунт
+                {t('home.cta.create')}
               </Button>
               <Button
                 size="lg"
@@ -745,7 +765,7 @@ function CtaBand() {
                 onClick={() => setView('kyc')}
                 className="h-11 px-6"
               >
-                Узнать о KYC
+                {t('home.cta.kyc')}
               </Button>
             </div>
           </div>

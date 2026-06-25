@@ -14,6 +14,7 @@ import {
   Clock,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
+import { useI18n } from '@/lib/use-i18n'
 import type { NewsCategory, NewsItem } from '@/lib/types'
 import { timeAgo, formatDateTime } from '@/lib/format'
 import { useMounted } from '@/lib/use-mounted'
@@ -54,20 +55,29 @@ const CATEGORY_CONFIG: Record<
 function CategoryBadge({ category }: { category: NewsCategory }) {
   const cfg = CATEGORY_CONFIG[category]
   const Icon = cfg.icon
+  const { t } = useI18n()
   return (
     <Badge
       variant="outline"
       className={cn('gap-1 px-2 py-0.5 text-[10px] font-semibold', cfg.classes)}
     >
       <Icon className="w-3 h-3" />
-      {category}
+      {t(`news.category.${catKey(category)}`)}
     </Badge>
   )
+}
+
+function catKey(c: NewsCategory): string {
+  if (c === 'Регуляторика') return 'regulatorika'
+  if (c === 'Рынок') return 'rynok'
+  if (c === 'Платформа') return 'platform'
+  return 'partnerstvo'
 }
 
 function NewsCard({ item, featured = false }: { item: NewsItem; featured?: boolean }) {
   const cfg = CATEGORY_CONFIG[item.category]
   const mounted = useMounted()
+  const { t: tNews } = useI18n()
   return (
     <motion.div
       layout
@@ -99,7 +109,7 @@ function NewsCard({ item, featured = false }: { item: NewsItem; featured?: boole
             {item.pinned && (
               <Badge variant="outline" className="gap-1 px-2 py-0.5 text-[10px] text-primary border-primary/30 bg-primary/5">
                 <Pin className="w-3 h-3" />
-                Закреплено
+                {tNews('news.pinned')}
               </Badge>
             )}
             <span className="ml-auto flex items-center gap-1 text-[11px] text-muted-foreground">
@@ -148,7 +158,7 @@ function NewsCard({ item, featured = false }: { item: NewsItem; featured?: boole
                   rel="noopener noreferrer"
                   className="text-[11px] text-primary hover:underline inline-flex items-center gap-1"
                 >
-                  Читать <ExternalLink className="w-3 h-3" />
+                  {tNews('news.readMore')} <ExternalLink className="w-3 h-3" />
                 </a>
               )}
             </div>
@@ -161,6 +171,7 @@ function NewsCard({ item, featured = false }: { item: NewsItem; featured?: boole
 
 export function NewsView() {
   const newsItems = useAppStore((s) => s.newsItems)
+  const { t } = useI18n()
   const [tab, setTab] = useState<FilterTab>('all')
   const [query, setQuery] = useState('')
 
@@ -202,9 +213,9 @@ export function NewsView() {
               <Newspaper className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Новости и анонсы</h1>
+              <h1 className="text-xl font-bold tracking-tight">{t('news.title')}</h1>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Регуляторика · Рынок · Платформа · Партнёрство — {newsItems.length} материалов
+                {t('news.subtitle')} {newsItems.length} {t('news.materialsWord')}
               </p>
             </div>
           </div>
@@ -213,7 +224,7 @@ export function NewsView() {
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Поиск по новостям…"
+              placeholder={t('news.search')}
               className="pl-9 h-9"
             />
           </div>
@@ -223,19 +234,19 @@ export function NewsView() {
         <Tabs value={tab} onValueChange={(v) => setTab(v as FilterTab)} className="mb-4">
           <TabsList className="h-9 flex-wrap">
             <TabsTrigger value="all" className="gap-1.5">
-              Все <span className="text-[10px] text-muted-foreground font-mono">{counts.all}</span>
+              {t('common.all')} <span className="text-[10px] text-muted-foreground font-mono">{counts.all}</span>
             </TabsTrigger>
             <TabsTrigger value="Регуляторика" className="gap-1.5">
-              Регуляторика <span className="text-[10px] text-muted-foreground font-mono">{counts.Регуляторика}</span>
+              {t('news.category.regulatorika')} <span className="text-[10px] text-muted-foreground font-mono">{counts.Регуляторика}</span>
             </TabsTrigger>
             <TabsTrigger value="Рынок" className="gap-1.5">
-              Рынок <span className="text-[10px] text-muted-foreground font-mono">{counts.Рынок}</span>
+              {t('news.category.rynok')} <span className="text-[10px] text-muted-foreground font-mono">{counts.Рынок}</span>
             </TabsTrigger>
             <TabsTrigger value="Платформа" className="gap-1.5">
-              Платформа <span className="text-[10px] text-muted-foreground font-mono">{counts.Платформа}</span>
+              {t('news.category.platform')} <span className="text-[10px] text-muted-foreground font-mono">{counts.Платформа}</span>
             </TabsTrigger>
             <TabsTrigger value="Партнёрство" className="gap-1.5">
-              Партнёрство <span className="text-[10px] text-muted-foreground font-mono">{counts.Партнёрство}</span>
+              {t('news.category.partnerstvo')} <span className="text-[10px] text-muted-foreground font-mono">{counts.Партнёрство}</span>
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -253,7 +264,7 @@ export function NewsView() {
         {filtered.length === 0 ? (
           <Card className="p-10 text-center">
             <Newspaper className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
-            <p className="text-sm text-muted-foreground">Ничего не найдено по запросу</p>
+            <p className="text-sm text-muted-foreground">{t('news.empty')}</p>
           </Card>
         ) : (
           <div className="grid gap-2.5 md:grid-cols-2">
@@ -268,10 +279,10 @@ export function NewsView() {
         {/* Footer */}
         <div className="mt-4 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
           <Badge variant="outline" className="border-border text-muted-foreground">
-            <Newspaper className="w-3 h-3 mr-1" /> Демо-лента РусКрипто
+            <Newspaper className="w-3 h-3 mr-1" /> {t('news.demoFeed')}
           </Badge>
           <span>•</span>
-          <span>Источник: внутренние анонсы и публичные пресс-релизы</span>
+          <span>{t('news.sourceNote')}</span>
         </div>
       </div>
     </div>

@@ -28,6 +28,7 @@ import {
   AreaChart,
 } from 'recharts'
 import { useAppStore } from '@/lib/store'
+import { useI18n } from '@/lib/use-i18n'
 import { fetchTickers } from '@/lib/market'
 import type { CoinTicker } from '@/lib/types'
 import { useMounted } from '@/lib/use-mounted'
@@ -136,14 +137,15 @@ export function PortfolioView() {
   const transactions = useAppStore((s) => s.transactions)
   const setView = useAppStore((s) => s.setView)
   const mounted = useMounted()
+  const { t } = useI18n()
 
   const [tickers, setTickers] = useState<CoinTicker[]>([])
 
   useEffect(() => {
     let mounted = true
     const load = async () => {
-      const t = await fetchTickers()
-      if (mounted) setTickers(t)
+      const tt = await fetchTickers()
+      if (mounted) setTickers(tt)
     }
     load()
     const interval = setInterval(load, 30000)
@@ -153,7 +155,7 @@ export function PortfolioView() {
     }
   }, [])
 
-  const btc = tickers.find((t) => t.symbol === 'BTC')
+  const btc = tickers.find((tk) => tk.symbol === 'BTC')
   const usdRub = btc && btc.priceUsd > 0 ? btc.priceRub / btc.priceUsd : FALLBACK_USD_RUB
 
   const holdings: Holding[] = useMemo(() => {
@@ -232,33 +234,33 @@ export function PortfolioView() {
 
   const handleDownloadTax = () => {
     const lines: string[] = []
-    lines.push('РусКрипто — Налоговый отчёт 3-НДФЛ')
-    lines.push(`Дата формирования,${new Date().toLocaleString('ru-RU')}`)
+    lines.push(t('portfolio.csv.title'))
+    lines.push(`${t('portfolio.csv.generatedAt')},${new Date().toLocaleString('ru-RU')}`)
     lines.push('')
-    lines.push('СВОДКА')
-    lines.push(`Реализованный PnL ₽,${realizedPnL.toFixed(2)}`)
-    lines.push(`Уплачено комиссий ₽,${totalFees.toFixed(2)}`)
-    lines.push(`Количество сделок,${tradesCount}`)
+    lines.push(t('portfolio.csv.summary'))
+    lines.push(`${t('portfolio.csv.realizedPnl')},${realizedPnL.toFixed(2)}`)
+    lines.push(`${t('portfolio.csv.feesPaid')},${totalFees.toFixed(2)}`)
+    lines.push(`${t('portfolio.csv.tradesCount')},${tradesCount}`)
     lines.push('')
-    lines.push('СДЕЛКИ')
-    lines.push('Время,Пара,Сторона,Цена ₽,Количество,Сумма ₽,Комиссия ₽')
+    lines.push(t('portfolio.csv.trades'))
+    lines.push(t('portfolio.csv.tradesHeader'))
     for (const o of orders) {
       lines.push(
         [o.time, o.pair, o.side, o.price, o.quantity, o.total.toFixed(2), o.fee.toFixed(2)].join(',')
       )
     }
     lines.push('')
-    lines.push('ТРАНЗАКЦИИ')
-    lines.push('Время,Тип,Актив,Количество,Статус,Адрес')
-    for (const t of transactions) {
+    lines.push(t('portfolio.csv.txs'))
+    lines.push(t('portfolio.csv.txsHeader'))
+    for (const tx of transactions) {
       lines.push(
-        [t.time, t.type, t.asset, t.amount, t.status, t.address || '-'].join(',')
+        [tx.time, tx.type, tx.asset, tx.amount, tx.status, tx.address || '-'].join(',')
       )
     }
     lines.push('')
-    lines.push('Отчёт сформирован автоматически. Применимо к ФЗ-1194918-8 ст.7, 115-ФЗ.')
+    lines.push(t('portfolio.csv.footer'))
     downloadCSV('ruscrypto-3ndfl.csv', lines.join('\n'))
-    toast.success('3-НДФЛ сформирован', { description: 'Файл CSV загружен' })
+    toast.success(t('portfolio.toast.generated'), { description: t('portfolio.toast.fileReady') })
   }
 
   return (
@@ -269,10 +271,10 @@ export function PortfolioView() {
           <div>
             <h1 className="text-xl lg:text-2xl font-bold flex items-center gap-2.5">
               <PieChartIcon className="w-6 h-6 text-primary" />
-              Портфель
+              {t('portfolio.title')}
             </h1>
             <p className="text-xs text-muted-foreground mt-1">
-              Обзор активов, доходности и налоговой отчётности
+              {t('portfolio.subtitle')}
             </p>
           </div>
           <Badge
@@ -280,7 +282,7 @@ export function PortfolioView() {
             className="gap-1.5 border-primary/30 bg-primary/5 text-primary"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-            Обновлено {mounted ? new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}
+            {t('portfolio.updatedAt')} {mounted ? new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}
           </Badge>
         </div>
 
@@ -289,7 +291,7 @@ export function PortfolioView() {
           <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-primary/10 blur-3xl" aria-hidden />
           <div className="relative grid lg:grid-cols-3 gap-4 items-center">
             <div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Общая стоимость портфеля</div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">{t('portfolio.stat.totalValue')}</div>
               <div className="text-3xl lg:text-4xl font-bold mt-1.5 tabular-nums">
                 {formatPrice(totalRub, 'rub')}
               </div>
@@ -298,7 +300,7 @@ export function PortfolioView() {
               </div>
             </div>
             <div className="lg:border-l lg:border-border lg:pl-4">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Доходность 24ч</div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">{t('portfolio.stat.pnl24')}</div>
               <div
                 className={cn(
                   'text-2xl font-bold mt-1.5 flex items-center gap-2 tabular-nums',
@@ -310,15 +312,15 @@ export function PortfolioView() {
               </div>
               <div className="text-xs text-muted-foreground mt-1">
                 {pnlUp ? '+' : ''}
-                {formatPrice((totalRub * pnl24hPct) / 100, 'rub')} за день
+                {formatPrice((totalRub * pnl24hPct) / 100, 'rub')} {t('portfolio.stat.dayWord')}
               </div>
             </div>
             <div className="lg:border-l lg:border-border lg:pl-4">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Активы в портфеле</div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">{t('portfolio.stat.assets')}</div>
               <div className="text-2xl font-bold mt-1.5 tabular-nums">{distinctAssets}</div>
               <div className="text-xs text-muted-foreground mt-1">
-                {holdings.filter((h) => h.change24h >= 0).length} растут •{' '}
-                {holdings.filter((h) => h.change24h < 0).length} падают
+                {holdings.filter((h) => h.change24h >= 0).length} {t('portfolio.stat.growing')} •{' '}
+                {holdings.filter((h) => h.change24h < 0).length} {t('portfolio.stat.falling')}
               </div>
             </div>
           </div>
@@ -328,7 +330,7 @@ export function PortfolioView() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
           <Card className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-xs text-muted-foreground">Диверсификация</div>
+              <div className="text-xs text-muted-foreground">{t('portfolio.stat.diversification')}</div>
               <Layers className="w-4 h-4 text-primary" />
             </div>
             <div className="text-xl font-bold tabular-nums">{Math.round(diversificationScore)}<span className="text-sm text-muted-foreground">/100</span></div>
@@ -336,7 +338,7 @@ export function PortfolioView() {
           </Card>
           <Card className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-xs text-muted-foreground">Крупнейшая позиция</div>
+              <div className="text-xs text-muted-foreground">{t('portfolio.stat.largestPosition')}</div>
               <Activity className="w-4 h-4 text-warning" />
             </div>
             <div className="text-xl font-bold tabular-nums">{largestPct.toFixed(1)}%</div>
@@ -346,19 +348,19 @@ export function PortfolioView() {
           </Card>
           <Card className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-xs text-muted-foreground">Стейблкоины</div>
+              <div className="text-xs text-muted-foreground">{t('portfolio.stat.stables')}</div>
               <ShieldAlert className="w-4 h-4 text-success" />
             </div>
             <div className="text-xl font-bold tabular-nums text-success">{stablePct.toFixed(1)}%</div>
-            <div className="text-xs text-muted-foreground mt-2">Защитная подушка</div>
+            <div className="text-xs text-muted-foreground mt-2">{t('portfolio.stat.protective')}</div>
           </Card>
           <Card className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-xs text-muted-foreground">Крипто-экспозиция</div>
+              <div className="text-xs text-muted-foreground">{t('portfolio.stat.cryptoExposure')}</div>
               <Coins className="w-4 h-4 text-violet-400" />
             </div>
             <div className="text-xl font-bold tabular-nums">{cryptoPct.toFixed(1)}%</div>
-            <div className="text-xs text-muted-foreground mt-2">Волатильные активы</div>
+            <div className="text-xs text-muted-foreground mt-2">{t('portfolio.stat.volatile')}</div>
           </Card>
         </div>
 
@@ -366,7 +368,7 @@ export function PortfolioView() {
         <div className="grid lg:grid-cols-5 gap-3 mb-3">
           <Card className="lg:col-span-2 p-4">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold">Распределение активов</h2>
+              <h2 className="font-semibold">{t('portfolio.allocation.title')}</h2>
               <PieChartIcon className="w-4 h-4 text-muted-foreground" />
             </div>
             <div className="relative h-[220px]">
@@ -398,7 +400,7 @@ export function PortfolioView() {
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Всего</div>
+                <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{t('portfolio.allocation.total')}</div>
                 <div className="text-lg font-bold tabular-nums">{formatPrice(totalRub, 'rub')}</div>
               </div>
             </div>
@@ -420,20 +422,20 @@ export function PortfolioView() {
 
           <Card className="lg:col-span-3 p-0 overflow-hidden">
             <div className="p-4 pb-3 flex items-center justify-between">
-              <h2 className="font-semibold">Активы</h2>
+              <h2 className="font-semibold">{t('portfolio.holdings.title')}</h2>
               <Button variant="ghost" size="sm" onClick={() => setView('wallet')} className="text-primary">
-                В кошелёк
+                {t('portfolio.holdings.toWallet')}
               </Button>
             </div>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-border">
-                    <TableHead className="pl-4">Актив</TableHead>
-                    <TableHead className="text-right">Кол-во</TableHead>
+                    <TableHead className="pl-4">{t('portfolio.holdings.col.asset')}</TableHead>
+                    <TableHead className="text-right">{t('portfolio.holdings.col.qty')}</TableHead>
                     <TableHead className="text-right">≈ ₽</TableHead>
-                    <TableHead className="text-right">24ч</TableHead>
-                    <TableHead className="text-right pr-4">Доля</TableHead>
+                    <TableHead className="text-right">{t('portfolio.holdings.col.change24')}</TableHead>
+                    <TableHead className="text-right pr-4">{t('portfolio.holdings.col.share')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -495,9 +497,9 @@ export function PortfolioView() {
           <Card className="p-4 mb-3">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h2 className="font-semibold">Доходность портфеля</h2>
+                <h2 className="font-semibold">{t('portfolio.performance.title')}</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  На основе {history.summary.tradeCount} сделок и {history.summary.txCount} транзакций
+                  {t('portfolio.performance.basedOn')} {history.summary.tradeCount} {t('portfolio.performance.tradesWord')} {t('portfolio.performance.and')} {history.summary.txCount} {t('portfolio.performance.txsWord')}
                 </p>
               </div>
               <Badge
@@ -547,7 +549,7 @@ export function PortfolioView() {
                       borderRadius: 8,
                       fontSize: 12,
                     }}
-                    formatter={(v: number) => [formatPrice(v, 'rub'), 'Стоимость']}
+                    formatter={(v: number) => [formatPrice(v, 'rub'), t('portfolio.performance.value')]}
                     labelFormatter={(l) => `${l}`}
                   />
                   <Area
@@ -563,7 +565,7 @@ export function PortfolioView() {
               </ResponsiveContainer>
             </div>
             <p className="text-xs text-muted-foreground mt-3">
-              Стоимость активов рассчитывается по текущим курсам (исторические котировки недоступны в демо).
+              {t('portfolio.performance.disclaimer')}
             </p>
           </Card>
         )}
@@ -578,31 +580,28 @@ export function PortfolioView() {
                   <FileText className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h2 className="font-semibold text-base">Налоговый отчёт 3-НДФЛ</h2>
-                  <p className="text-xs text-muted-foreground">Автоматическое формирование для ФНС</p>
+                  <h2 className="font-semibold text-base">{t('portfolio.tax.title')}</h2>
+                  <p className="text-xs text-muted-foreground">{t('portfolio.tax.subtitle')}</p>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground leading-relaxed mb-4">
-                Платформа автоматически формирует декларацию 3-НДФЛ по сделкам с криптовалютами
-                в соответствии с ФЗ-1194918-8 ст.7. Все реализованные прибыли/убытки,
-                комиссии и транзакции учитываются. Данные можно выгрузить в CSV для импорта
-                в личный кабинет налогоплательщика.
+                {t('portfolio.tax.desc')}
               </p>
               <div className="grid grid-cols-3 gap-3 mb-4">
                 <div className="rounded-xl bg-muted/50 p-3">
-                  <div className="text-xs text-muted-foreground">Реализованный PnL</div>
+                  <div className="text-xs text-muted-foreground">{t('portfolio.tax.realizedPnl')}</div>
                   <div className="text-base font-bold mt-1 tabular-nums text-success">
                     +{formatNumber(realizedPnL, 0)} ₽
                   </div>
                 </div>
                 <div className="rounded-xl bg-muted/50 p-3">
-                  <div className="text-xs text-muted-foreground">Комиссии уплачено</div>
+                  <div className="text-xs text-muted-foreground">{t('portfolio.tax.feesPaid')}</div>
                   <div className="text-base font-bold mt-1 tabular-nums">
                     {formatNumber(totalFees, 2)} ₽
                   </div>
                 </div>
                 <div className="rounded-xl bg-muted/50 p-3">
-                  <div className="text-xs text-muted-foreground">Сделок совершено</div>
+                  <div className="text-xs text-muted-foreground">{t('portfolio.tax.tradesCount')}</div>
                   <div className="text-base font-bold mt-1 tabular-nums">{tradesCount}</div>
                 </div>
               </div>
@@ -611,31 +610,31 @@ export function PortfolioView() {
                 className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2"
               >
                 <Download className="w-4 h-4" />
-                Скачать 3-НДФЛ (CSV)
+                {t('portfolio.tax.download')}
               </Button>
             </div>
             <div className="lg:border-l lg:border-border lg:pl-4 flex flex-col justify-between gap-3">
               <div>
                 <div className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
-                  Регуляторная база
+                  {t('portfolio.tax.regulatoryTitle')}
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-start gap-2 text-sm">
                     <CircleDollarSign className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                    <span>ФЗ-1194918-8 ст.7 — налогообложение</span>
+                    <span>{t('portfolio.tax.reg1')}</span>
                   </div>
                   <div className="flex items-start gap-2 text-sm">
                     <ShieldAlert className="w-4 h-4 text-success shrink-0 mt-0.5" />
-                    <span>115-ФЗ — AML комплаенс</span>
+                    <span>{t('portfolio.tax.reg2')}</span>
                   </div>
                   <div className="flex items-start gap-2 text-sm">
                     <Wallet className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" />
-                    <span>НК РФ ст.214 — НДФЛ 13%</span>
+                    <span>{t('portfolio.tax.reg3')}</span>
                   </div>
                 </div>
               </div>
               <div className="rounded-xl bg-success/5 border border-success/20 p-2.5 text-xs text-success">
-                Отчёт формируется на основе данных за текущий налоговый период (календарный год).
+                {t('portfolio.tax.disclaimer')}
               </div>
             </div>
           </div>

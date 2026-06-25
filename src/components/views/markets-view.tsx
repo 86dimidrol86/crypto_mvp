@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '@/lib/store'
+import { useI18n } from '@/lib/use-i18n'
 import { fetchTickers, jitterPrice } from '@/lib/market'
 import type { CoinTicker, PriceAlertCondition } from '@/lib/types'
 import { formatPrice, formatNumber, formatPercent, timeAgo } from '@/lib/format'
@@ -111,6 +112,7 @@ function PriceAlertDialog({
   const addPriceAlert = useAppStore((s) => s.addPriceAlert)
   const removePriceAlert = useAppStore((s) => s.removePriceAlert)
   const togglePriceAlert = useAppStore((s) => s.togglePriceAlert)
+  const { t } = useI18n()
 
   const [open, setOpen] = useState(false)
   const [condition, setCondition] = useState<PriceAlertCondition>('above')
@@ -131,7 +133,7 @@ function PriceAlertDialog({
   const handleAdd = () => {
     const price = parseFloat(targetPrice.replace(',', '.'))
     if (!price || price <= 0) {
-      toast.error('Укажите корректную цену')
+      toast.error(t('markets.alert.toast.invalid'))
       return
     }
     addPriceAlert({
@@ -140,7 +142,7 @@ function PriceAlertDialog({
       targetPrice: price,
       note: note.trim() || undefined,
     })
-    toast.success(`Алерт создан: ${symbol} ${condition === 'above' ? '≥' : '≤'} ${price.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽`)
+    toast.success(`${t('markets.alert.toast.created')} ${symbol} ${condition === 'above' ? '≥' : '≤'} ${price.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽`)
     setNote('')
     setOpen(false)
   }
@@ -154,7 +156,7 @@ function PriceAlertDialog({
         size="icon"
         className="relative h-7 w-7"
         onClick={() => setOpen(true)}
-        title={`Алерты по ${symbol}`}
+        title={`${t('markets.alert.title.bySymbol')} ${symbol}`}
       >
         {activeCount > 0 ? (
           <BellRing className="w-3.5 h-3.5 text-primary" />
@@ -172,10 +174,10 @@ function PriceAlertDialog({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <BellRing className="w-5 h-5 text-primary" />
-              Алерт по {symbol}/RUB
+              {t('markets.alert.title.onPair')} {symbol}/RUB
             </DialogTitle>
             <DialogDescription>
-              Уведомим, когда цена пересечет заданный порог. Текущая цена:{' '}
+              {t('markets.alert.desc')}{' '}
               <span className="font-mono tabular-nums text-foreground">
                 {currentPrice > 0
                   ? `${currentPrice.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽`
@@ -188,7 +190,7 @@ function PriceAlertDialog({
           {symbolAlerts.length > 0 && (
             <div className="space-y-1.5">
               <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                Текущие алерты ({symbolAlerts.length})
+                {t('markets.alert.current')} ({symbolAlerts.length})
               </div>
               <div className="max-h-32 overflow-y-auto scrollbar-thin space-y-1.5">
                 {symbolAlerts.map((a) => (
@@ -219,15 +221,15 @@ function PriceAlertDialog({
                     </span>
                     {a.triggered ? (
                       <Badge variant="outline" className="h-4 px-1 text-[9px] text-destructive border-destructive/40">
-                        сработал
+                        {t('markets.alert.triggeredWord')}
                       </Badge>
                     ) : a.active ? (
                       <Badge variant="outline" className="h-4 px-1 text-[9px] text-success border-success/40">
-                        активен
+                        {t('markets.alert.activeWord')}
                       </Badge>
                     ) : (
                       <Badge variant="outline" className="h-4 px-1 text-[9px] text-muted-foreground">
-                        пауза
+                        {t('markets.alert.paused')}
                       </Badge>
                     )}
                     <div className="ml-auto flex items-center gap-2">
@@ -235,15 +237,15 @@ function PriceAlertDialog({
                         checked={a.active}
                         onCheckedChange={() => togglePriceAlert(a.id)}
                         className="scale-75"
-                        title={a.active ? 'Поставить на паузу' : 'Возобновить'}
+                        title={a.active ? t('markets.alert.pauseTitle') : t('markets.alert.resumeTitle')}
                       />
                       <button
                         onClick={() => {
                           removePriceAlert(a.id)
-                          toast(`Алерт удалён: ${a.symbol} ${a.condition === 'above' ? '≥' : '≤'} ${a.targetPrice} ₽`)
+                          toast(`${t('markets.alert.deletedToast')} ${a.symbol} ${a.condition === 'above' ? '≥' : '≤'} ${a.targetPrice} ₽`)
                         }}
                         className="text-muted-foreground hover:text-destructive"
-                        title="Удалить"
+                        title={t('markets.alert.deleteTitle')}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -257,7 +259,7 @@ function PriceAlertDialog({
           {/* New alert form */}
           <div className="space-y-3 pt-2 border-t border-border">
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              Новый алерт
+              {t('markets.alert.new')}
             </div>
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -271,8 +273,8 @@ function PriceAlertDialog({
                 )}
               >
                 <ArrowUp className="w-4 h-4" />
-                <span className="text-xs font-semibold">Цена выше</span>
-                <span className="text-[10px] opacity-70">уведомить при росте</span>
+                <span className="text-xs font-semibold">{t('markets.alert.above')}</span>
+                <span className="text-[10px] opacity-70">{t('markets.alert.aboveHint')}</span>
               </button>
               <button
                 type="button"
@@ -285,13 +287,13 @@ function PriceAlertDialog({
                 )}
               >
                 <ArrowDown className="w-4 h-4" />
-                <span className="text-xs font-semibold">Цена ниже</span>
-                <span className="text-[10px] opacity-70">уведомить при падении</span>
+                <span className="text-xs font-semibold">{t('markets.alert.below')}</span>
+                <span className="text-[10px] opacity-70">{t('markets.alert.belowHint')}</span>
               </button>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="alert-price" className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                Целевая цена (₽)
+                {t('markets.alert.target')}
               </Label>
               <Input
                 id="alert-price"
@@ -305,13 +307,13 @@ function PriceAlertDialog({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="alert-note" className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                Заметка (необязательно)
+                {t('markets.alert.note')}
               </Label>
               <Input
                 id="alert-note"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="например: длинная позиция, стоп-лосс…"
+                placeholder={t('markets.alert.notePlaceholder')}
                 maxLength={80}
               />
             </div>
@@ -319,11 +321,11 @@ function PriceAlertDialog({
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>
-              Отмена
+              {t('markets.alert.cancel')}
             </Button>
             <Button onClick={handleAdd} className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90">
               <Plus className="w-4 h-4" />
-              Создать алерт
+              {t('markets.alert.createBtn')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -338,6 +340,7 @@ function MyAlertsSection({ tickers }: { tickers: CoinTicker[] }) {
   const removePriceAlert = useAppStore((s) => s.removePriceAlert)
   const togglePriceAlert = useAppStore((s) => s.togglePriceAlert)
   const mounted = useMounted()
+  const { t } = useI18n()
 
   if (priceAlerts.length === 0) {
     return (
@@ -346,9 +349,9 @@ function MyAlertsSection({ tickers }: { tickers: CoinTicker[] }) {
           <div className="w-10 h-10 rounded-full bg-muted/60 flex items-center justify-center mb-2">
             <Bell className="w-5 h-5 text-muted-foreground" />
           </div>
-          <h3 className="font-semibold text-sm">Алерты по цене</h3>
+          <h3 className="font-semibold text-sm">{t('markets.alertsSection.title')}</h3>
           <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-            Нажмите на колокольчик у любой пары выше, чтобы создать уведомление о достижении ценой заданного уровня.
+            {t('markets.alertsSection.desc')}
           </p>
         </div>
       </Card>
@@ -360,8 +363,8 @@ function MyAlertsSection({ tickers }: { tickers: CoinTicker[] }) {
   const paused = priceAlerts.filter((a) => !a.active && !a.triggered)
 
   const priceFor = (symbol: string): number => {
-    const t = tickers.find((x) => x.symbol === symbol)
-    return t?.priceRub ?? 0
+    const tk = tickers.find((x) => x.symbol === symbol)
+    return tk?.priceRub ?? 0
   }
 
   return (
@@ -369,21 +372,21 @@ function MyAlertsSection({ tickers }: { tickers: CoinTicker[] }) {
       <div className="flex items-center justify-between mb-2.5">
         <div className="flex items-center gap-2">
           <BellRing className="w-4 h-4 text-primary" />
-          <h3 className="font-semibold text-sm">Мои алерты</h3>
+          <h3 className="font-semibold text-sm">{t('markets.myAlerts.title')}</h3>
           <Badge variant="outline" className="text-[10px] text-muted-foreground">
             {priceAlerts.length}
           </Badge>
         </div>
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
           <span className="inline-flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary" /> активных: {active.length}
+            <span className="w-1.5 h-1.5 rounded-full bg-primary" /> {t('markets.myAlerts.active')} {active.length}
           </span>
           <span className="inline-flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-destructive" /> сработавших: {triggeredAlerts.length}
+            <span className="w-1.5 h-1.5 rounded-full bg-destructive" /> {t('markets.myAlerts.triggered')} {triggeredAlerts.length}
           </span>
           {paused.length > 0 && (
             <span className="inline-flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" /> пауза: {paused.length}
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" /> {t('markets.myAlerts.paused')} {paused.length}
             </span>
           )}
         </div>
@@ -435,7 +438,7 @@ function MyAlertsSection({ tickers }: { tickers: CoinTicker[] }) {
                   <div className="text-[11px] text-muted-foreground shrink-0">
                     {cur > 0 ? (
                       <>
-                        тек. <span className="font-mono tabular-nums">{cur.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽</span>
+                        {t('markets.myAlerts.cur')} <span className="font-mono tabular-nums">{cur.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽</span>
                         <span className={cn('ml-1', Math.abs(distance) < 1 ? 'text-warning' : 'text-muted-foreground/70')}>
                           ({distance >= 0 ? '+' : ''}{distance.toFixed(1)}%)
                         </span>
@@ -452,22 +455,22 @@ function MyAlertsSection({ tickers }: { tickers: CoinTicker[] }) {
                   <div className="ml-auto flex items-center gap-2 shrink-0">
                     {isTriggered ? (
                       <Badge variant="outline" className="text-[10px] text-destructive border-destructive/40">
-                        сработал {a.triggeredAt && mounted ? timeAgo(a.triggeredAt) : ''}
+                        {t('markets.alert.triggeredWord')} {a.triggeredAt && mounted ? timeAgo(a.triggeredAt) : ''}
                       </Badge>
                     ) : (
                       <Switch
                         checked={a.active}
                         onCheckedChange={() => togglePriceAlert(a.id)}
-                        title={a.active ? 'Поставить на паузу' : 'Возобновить'}
+                        title={a.active ? t('markets.alert.pauseTitle') : t('markets.alert.resumeTitle')}
                       />
                     )}
                     <button
                       onClick={() => {
                         removePriceAlert(a.id)
-                        toast(`Алерт удалён: ${a.symbol}`)
+                        toast(`${t('markets.alert.deletedToast')} ${a.symbol}`)
                       }}
                       className="text-muted-foreground hover:text-destructive transition"
-                      title="Удалить"
+                      title={t('markets.alert.deleteTitle')}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -488,6 +491,7 @@ export function MarketsView() {
   const priceAlerts = useAppStore((s) => s.priceAlerts)
   const markPriceAlertTriggered = useAppStore((s) => s.markPriceAlertTriggered)
   const pushNotification = useAppStore((s) => s.pushNotification)
+  const { t } = useI18n()
 
   const [tickers, setTickers] = useState<CoinTicker[]>([])
   const [query, setQuery] = useState('')
@@ -505,8 +509,8 @@ export function MarketsView() {
   useEffect(() => {
     let mounted = true
     const load = async () => {
-      const t = await fetchTickers()
-      if (mounted) setTickers(t)
+      const tt = await fetchTickers()
+      if (mounted) setTickers(tt)
     }
     load()
     const interval = setInterval(load, 12000)
@@ -550,17 +554,17 @@ export function MarketsView() {
       const activeAlerts = currentAlerts.filter((a) => a.active && !a.triggered)
       if (activeAlerts.length === 0) return
       for (const alert of activeAlerts) {
-        const t = currentTickers.find((x) => x.symbol === alert.symbol)
-        if (!t || t.priceRub <= 0) continue
+        const tk = currentTickers.find((x) => x.symbol === alert.symbol)
+        if (!tk || tk.priceRub <= 0) continue
         const crossed =
-          (alert.condition === 'above' && t.priceRub >= alert.targetPrice) ||
-          (alert.condition === 'below' && t.priceRub <= alert.targetPrice)
+          (alert.condition === 'above' && tk.priceRub >= alert.targetPrice) ||
+          (alert.condition === 'below' && tk.priceRub <= alert.targetPrice)
         if (crossed) {
           markPriceAlertTriggered(alert.id)
-          const dir = alert.condition === 'above' ? 'достигла' : 'опустилась до'
-          const msg = `${alert.symbol} ${dir} ${alert.targetPrice.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽ (тек. ${t.priceRub.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽)`
-          toast.warning(`🔔 Алерт: ${alert.symbol}`, { description: msg })
-          pushNotification(`Алерт по ${alert.symbol}`, msg)
+          const dir = alert.condition === 'above' ? t('markets.toast.dirAbove') : t('markets.toast.dirBelow')
+          const msg = `${alert.symbol} ${dir} ${alert.targetPrice.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽ (${t('markets.toast.curWord')} ${tk.priceRub.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽)`
+          toast.warning(`🔔 ${t('markets.toast.alertTitle')} ${alert.symbol}`, { description: msg })
+          pushNotification(`${t('markets.toast.alertBySymbol')} ${alert.symbol}`, msg)
         }
       }
     }
@@ -574,10 +578,10 @@ export function MarketsView() {
       const next = new Set(prev)
       if (next.has(symbol)) {
         next.delete(symbol)
-        toast(`${symbol} удалён из избранного`)
+        toast(`${symbol} ${t('markets.toast.removedFav')}`)
       } else {
         next.add(symbol)
-        toast.success(`${symbol} добавлен в избранное`)
+        toast.success(`${symbol} ${t('markets.toast.addedFav')}`)
       }
       saveFavorites(next)
       return next
@@ -587,18 +591,18 @@ export function MarketsView() {
   // Build pairs array with derived fields
   const rows = useMemo(() => {
     return PAIR_TICKERS.map((p) => {
-      const t = tickers.find((x) => x.symbol === p.symbol)
+      const tk = tickers.find((x) => x.symbol === p.symbol)
       return {
         symbol: p.symbol,
         name: p.name,
         pair: `${p.symbol}/RUB`,
-        priceRub: t?.priceRub ?? 0,
-        priceUsd: t?.priceUsd ?? 0,
-        change24h: t?.change24h ?? 0,
-        high24h: t?.high24h ? t.high24h * (t.priceRub / t.priceUsd || 1) : undefined,
-        low24h: t?.low24h ? t.low24h * (t.priceRub / t.priceUsd || 1) : undefined,
-        volume24hRub: t?.volume24h ? t.volume24h * (t.priceRub / t.priceUsd || 1) : 0,
-        spark: generateSpark(t?.change24h ?? 0),
+        priceRub: tk?.priceRub ?? 0,
+        priceUsd: tk?.priceUsd ?? 0,
+        change24h: tk?.change24h ?? 0,
+        high24h: tk?.high24h ? tk.high24h * (tk.priceRub / tk.priceUsd || 1) : undefined,
+        low24h: tk?.low24h ? tk.low24h * (tk.priceRub / tk.priceUsd || 1) : undefined,
+        volume24hRub: tk?.volume24h ? tk.volume24h * (tk.priceRub / tk.priceUsd || 1) : 0,
+        spark: generateSpark(tk?.change24h ?? 0),
         isFav: favorites.has(p.symbol),
       }
     })
@@ -666,9 +670,9 @@ export function MarketsView() {
                 <LineChart className="w-5 h-5" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold tracking-tight">Рынки</h1>
+                <h1 className="text-2xl font-bold tracking-tight">{t('markets.title')}</h1>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Реальные котировки Binance • 8 торговых пар • обновление каждые 12 сек
+                  {t('markets.subtitle')}
                 </p>
               </div>
             </div>
@@ -679,7 +683,7 @@ export function MarketsView() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <Card className="p-3.5">
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              Объём 24ч (все пары)
+              {t('markets.stat.volumeAll')}
             </div>
             <div className="text-xl font-bold mt-1 font-mono tabular-nums">
               {totalVolume > 0 ? <Volume24h rub={totalVolume} /> : '—'}
@@ -687,7 +691,7 @@ export function MarketsView() {
           </Card>
           <Card className="p-3.5">
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              Растущих / Падающих
+              {t('markets.stat.ratio')}
             </div>
             <div className="text-xl font-bold mt-1 flex items-center gap-2">
               <span className="text-success">{gainers}</span>
@@ -697,7 +701,7 @@ export function MarketsView() {
           </Card>
           <Card className="p-3.5">
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              Топ роста
+              {t('markets.stat.topGainer')}
             </div>
             <div className="text-xl font-bold mt-1 flex items-center gap-2 text-success">
               {topGainer ? (
@@ -712,7 +716,7 @@ export function MarketsView() {
           </Card>
           <Card className="p-3.5">
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              Топ падения
+              {t('markets.stat.topLoser')}
             </div>
             <div className="text-xl font-bold mt-1 flex items-center gap-2 text-destructive">
               {topLoser ? (
@@ -732,13 +736,13 @@ export function MarketsView() {
           <div className="flex flex-col lg:flex-row lg:items-center gap-2.5">
             <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
               <TabsList>
-                <TabsTrigger value="all">Все</TabsTrigger>
+                <TabsTrigger value="all">{t('markets.tab.all')}</TabsTrigger>
                 <TabsTrigger value="favorites">
                   <Star className="w-3.5 h-3.5 mr-1.5" />
-                  Фавориты
+                  {t('markets.tab.favs')}
                 </TabsTrigger>
-                <TabsTrigger value="gainers">Рост</TabsTrigger>
-                <TabsTrigger value="losers">Падение</TabsTrigger>
+                <TabsTrigger value="gainers">{t('markets.tab.gainers')}</TabsTrigger>
+                <TabsTrigger value="losers">{t('markets.tab.losers')}</TabsTrigger>
               </TabsList>
             </Tabs>
 
@@ -747,7 +751,7 @@ export function MarketsView() {
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Поиск по символу или названию…"
+                placeholder={t('markets.search')}
                 className="pl-9 h-9"
               />
             </div>
@@ -759,28 +763,28 @@ export function MarketsView() {
           {/* Header */}
           <div className="grid grid-cols-[1.6fr_1fr_0.8fr_0.8fr_0.8fr_1fr_0.5fr_0.7fr] gap-3 px-3 py-2.5 border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
             <button onClick={() => toggleSort('name')} className="flex items-center gap-1 text-left">
-              Пара {sortKey === 'name' && <span>{sortDir === 'asc' ? '▲' : '▼'}</span>}
+              {t('markets.col.pair')} {sortKey === 'name' && <span>{sortDir === 'asc' ? '▲' : '▼'}</span>}
             </button>
             <button onClick={() => toggleSort('price')} className="flex items-center gap-1 text-right justify-end">
-              Цена {sortKey === 'price' && <span>{sortDir === 'asc' ? '▲' : '▼'}</span>}
+              {t('markets.col.price')} {sortKey === 'price' && <span>{sortDir === 'asc' ? '▲' : '▼'}</span>}
             </button>
             <button onClick={() => toggleSort('change')} className="flex items-center gap-1 text-right justify-end">
-              Изм. 24ч {sortKey === 'change' && <span>{sortDir === 'asc' ? '▲' : '▼'}</span>}
+              {t('markets.col.change')} {sortKey === 'change' && <span>{sortDir === 'asc' ? '▲' : '▼'}</span>}
             </button>
-            <span className="text-right">Макс 24ч</span>
-            <span className="text-right">Мин 24ч</span>
+            <span className="text-right">{t('markets.col.high24')}</span>
+            <span className="text-right">{t('markets.col.low24')}</span>
             <button onClick={() => toggleSort('volume')} className="flex items-center gap-1 text-right justify-end">
-              Объём 24ч {sortKey === 'volume' && <span>{sortDir === 'asc' ? '▲' : '▼'}</span>}
+              {t('markets.col.volume24')} {sortKey === 'volume' && <span>{sortDir === 'asc' ? '▲' : '▼'}</span>}
             </button>
-            <span className="text-center">Алерты</span>
-            <span className="text-right">Действие</span>
+            <span className="text-center">{t('markets.col.alerts')}</span>
+            <span className="text-right">{t('markets.col.action')}</span>
           </div>
 
           {loading ? (
             <TableSkeleton rows={8} />
           ) : sorted.length === 0 ? (
             <div className="py-12 text-center text-sm text-muted-foreground">
-              Нет подходящих пар
+              {t('markets.empty')}
             </div>
           ) : (
             <div className="flex flex-col">
@@ -796,7 +800,7 @@ export function MarketsView() {
                     <div className="flex items-center gap-2.5 min-w-0">
                       <button
                         onClick={() => toggleFav(r.symbol)}
-                        aria-label={r.isFav ? 'Убрать из избранного' : 'Добавить в избранное'}
+                        aria-label={r.isFav ? t('markets.fav.remove') : t('markets.fav.add')}
                         className="shrink-0"
                       >
                         <Star
@@ -865,7 +869,7 @@ export function MarketsView() {
                         onClick={() => goTrade(r.pair)}
                         className="h-7 gap-1 bg-primary text-primary-foreground hover:bg-primary/90 text-xs px-2.5"
                       >
-                        Торговать
+                        {t('markets.action.trade')}
                         <ArrowRight className="w-3 h-3" />
                       </Button>
                     </div>
@@ -882,7 +886,7 @@ export function MarketsView() {
             <TableSkeleton rows={6} />
           ) : sorted.length === 0 ? (
             <div className="py-12 text-center text-sm text-muted-foreground">
-              Нет подходящих пар
+              {t('markets.empty')}
             </div>
           ) : (
             sorted.map((r) => {
@@ -892,7 +896,7 @@ export function MarketsView() {
                 <Card key={r.symbol} className="p-3.5">
                   <div className="flex items-center justify-between mb-2.5">
                     <div className="flex items-center gap-2.5">
-                      <button onClick={() => toggleFav(r.symbol)} aria-label="Избранное">
+                      <button onClick={() => toggleFav(r.symbol)} aria-label={t('markets.fav.aria')}>
                         <Star
                           className={cn(
                             'w-4 h-4',
@@ -924,7 +928,7 @@ export function MarketsView() {
 
                   <div className="flex items-end justify-between mb-2.5">
                     <div>
-                      <div className="text-[10px] text-muted-foreground uppercase">Цена</div>
+                      <div className="text-[10px] text-muted-foreground uppercase">{t('markets.col.price')}</div>
                       <div className="text-xl font-mono font-bold tabular-nums">
                         {r.priceRub > 0
                           ? r.priceRub.toLocaleString('ru-RU', {
@@ -940,15 +944,15 @@ export function MarketsView() {
 
                   <div className="grid grid-cols-3 gap-2 text-[11px] mb-2.5">
                     <div>
-                      <div className="text-muted-foreground">Макс 24ч</div>
+                      <div className="text-muted-foreground">{t('markets.col.high24')}</div>
                       <div className="font-mono tabular-nums">{r.high24h ? formatPrice(r.high24h, 'rub') : '—'}</div>
                     </div>
                     <div>
-                      <div className="text-muted-foreground">Мин 24ч</div>
+                      <div className="text-muted-foreground">{t('markets.col.low24')}</div>
                       <div className="font-mono tabular-nums">{r.low24h ? formatPrice(r.low24h, 'rub') : '—'}</div>
                     </div>
                     <div>
-                      <div className="text-muted-foreground">Объём</div>
+                      <div className="text-muted-foreground">{t('common.volume')}</div>
                       <div className="font-mono tabular-nums"><Volume24h rub={r.volume24hRub} /></div>
                     </div>
                   </div>
@@ -958,7 +962,7 @@ export function MarketsView() {
                       onClick={() => goTrade(r.pair)}
                       className="flex-1 h-9 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 text-sm"
                     >
-                      Торговать {r.symbol}
+                      {t('markets.action.trade')} {r.symbol}
                       <ArrowRight className="w-4 h-4" />
                     </Button>
                     <PriceAlertDialog symbol={r.symbol} currentPrice={r.priceRub} />
@@ -975,14 +979,14 @@ export function MarketsView() {
         {/* Footer hint */}
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
           <Badge variant="outline" className="border-border text-muted-foreground">
-            <Star className="w-3 h-3 mr-1 fill-primary text-primary" /> Фавориты хранятся локально
+            <Star className="w-3 h-3 mr-1 fill-primary text-primary" /> {t('markets.note.favs')}
           </Badge>
           <span>•</span>
           <Badge variant="outline" className="border-border text-muted-foreground">
-            <Bell className="w-3 h-3 mr-1 text-primary" /> Алерты проверяются каждые 3.5 сек
+            <Bell className="w-3 h-3 mr-1 text-primary" /> {t('markets.note.alerts')}
           </Badge>
           <span>•</span>
-          <span>Котировки: Binance 24hr ticker · USD/RUB: exchangerate-api</span>
+          <span>{t('markets.note.source')}</span>
         </div>
       </div>
     </div>

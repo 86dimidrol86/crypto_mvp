@@ -16,6 +16,7 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
+import { useI18n } from '@/lib/use-i18n'
 import { useApi, apiPost, apiPatch } from '@/lib/use-api'
 import type { P2POffer, P2PDeal, OrderSide, DealStatus } from '@/lib/types'
 import { formatNumber, formatPrice } from '@/lib/format'
@@ -117,13 +118,14 @@ function RatingStars({ rating }: { rating: number }) {
   )
 }
 
-function dealStatusBadge(status: DealStatus) {
+function DealStatusBadge({ status }: { status: DealStatus }) {
+  const { t } = useI18n()
   const map: Record<DealStatus, { label: string; cls: string }> = {
-    PENDING: { label: 'Ожидает оплаты', cls: 'bg-warning/15 text-warning border-warning/30' },
-    PAID: { label: 'Оплачено', cls: 'bg-sky-500/15 text-sky-400 border-sky-500/30' },
-    COMPLETED: { label: 'Завершено', cls: 'bg-success/15 text-success border-success/30' },
-    CANCELLED: { label: 'Отменено', cls: 'bg-muted/60 text-muted-foreground border-border' },
-    DISPUTE: { label: 'Спор', cls: 'bg-destructive/15 text-destructive border-destructive/30' },
+    PENDING: { label: t('p2p.status.PENDING'), cls: 'bg-warning/15 text-warning border-warning/30' },
+    PAID: { label: t('p2p.status.PAID'), cls: 'bg-sky-500/15 text-sky-400 border-sky-500/30' },
+    COMPLETED: { label: t('p2p.status.COMPLETED'), cls: 'bg-success/15 text-success border-success/30' },
+    CANCELLED: { label: t('p2p.status.CANCELLED'), cls: 'bg-muted/60 text-muted-foreground border-border' },
+    DISPUTE: { label: t('p2p.status.DISPUTE'), cls: 'bg-destructive/15 text-destructive border-destructive/30' },
   }
   const s = map[status]
   return (
@@ -141,11 +143,12 @@ function OfferRow({
   offer: P2POffer
   onAccept: (o: P2POffer) => void
 }) {
+  const { t } = useI18n()
   // Active tab "buy USDT" shows offers where OTHER users are SELLING (we buy from them).
   // Active tab "sell USDT" shows offers where OTHER users are BUYING (we sell to them).
   // The store keeps offer.type as the maker's side; we accept and the deal is created with opposite side.
   const isBuyOffer = offer.type === 'buy'
-  const actionLabel = isBuyOffer ? 'Продать USDT' : 'Купить USDT'
+  const actionLabel = isBuyOffer ? t('p2p.action.sellUsdt') : t('p2p.action.buyUsdt')
   const actionCls = isBuyOffer
     ? 'bg-destructive text-white hover:bg-destructive/90'
     : 'bg-success text-success-foreground hover:bg-success/90'
@@ -158,7 +161,7 @@ function OfferRow({
         <div className="min-w-0">
           <div className="text-sm font-medium truncate">{offer.user}</div>
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-            <span>{offer.completed} сделок</span>
+            <span>{offer.completed} {t('p2p.offer.deals')}</span>
             {offer.rating && <RatingStars rating={offer.rating} />}
           </div>
         </div>
@@ -170,13 +173,13 @@ function OfferRow({
           {offer.method}
         </Badge>
         <div className="text-[10px] text-muted-foreground mt-1">
-          {offer.fiat} • лимиты 100–{formatNumber(offer.amount * offer.price, 0)} ₽
+          {offer.fiat} • {t('p2p.offer.limits')} 100–{formatNumber(offer.amount * offer.price, 0)} ₽
         </div>
       </div>
 
       {/* Amount */}
       <div className="col-span-6 sm:col-span-2 text-right">
-        <div className="text-[10px] text-muted-foreground">Доступно</div>
+        <div className="text-[10px] text-muted-foreground">{t('p2p.offer.available')}</div>
         <div className="text-sm font-mono tabular-nums">
           {formatNumber(offer.amount, 0)} {offer.asset}
         </div>
@@ -188,7 +191,7 @@ function OfferRow({
           <div className="text-lg font-mono font-bold tabular-nums text-primary">
             {formatNumber(offer.price, 2)} ₽
           </div>
-          <div className="text-[10px] text-muted-foreground">за 1 USDT</div>
+          <div className="text-[10px] text-muted-foreground">{t('p2p.offer.perUsdt')}</div>
         </div>
         <Button
           size="sm"
@@ -212,6 +215,7 @@ function OffersSection({
   loading: boolean
   onAcceptOffer: (offer: P2POffer) => void
 }) {
+  const { t } = useI18n()
   const storeOffers = useAppStore((s) => s.p2pOffers)
   const offers = apiOffers && apiOffers.length > 0 ? apiOffers : storeOffers
   const [tab, setTab] = useState<'buy' | 'sell'>('buy')
@@ -242,7 +246,7 @@ function OffersSection({
 
   const handleAccept = (offer: P2POffer) => {
     onAcceptOffer(offer)
-    toast.success('Сделка P2P создана', {
+    toast.success(t('p2p.toast.created'), {
       description: `${formatNumber(offer.amount, 0)} USDT • ${formatNumber(
         offer.price,
         2
@@ -267,7 +271,7 @@ function OffersSection({
                 : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted/60'
             )}
           >
-            Купить USDT
+            {t('p2p.listings.buyTab')}
           </button>
           <button
             onClick={() => setTab('sell')}
@@ -278,7 +282,7 @@ function OffersSection({
                 : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted/60'
             )}
           >
-            Продать USDT
+            {t('p2p.listings.sellTab')}
           </button>
         </div>
       </div>
@@ -290,7 +294,7 @@ function OffersSection({
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск по имени или методу"
+            placeholder={t('p2p.listings.searchPlaceholder')}
             className="pl-8 h-9 text-sm"
           />
         </div>
@@ -298,34 +302,34 @@ function OffersSection({
           type="number"
           value={minPrice}
           onChange={(e) => setMinPrice(e.target.value)}
-          placeholder="Мин. цена ₽"
+          placeholder={t('p2p.listings.minPrice')}
           className="h-9 text-sm font-mono"
         />
         <Input
           type="number"
           value={maxPrice}
           onChange={(e) => setMaxPrice(e.target.value)}
-          placeholder="Макс. цена ₽"
+          placeholder={t('p2p.listings.maxPrice')}
           className="h-9 text-sm font-mono"
         />
         <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
           <SelectTrigger className="h-9 text-sm">
-            <SelectValue placeholder="Сортировка" />
+            <SelectValue placeholder={t('p2p.listings.sort')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="none">Без сортировки</SelectItem>
-            <SelectItem value="price-asc">Цена ↑</SelectItem>
-            <SelectItem value="price-desc">Цена ↓</SelectItem>
+            <SelectItem value="none">{t('p2p.listings.sortNone')}</SelectItem>
+            <SelectItem value="price-asc">{t('p2p.listings.sortPriceAsc')}</SelectItem>
+            <SelectItem value="price-desc">{t('p2p.listings.sortPriceDesc')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       {/* Header row (desktop) */}
       <div className="hidden sm:grid grid-cols-12 gap-3 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground bg-muted/30 border-b border-border">
-        <span className="col-span-4">Рекламодатель</span>
-        <span className="col-span-3">Способ оплаты</span>
-        <span className="col-span-2 text-right">Доступно</span>
-        <span className="col-span-3 text-right">Цена</span>
+        <span className="col-span-4">{t('p2p.listings.col.advertiser')}</span>
+        <span className="col-span-3">{t('p2p.listings.col.method')}</span>
+        <span className="col-span-2 text-right">{t('p2p.listings.col.available')}</span>
+        <span className="col-span-3 text-right">{t('p2p.listings.col.price')}</span>
       </div>
 
       {showSkeleton ? (
@@ -337,9 +341,9 @@ function OffersSection({
       ) : filtered.length === 0 ? (
         <div className="p-8 text-center">
           <Users className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
-          <p className="text-sm text-muted-foreground">Нет подходящих объявлений</p>
+          <p className="text-sm text-muted-foreground">{t('p2p.listings.empty')}</p>
           <p className="text-[11px] text-muted-foreground/70 mt-1">
-            Измените фильтры или создайте своё
+            {t('p2p.listings.emptyHint')}
           </p>
         </div>
       ) : (
@@ -371,6 +375,7 @@ function CreateOfferDialog({
   onCreated?: () => void
 }) {
   const addP2POffer = useAppStore((s) => s.addP2POffer)
+  const { t } = useI18n()
   const [type, setType] = useState<OrderSide>('buy')
   const [price, setPrice] = useState('')
   const [amount, setAmount] = useState('')
@@ -380,11 +385,11 @@ function CreateOfferDialog({
     const p = parseFloat(price)
     const a = parseFloat(amount)
     if (!p || p <= 0) {
-      toast.error('Введите корректную цену')
+      toast.error(t('p2p.create.toast.priceInvalid'))
       return
     }
     if (!a || a <= 0) {
-      toast.error('Введите количество USDT')
+      toast.error(t('p2p.create.toast.qtyRequired'))
       return
     }
     // Persist via API (fire-and-forget resilience; local store update is the source of UI truth)
@@ -405,15 +410,15 @@ function CreateOfferDialog({
       fiat: 'RUB',
       price: p,
       amount: a,
-      user: 'Вы',
+      user: t('p2p.create.you'),
       method,
       rating: 5,
     })
-    toast.success('Объявление создано', {
-      description: `${type === 'buy' ? 'Покупка' : 'Продажа'} ${formatNumber(
+    toast.success(t('p2p.create.toast.created'), {
+      description: `${type === 'buy' ? t('p2p.create.toast.buyWord') : t('p2p.create.toast.sellWord')} ${formatNumber(
         a,
         0
-      )} USDT по ${formatNumber(p, 2)} ₽`,
+      )} USDT ${t('p2p.create.toast.byWord')} ${formatNumber(p, 2)} ₽`,
     })
     setPrice('')
     setAmount('')
@@ -425,16 +430,16 @@ function CreateOfferDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Создать объявление P2P</DialogTitle>
+          <DialogTitle>{t('p2p.create.title')}</DialogTitle>
           <DialogDescription>
-            Опубликуйте своё объявление по покупке или продаже USDT за рубли.
+            {t('p2p.create.desc')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 py-2">
           <div className="space-y-1.5">
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-              Тип сделки
+              {t('p2p.create.typeLabel')}
             </Label>
             <div className="grid grid-cols-2 gap-1.5">
               <button
@@ -446,7 +451,7 @@ function CreateOfferDialog({
                     : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted/60'
                 )}
               >
-                Купить USDT
+                {t('p2p.listings.buyTab')}
               </button>
               <button
                 onClick={() => setType('sell')}
@@ -457,7 +462,7 @@ function CreateOfferDialog({
                     : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted/60'
                 )}
               >
-                Продать USDT
+                {t('p2p.listings.sellTab')}
               </button>
             </div>
           </div>
@@ -465,7 +470,7 @@ function CreateOfferDialog({
           <div className="grid grid-cols-2 gap-2.5">
             <div className="space-y-1.5">
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-                Цена за USDT, ₽
+                {t('p2p.create.priceLabel')}
               </Label>
               <Input
                 type="number"
@@ -477,7 +482,7 @@ function CreateOfferDialog({
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-                Количество USDT
+                {t('p2p.create.qtyLabel')}
               </Label>
               <Input
                 type="number"
@@ -491,7 +496,7 @@ function CreateOfferDialog({
 
           <div className="space-y-1.5">
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-              Способ оплаты
+              {t('p2p.create.methodLabel')}
             </Label>
             <Select value={method} onValueChange={setMethod}>
               <SelectTrigger className="w-full">
@@ -509,7 +514,7 @@ function CreateOfferDialog({
 
           {price && amount && (
             <div className="rounded-lg bg-muted/40 border border-border px-3 py-2.5 flex justify-between text-sm">
-              <span className="text-muted-foreground">Итого сделка</span>
+              <span className="text-muted-foreground">{t('p2p.create.totalLabel')}</span>
               <span className="font-mono tabular-nums font-semibold">
                 {formatNumber((parseFloat(price) || 0) * (parseFloat(amount) || 0), 0)} ₽
               </span>
@@ -519,13 +524,13 @@ function CreateOfferDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Отмена
+            {t('p2p.create.cancel')}
           </Button>
           <Button
             onClick={handleSubmit}
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            Опубликовать
+            {t('p2p.create.publish')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -556,12 +561,13 @@ function ChatWidget({
   deal: P2PDeal
   onClose: () => void
 }) {
+  const { t } = useI18n()
   const [messages, setMessages] = useState<ChatMsg[]>(() => [
     {
       id: '1',
       from: 'them',
-      text: `Здравствуйте! Сделка по ${formatNumber(deal.amount, 0)} USDT готова. ${
-        deal.type === 'buy' ? 'Отправлю реквизиты для оплаты.' : 'Жду вашу оплату.'
+      text: `${t('p2p.chat.helloPrefix')} ${formatNumber(deal.amount, 0)} USDT ${t('p2p.chat.readyWord')}. ${
+        deal.type === 'buy' ? t('p2p.chat.helloSuffix1') : t('p2p.chat.helloSuffix2')
       }`,
       time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
     },
@@ -598,7 +604,7 @@ function ChatWidget({
           <div className="text-sm font-semibold truncate">{deal.counterparty}</div>
           <div className="text-[10px] text-success flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-success" />
-            онлайн • {deal.paymentMethod}
+            {t('p2p.chat.online')} • {deal.paymentMethod}
           </div>
         </div>
         <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onClose}>
@@ -641,7 +647,7 @@ function ChatWidget({
           onKeyDown={(e) => {
             if (e.key === 'Enter') send()
           }}
-          placeholder="Сообщение..."
+          placeholder={t('p2p.chat.placeholder')}
           className="h-9 text-sm"
         />
         <Button size="icon" className="h-9 w-9 bg-primary hover:bg-primary/90" onClick={send}>
@@ -660,6 +666,7 @@ function MyDealsSection({
   apiDeals: P2PDeal[] | null
   onRefresh?: () => void
 }) {
+  const { t } = useI18n()
   const storeDeals = useAppStore((s) => s.p2pDeals)
   const updateDealStatus = useAppStore((s) => s.updateDealStatus)
   const [subtab, setSubtab] = useState<'active' | 'completed'>('active')
@@ -688,7 +695,7 @@ function MyDealsSection({
       // Ignore API error — still mirror locally
     }
     updateDealStatus(d.id, 'COMPLETED')
-    toast.success('Сделка завершена', {
+    toast.success(t('p2p.deals.toast.completed'), {
       description: `${formatNumber(d.amount, 0)} USDT • ${formatNumber(
         d.total || d.amount * d.price,
         0
@@ -703,7 +710,7 @@ function MyDealsSection({
       // Ignore API error — still mirror locally
     }
     updateDealStatus(d.id, 'CANCELLED')
-    toast.error('Сделка отменена', {
+    toast.error(t('p2p.deals.toast.cancelled'), {
       description: `${d.counterparty} • ${formatNumber(d.amount, 0)} USDT`,
     })
     onRefresh?.()
@@ -714,7 +721,7 @@ function MyDealsSection({
       <div className="px-3 py-2.5 border-b border-border flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4 text-primary" />
-          <h3 className="text-sm font-semibold">Мои сделки</h3>
+          <h3 className="text-sm font-semibold">{t('p2p.deals.title')}</h3>
           <Badge variant="secondary" className="text-[10px]">
             {p2pDeals.length}
           </Badge>
@@ -722,10 +729,10 @@ function MyDealsSection({
         <Tabs value={subtab} onValueChange={(v) => setSubtab(v as typeof subtab)}>
           <TabsList className="h-8">
             <TabsTrigger value="active" className="text-xs px-2.5">
-              Активные ({p2pDeals.filter((d) => activeStatuses.includes(d.status)).length})
+              {t('p2p.deals.active')} ({p2pDeals.filter((d) => activeStatuses.includes(d.status)).length})
             </TabsTrigger>
             <TabsTrigger value="completed" className="text-xs px-2.5">
-              Завершённые ({p2pDeals.filter((d) => completedStatuses.includes(d.status)).length})
+              {t('p2p.deals.completed')} ({p2pDeals.filter((d) => completedStatuses.includes(d.status)).length})
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -735,10 +742,10 @@ function MyDealsSection({
         <div className="p-8 text-center">
           <Clock className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
           <p className="text-sm text-muted-foreground">
-            {subtab === 'active' ? 'Нет активных сделок' : 'Нет завершённых сделок'}
+            {subtab === 'active' ? t('p2p.deals.emptyActive') : t('p2p.deals.emptyCompleted')}
           </p>
           <p className="text-[11px] text-muted-foreground/70 mt-1">
-            Примите объявление выше, чтобы начать
+            {t('p2p.deals.emptyHint')}
           </p>
         </div>
       ) : (
@@ -762,30 +769,30 @@ function MyDealsSection({
                           : 'bg-destructive/15 text-destructive'
                       )}
                     >
-                      {isBuy ? 'Покупка' : 'Продажа'} {d.asset}
+                      {isBuy ? t('common.buy2') : t('common.sell2')} {d.asset}
                     </Badge>
                   </div>
                 </div>
                 <div className="col-span-6 sm:col-span-3">
-                  <div className="text-[10px] text-muted-foreground">Количество</div>
+                  <div className="text-[10px] text-muted-foreground">{t('p2p.deals.qty')}</div>
                   <div className="text-sm font-mono tabular-nums">
                     {formatNumber(d.amount, 2)} {d.asset}
                   </div>
                 </div>
                 <div className="col-span-6 sm:col-span-2">
-                  <div className="text-[10px] text-muted-foreground">Цена</div>
+                  <div className="text-[10px] text-muted-foreground">{t('p2p.deals.price')}</div>
                   <div className="text-sm font-mono tabular-nums">
                     {formatNumber(d.price, 2)} ₽
                   </div>
                 </div>
                 <div className="col-span-6 sm:col-span-2">
-                  <div className="text-[10px] text-muted-foreground">Сумма</div>
+                  <div className="text-[10px] text-muted-foreground">{t('p2p.deals.sum')}</div>
                   <div className="text-sm font-mono tabular-nums font-semibold">
                     {formatPrice(d.total || d.amount * d.price, 'rub')}
                   </div>
                 </div>
                 <div className="col-span-6 sm:col-span-2 flex flex-col items-end gap-1">
-                  {dealStatusBadge(d.status)}
+                  <DealStatusBadge status={d.status} />
                   {activeStatuses.includes(d.status) && (
                     <div className="flex gap-1">
                       <Button
@@ -795,7 +802,7 @@ function MyDealsSection({
                         onClick={() => setChatDealId(d.id)}
                       >
                         <MessageCircle className="w-3 h-3" />
-                        Чат
+                        {t('p2p.deals.chat')}
                       </Button>
                       {d.status === 'PENDING' && (
                         <>
@@ -832,6 +839,7 @@ function MyDealsSection({
 
 // ─── Main P2PView ───────────────────────────────────────────────────────────
 export function P2PView() {
+  const { t } = useI18n()
   const [createOpen, setCreateOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const p2pUrl = refreshKey ? `/api/p2p?t=${refreshKey}` : '/api/p2p'
@@ -870,9 +878,9 @@ export function P2PView() {
               <Users className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">P2P Торговля</h1>
+              <h1 className="text-xl font-bold tracking-tight">{t('p2p.header.title')}</h1>
               <p className="text-xs text-muted-foreground">
-                Прямая торговля USDT/RUB • эскроу-гарант • 0% комиссия
+                {t('p2p.header.subtitle')}
               </p>
             </div>
           </div>
@@ -881,7 +889,7 @@ export function P2PView() {
             className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2"
           >
             <Plus className="w-4 h-4" />
-            Создать объявление
+            {t('p2p.header.create')}
           </Button>
         </div>
 
@@ -890,29 +898,29 @@ export function P2PView() {
           <Card className="p-3 flex items-center gap-2.5">
             <ShieldCheck className="w-5 h-5 text-success shrink-0" />
             <div>
-              <div className="text-sm font-semibold">Эскроу-гарант</div>
-              <div className="text-[10px] text-muted-foreground">USDT блокируются</div>
+              <div className="text-sm font-semibold">{t('p2p.features.escrow.title')}</div>
+              <div className="text-[10px] text-muted-foreground">{t('p2p.features.escrow.sub')}</div>
             </div>
           </Card>
           <Card className="p-3 flex items-center gap-2.5">
             <Clock className="w-5 h-5 text-warning shrink-0" />
             <div>
-              <div className="text-sm font-semibold">15 мин окно</div>
-              <div className="text-[10px] text-muted-foreground">на оплату СБП</div>
+              <div className="text-sm font-semibold">{t('p2p.features.window.title')}</div>
+              <div className="text-[10px] text-muted-foreground">{t('p2p.features.window.sub')}</div>
             </div>
           </Card>
           <Card className="p-3 flex items-center gap-2.5">
             <TrendingUp className="w-5 h-5 text-primary shrink-0" />
             <div>
-              <div className="text-sm font-semibold">0% комиссия</div>
-              <div className="text-[10px] text-muted-foreground">на P2P-сделки</div>
+              <div className="text-sm font-semibold">{t('p2p.features.fee.title')}</div>
+              <div className="text-[10px] text-muted-foreground">{t('p2p.features.fee.sub')}</div>
             </div>
           </Card>
           <Card className="p-3 flex items-center gap-2.5">
             <MessageCircle className="w-5 h-5 text-sky-400 shrink-0" />
             <div>
-              <div className="text-sm font-semibold">Встроенный чат</div>
-              <div className="text-[10px] text-muted-foreground">+ арбитраж</div>
+              <div className="text-sm font-semibold">{t('p2p.features.chat.title')}</div>
+              <div className="text-[10px] text-muted-foreground">{t('p2p.features.chat.sub')}</div>
             </div>
           </Card>
         </div>

@@ -61,6 +61,9 @@ import { AuthView } from '@/components/views/auth-view'
 import { AdminView } from '@/components/views/admin-view'
 import { MarginView } from '@/components/views/margin-view'
 import { NewsView } from '@/components/views/news-view'
+import { HelpView } from '@/components/views/help-view'
+import { HelpChatWidget } from '@/components/help-chat-widget'
+import { HelpCircle } from 'lucide-react'
 
 interface NavItem {
   id: ViewId
@@ -74,6 +77,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { id: 'home', label: 'nav.home', i18n: true, icon: Home, group: 'nav.group.obzor', groupI18n: true },
   { id: 'news', label: 'nav.news', i18n: true, icon: Newspaper, group: 'nav.group.obzor', groupI18n: true },
+  { id: 'help', label: 'nav.help', i18n: true, icon: HelpCircle, group: 'nav.group.obzor', groupI18n: true },
   { id: 'trade', label: 'nav.trade', i18n: true, icon: CandlestickChart, group: 'nav.group.torgovlya', groupI18n: true },
   { id: 'markets', label: 'nav.markets', i18n: true, icon: LineChart, group: 'nav.group.torgovlya', groupI18n: true },
   { id: 'margin', label: 'nav.margin', i18n: true, icon: TrendingUp, group: 'nav.group.torgovlya', groupI18n: true },
@@ -91,6 +95,7 @@ const NAV: NavItem[] = [
 const VIEW_COMPONENTS: Record<ViewId, React.ComponentType> = {
   home: HomeView,
   news: NewsView,
+  help: HelpView,
   trade: TradeView,
   markets: MarketsView,
   margin: MarginView,
@@ -110,10 +115,14 @@ function SidebarContent({ onNavigate, collapsed }: { onNavigate?: () => void; co
   const activeView = useAppStore((s) => s.activeView)
   const setView = useAppStore((s) => s.setView)
   const alerts = useAppStore((s) => s.alerts)
+  const userRole = useAppStore((s) => s.userRole)
   const openAlerts = alerts.filter((a) => a.status === 'OPEN').length
   const { t } = useI18n()
 
-  const groups = Array.from(new Set(NAV.map((n) => n.group)))
+  const isAdmin = userRole === 'ADMIN' || userRole === 'COMPLIANCE'
+  // Filter admin nav item for non-admin users
+  const visibleNav = NAV.filter((n) => n.id !== 'admin' || isAdmin)
+  const groups = Array.from(new Set(visibleNav.map((n) => n.group)))
 
   const handleClick = (id: ViewId) => {
     setView(id)
@@ -132,7 +141,7 @@ function SidebarContent({ onNavigate, collapsed }: { onNavigate?: () => void; co
             )}
             {collapsed && <div className="h-px mx-2 my-1 bg-border/60" />}
             <div className="flex flex-col gap-0.5">
-              {NAV.filter((n) => n.group === group).map((item) => {
+              {visibleNav.filter((n) => n.group === group).map((item) => {
                 const active = activeView === item.id
                 const label = item.i18n ? t(item.label) : item.label
                 const btn = (
@@ -263,16 +272,10 @@ function Header() {
           </SheetContent>
         </Sheet>
 
-        {/* Logo — desktop */}
-        <div className="hidden lg:block shrink-0">
-          <button onClick={() => setView('home')} className="hover:opacity-80 transition">
-            <Logo size={32} />
-          </button>
-        </div>
-        {/* Logo — mobile (compact, icon only) */}
+        {/* Logo — mobile only (desktop has it in sidebar) */}
         <div className="lg:hidden shrink-0">
           <button onClick={() => setView('home')}>
-            <Logo size={28} showText={false} />
+            <Logo size={26} showText={false} />
           </button>
         </div>
 
@@ -347,6 +350,8 @@ export default function CryptoExchangeApp() {
   const activeView = useAppStore((s) => s.activeView)
   const collapsed = useAppStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useAppStore((s) => s.toggleSidebar)
+  const userRole = useAppStore((s) => s.userRole)
+  const isAdmin = userRole === 'ADMIN' || userRole === 'COMPLIANCE'
   const ViewComponent = VIEW_COMPONENTS[activeView] || HomeView
 
   // Прокрутка наверх при смене view
@@ -366,18 +371,42 @@ export default function CryptoExchangeApp() {
             collapsed ? 'w-[68px]' : 'w-64'
           )}
         >
-          {/* Collapse toggle */}
-          <div className={cn('flex border-b border-border', collapsed ? 'justify-center p-2' : 'justify-end p-2')}>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleSidebar}
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
-            >
-              {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
-            </Button>
+          {/* Logo in sidebar */}
+          <div className={cn('border-b border-border', collapsed ? 'p-2 flex justify-center' : 'px-3 py-2.5 flex items-center justify-between gap-2')}>
+            {collapsed ? (
+              <button onClick={() => setView('home')} aria-label="РусКрипто — на главную">
+                <Logo size={32} showText={false} />
+              </button>
+            ) : (
+              <button onClick={() => setView('home')} className="hover:opacity-80 transition">
+                <Logo size={30} />
+              </button>
+            )}
+            {!collapsed && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleSidebar}
+                className="h-7 w-7 text-muted-foreground hover:text-foreground shrink-0"
+                aria-label="Свернуть меню"
+              >
+                <PanelLeftClose className="w-4 h-4" />
+              </Button>
+            )}
           </div>
+          {collapsed && (
+            <div className="flex justify-center p-2 border-b border-border">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleSidebar}
+                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                aria-label="Развернуть меню"
+              >
+                <PanelLeftOpen className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
           <SidebarContent collapsed={collapsed} />
         </aside>
 
@@ -390,6 +419,8 @@ export default function CryptoExchangeApp() {
           <Footer />
         </div>
       </div>
+      {/* Floating AI assistant — hidden on help view (redundant) */}
+      {activeView !== 'help' && <HelpChatWidget />}
     </div>
   )
 }

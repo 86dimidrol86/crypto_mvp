@@ -1462,3 +1462,219 @@ Stage Summary:
 - 14 views total (added admin). Real Prisma data in analytics, portfolio, profile, admin. i18n RU/EN infrastructure. Skeletons + animations. Compact density throughout. Resizable margin terminal. Fixed TradingView + chart labels.
 - Git: commit 849e221 pushed to origin/spa-mvp (spa-mvp ff'd from main).
 - NEXT: i18n can be extended to remaining views (trade/wallet/p2p/etc) — currently core only. Portfolio historical prices are current-price-approximated (no historical feed). Admin nav not role-gated (visible to all in demo).
+
+---
+Task ID: HELP-CENTER
+Agent: full-stack-developer
+Task: Build "Справочный центр" (Help Center) section + floating AI chatbot for the РусКрипто crypto exchange SPA. 3 deliverables: structured help-content data + help-view, floating HelpChatWidget global, /api/help/chat AI endpoint via z-ai-web-dev-sdk.
+
+Work Log:
+- Read worklog.md last entries (USER+PLANNED-2 / M1-PROFILE — confirmed dark gold #F0B90B theme, compact px-3 lg:px-5 py-4 padding convention, useMounted pattern, i18n RU/EN via useI18n hook).
+- Read context: src/app/page.tsx (NAV array, VIEW_COMPONENTS map, CryptoExchangeApp shell), src/lib/types.ts (ViewId union), src/lib/store.ts (activeView/setView/locale), src/lib/use-i18n.ts (useI18n → t/locale), src/lib/i18n.ts (RU/EN dicts), src/components/views/news-view.tsx (reference: search input + Tabs filter + AnimatePresence + Card grid).
+- Read api/analytics/route.ts + lib/use-api.ts for API pattern conventions.
+
+STEP 1 — types + i18n:
+- Added 'help' to ViewId union in src/lib/types.ts.
+- Added nav.help ('Справка'/'Help') + nav.help.sub keys to both RU and EN dicts in src/lib/i18n.ts.
+
+STEP 2 — help-content.ts (NEW, ~580 lines):
+- Defined HelpSection type (12 sections: spot/margin/p2p/crossborder/wallet/portfolio/analytics/kyc/compliance/markets/news/security).
+- Defined types: FaqItem, HelpArticle, SectionMeta.
+- HELP_SECTIONS array (12 entries + 'all') with bilingual labels + lucide icon name.
+- POPULAR_QUESTIONS array — 6 curated bilingual Q&A (market vs limit orders, liquidation, network confirmations, Gosuslugi KYC, AML check, 3-NDFL tax report).
+- HELP_ARTICLES array — 14 structured articles, each with id, section, title {ru,en}, definition {ru,en}, howTo {ru:string[], en:string[]}, faq[] {q,a}{ru,en}. Topics: spot-overview (orders/TIF/fees), spot-orderbook (reading book/spread), spot-fees (maker/taker/limits/funding), margin-overview (leverage 20x/long/short/liquidation/ratio/call), p2p-overview (escrow/SBP/disputes/payment methods), crossborder-overview (173-FZ/saga/corridors RU-CN/AE/TR/IN/KZ/AM/SWIFT MT103), wallet-overview (deposit/withdraw/whitelist), wallet-networks (TRC-20/ERC-20/BEP-20/confirmations), portfolio-overview (allocation/PnL/3-NDFL/CSV), analytics-overview (KPIs/Binance/ЦБ РФ), kyc-overview (L0/L1/L2/Gosuslugi/ESIA/qualified investor), compliance-overview (AML/SHAP/SAR/quarantine/115-ФЗ), markets-overview (favorites/alerts/sparkline), news-overview (categories/ticker), security-overview (2FA/anti-phishing/login history/sessions/whitelist). All content REAL, user-facing Russian for investors + English translations.
+- SECTION_SUMMARIES: 12 short bilingual summaries injected into AI system prompt as context.
+
+STEP 3 — help-view.tsx (NEW, ~300 lines, 'use client'):
+- Header: HelpCircle icon + "Справочный центр"/"Help Center" title + subtitle with article count + search Input (filters by title/definition/faq q+a/howTo steps in both ru and en).
+- PopularQuestions card (gold-tinted bg-primary/5 border-primary/20) with Accordion of 6 curated Q&A, shown only when section='all' AND no search query.
+- Section Tabs (LayoutGrid/Все + 11 section tabs with icon, label, count badge), horizontal scroll on mobile.
+- ArticleCard: shadcn Accordion. Trigger shows section Badge + title + 2-line definition preview. Expandable content has 3 sub-blocks: Definition (BookOpen icon, muted bg), How to use (ListChecks icon, numbered steps with gold square badges), FAQ (MessageCircleQuestion icon, Q+A with primary left-border).
+- Framer-motion AnimatePresence popLayout on articles grid (2 cols on lg).
+- Footer: hint to use chat widget for unanswered questions.
+- Locale-aware (all strings switch ru/en based on useI18n).
+
+STEP 4 — /api/help/chat/route.ts (NEW, server-side):
+- POST handler. Body: { message, locale, history[] }.
+- Validates message non-empty (400 on empty). Sanitizes history (filter role+content, slice last 10, slice 4000 chars each).
+- Builds bilingual system prompt with SECTION_SUMMARIES injected as context, 7 response rules (markdown, brevity, off-topic guardrail, no secrets, no financial advice).
+- Calls z-ai-web-dev-sdk: `const zai = await ZAI.create(); completion = await zai.chat.completions.create({ messages: [system, ...history, user], thinking: { type: 'disabled' } })`.
+- Returns { answer, locale } on success, 500 with friendly error on failure (try/catch).
+- Backend-only (route handler), compliant with z-ai-web-dev-sdk usage policy.
+
+STEP 5 — help-chat-widget.tsx (NEW, ~340 lines, 'use client'):
+- Floating HelpCircle button bottom-right (fixed z-50, gold bg-primary, w-12/14, ring-primary/20 → hover ring-primary/40). Spring animation on mount (delay 0.4s). HelpCircle↔X icon swap with rotate transition. Pulsing green dot when closed (online indicator).
+- Chat panel: fixed bottom-20 right-3 left-3 h-[70vh] on mobile, sm:bottom-6 sm:right-6 sm:w-[380px] sm:h-[540px] — gold-tinted gradient header (Bot icon + "Помощник РусКрипто"/"RusKripto Assistant" + "ИИ-консультант по платформе" subtitle + green online pill + close button).
+- Message list (scrollable, scrollbar-thin, bg-background/40): user messages right (gold bg-primary, primary-foreground, rounded-tr-sm, User icon), bot messages left (bg-card border-border, rounded-tl-sm, Bot icon). Bot messages render mini-markdown (**bold** → <strong>, numbered lists → <ol>, dash lists → <ul>, paragraphs). Auto-scroll on new message / loading / open.
+- Typing indicator: 3 pulsing dots in bot bubble while waiting for API.
+- Quick suggestion chips (4 chips: "Что такое спот-торги?", "Как открыть маржу?", "Как вывести средства?", "Что такое AML?" — localized), shown only before first user message.
+- Input form: Input + Send button (gold bg-primary, disabled while loading or empty). Enter submits.
+- onSend: POSTs to /api/help/chat with {message, locale, history (filtered, no greet)}. On success appends assistant message. On error appends inline error message + sonner.toast.error. Resets input. Sets loading state during request.
+- Framer-motion: button scale/spring on mount, panel opacity+y+scale on open/close, message opacity+y on append, suggestions section visible only pre-first-user-message.
+
+STEP 6 — page.tsx integration:
+- Added imports: HelpView, HelpChatWidget, HelpCircle.
+- Added to NAV array: { id: 'help', label: 'nav.help', i18n: true, icon: HelpCircle, group: 'nav.group.obzor', groupI18n: true } — placed after 'news' in Обзор group.
+- Added to VIEW_COMPONENTS: help: HelpView.
+- Rendered <HelpChatWidget /> inside CryptoExchangeApp root div, after the main flex container, gated by `activeView !== 'help'` (avoid redundancy on help view itself).
+
+VERIFICATION:
+- `curl -s -X POST http://localhost:3000/api/help/chat -H "Content-Type: application/json" -d '{"message":"Что такое спот?","locale":"ru","history":[]}'` → 200, {"answer":"**Спот-торговля** — это покупка и продажа криптовалюты по текущей рыночной цене. На платформе вы можете размещать рыночные или лимитные ордера... Комиссии составляют 0.1% для мейкера и 0.2% для тейкера.","locale":"ru"} ✓
+- `curl -s -X POST http://localhost:3000/api/help/chat -H "Content-Type: application/json" -d '{"message":"How to enable 2FA?","locale":"en","history":[]}'` → 200, English answer with numbered list (markdown) ✓
+- `curl -s http://localhost:3000 -o /dev/null -w "%{http_code}"` → 200 ✓
+- `cd /home/z/my-project && bun run lint 2>&1 | tail -10` → "$ eslint ." only (0 errors, 0 warnings) ✓
+- `tail -30 /home/z/my-project/dev.log` → "✓ Compiled in 151ms", "POST /api/help/chat 200 in 1404ms", "GET / 200", no errors/warnings ✓
+
+Files modified:
+- src/lib/types.ts — added 'help' to ViewId union.
+- src/lib/i18n.ts — added nav.help + nav.help.sub keys (RU+EN).
+- src/lib/help-content.ts (NEW, 580+ lines) — HelpSection type, FaqItem/HelpArticle/SectionMeta interfaces, HELP_SECTIONS (12+all), POPULAR_QUESTIONS (6), HELP_ARTICLES (14 structured bilingual articles), SECTION_SUMMARIES (12 bilingual short summaries for AI system prompt).
+- src/app/api/help/chat/route.ts (NEW) — POST endpoint using z-ai-web-dev-sdk with bilingual system prompt, history sanitization, error handling.
+- src/components/views/help-view.tsx (NEW) — Help Center view: header+search, popular Q&A accordion, section tabs, expandable article cards with definition/howTo/FAQ blocks, locale-aware.
+- src/components/help-chat-widget.tsx (NEW) — floating gold button + chat panel with markdown bot messages, typing indicator, suggestion chips, framer-motion animations, POST to /api/help/chat.
+- src/app/page.tsx — added 'help' to NAV (after 'news', HelpCircle icon, Обзор group), added HelpView to VIEW_COMPONENTS, rendered <HelpChatWidget /> globally (gated by activeView !== 'help').
+
+Summary of delivered UX:
+- Sidebar (Обзор group): new "Справка"/"Help" item with HelpCircle icon — opens Справочный центр.
+- Справочный центр: search across all article titles/definitions/FAQ/HowTo (ru+en), section tabs (Все + 11 sections with counts), 6 popular questions accordion at top, 14 expandable article cards each rendering Definition + numbered How-To + FAQ with gold accent styling. Locale-aware (full ru/en switch).
+- Floating Help button: bottom-right circular gold button (HelpCircle icon, pulsing green "online" dot), visible on ALL views except 'help' itself. Spring animation on mount.
+- Chat panel (~380×540px desktop, full-width mobile): bot/user message bubbles (gold for user, card for bot with mini-markdown rendering), typing indicator (3 pulsing dots), 4 localized suggestion chips before first user message, Enter-to-send input with gold Send button. Bot responds in user's locale.
+- AI endpoint: bilingual system prompt with 12-section context, 7 response rules (markdown, brevity, off-topic guardrail, no-secrets, no-financial-advice), history-aware (last 10 messages), 4s-char-cap on inputs. Try/catch with friendly 500 error.
+
+Stage Summary:
+- ALL 3 DELIVERABLES COMPLETE: Help Center data + view, floating AI chat widget, AI chat API endpoint.
+- 14 structured help articles + 6 popular Q&A — real user-facing Russian content + English translations.
+- AI assistant uses z-ai-web-dev-sdk (backend-only), responds in user's locale, maintains conversation context (up to 10 messages), friendly markdown output.
+- Theme: dark default + gold #F0B90B primary, no indigo/blue primary introduced. Compact px-3 lg:px-5 py-4 padding matching other views.
+- Lint clean, dev server clean, both RU/EN API calls return valid answers.
+
+---
+Task ID: I18N-REMAINING
+Agent: full-stack-developer
+Task: Finish i18n RU/EN translation for the remaining 6 views (wallet, payments, kyc, compliance, profile, admin) of the РусКрипто crypto exchange SPA. The previous i18n agent had pre-populated i18n.ts with keys for all 6 sections (~30-50 keys each, RU+EN) but timed out before applying them to the views. My task: read each view, identify all Russian strings, add any missing keys, replace Russian literals with t() calls.
+
+Work Log:
+- Read /home/z/my-project/worklog.md (last 2 entries: HELP-CENTER context — confirmed dark gold #F0B90B theme, useI18n hook from @/lib/use-i18n, existing 16-view structure).
+- Read /home/z/my-project/src/lib/i18n.ts (2221 lines). Verified all 6 sections (wallet, payments, kyc, compliance, profile, admin) already have full RU+EN key sets — added only missing keys.
+- Read /home/z/my-project/src/lib/use-i18n.ts — confirmed useI18n() returns { t, locale, setLocale }.
+
+i18n.ts additions (RU+EN):
+- wallet.network.btc / .eth / .bnb (universal English tech network names)
+- wallet.asset.rub ('Российский рубль' / 'Russian ruble') — was missing
+- wallet.asset.usdt / .btc / .eth (universal English asset names)
+- wallet.col.rubValue ('≈ RUB') / .usdValue ('≈ USD') — currency columns
+- Fixed EN wallet.deposit.warningMid ('on the' → 'via network') and warningEnd (removed leading 'network. ' prefix) — original EN keys were structurally broken when assembled into the warning sentence.
+
+View 1 — wallet-view.tsx (940→943 lines):
+- Imported useI18n from '@/lib/use-i18n'.
+- Refactored NETWORKS_BY_ASSET: removed hardcoded Russian network labels (TRC-20/SBP/BANK), kept only `id`. Added top-level `networkLabel(id, t)` helper that switches on id and returns the translated label via t('wallet.network.*'). For BTC/ERC-20/BEP-20 (universal English tech names) returns the same English string in both locales.
+- Refactored `statusBadge(status)` → `statusBadge(status, t)`: takes t as parameter (top-level function, not hook) and uses t('wallet.tx.completed/pending/failed') instead of hardcoded "Выполнено/В ожидании/Отклонено".
+- Added `const { t } = useI18n()` to TotalBalanceCard, AssetsTab, DepositTab, WithdrawTab, HistoryTab, WalletView.
+- Replaced all ~50 Russian strings: "Общая стоимость портфеля", "Пополнить"/"Вывести", table headers ("Актив"/"Доступно"/"≈ RUB"/"≈ USD"), asset display name ("Российский рубль" → t('wallet.asset.rub')), "Актив для пополнения", "Сеть", "Сгенерировать адрес"/"новый адрес", "Адрес пополнения"/"Активен", "Нажмите «Сгенерировать адрес»", "QR-код адреса пополнения" (alt), "Мин. подтверждения"/"Мгновенно (СБП)"/"3 блоков"/"12 блоков", "Мин. сумма", deposit warning ("Отправляйте только {asset} по сети {network}. Отправка других активов..."), withdraw form ("Актив для вывода", "Сеть вывода", "комиссия", "Адрес получателя", "Доступно:", placeholders, "Сумма вывода", large-warn, "2FA-код", "Белый список", "Включён"/"Выключен", "Запросить вывод", summary card ("Сводка вывода", "Сумма", "Комиссия сети", "Получит адресат", notes 1-3), history ("История операций пуста", hint, tx type labels deposit/withdrawal/trade/payment/fee), header ("Кошелёк", subtitle), tab labels ("Активы"/"Пополнить"/"Вывести"/"История"), "Последние операции" (skeleton), "только что" (timeAgo compare). Toasts: generated/copied/copyFailed/amountRequired/insufficient/addressRequired/2faRequired/created.
+
+View 2 — payments-view.tsx (774→800 lines):
+- Imported useI18n.
+- Converted module-level consts STATUS_LABEL/STATUS_DESCRIPTION (RU strings) → STATUS_LABEL_KEY/STATUS_DESCRIPTION_KEY (i18n key strings). Each entry now stores e.g. 'payments.status.INITIATED' instead of 'Инициирован'. Used at render as `t(STATUS_LABEL_KEY[s])`.
+- Added top-level `corridorName(id, t)` helper → `t(\`payments.corridor.${id.toLowerCase()}\`)` (e.g. 'ru-cn' → 'Россия → Китай' / 'Russia → China').
+- Added top-level `corridorEta(id, t)` helper → looks up corridor index in CORRIDORS array, returns `t(\`payments.corridor.eta-${idx+1}\`)` (eta-1..eta-6).
+- Added `const { t } = useI18n()` to PaymentStepper, NewPaymentForm, CorridorsCard, MyPayments, RegulatoryNote, PaymentsView.
+- PaymentStepper: replaces STATUS_LABEL[s]/STATUS_DESCRIPTION[s] with t() lookups; "Ошибка" (failed line) → t('payments.status.FAILED').
+- NewPaymentForm: replaced form labels (Коридор, Сумма перевода, Бенефициар, Счёт/IBAN, SWIFT/BIC, Назначение платежа, Курс, Комиссия коридора, Получит бенефициар, ETA, Создать платёж), default purpose text, validation toasts (5), success toast "Платёж создан", status-update pushNotification (uses t for "Статус:" prefix + label + description), settled notification "Платёж зачислен". Corridor name/eta now translated via helpers.
+- CorridorsCard: title "Активные коридоры", subtitle "6 направлений • ликвидность в реальном времени", corridor names + ETA via helpers.
+- MyPayments: title "Мои платежи", count words ("платёж"/"платежей"), empty states ("Нет активных платежей", "Платежей пока нет", "Создайте первый кросс-бордер платёж..."), row labels ("Отправлено"/"Получено"), status badge via t(STATUS_LABEL_KEY[p.status]). Rendered corridor display: looks up corridor by name OR id, then translates via corridorName(id, t) — handles both store data (Russian name) and API data.
+- RegulatoryNote: "Валютный контроль 173-ФЗ", badge "АВТО-ДОКУМЕНТЫ", description paragraph, document pills ("Паспорт сделки"/"УФЭД"/"Отчётность ЦБ").
+- PaymentsView: header badges ("173-ФЗ"), title "Кросс-бордер платежи", subtitle, correspondent bank label "Банк-корреспондент", liquidity "Ликвидность 24ч".
+
+View 3 — kyc-view.tsx (897→903 lines):
+- Imported useI18n.
+- Converted module-level STEPS array: `title` (RU string) → `titleKey` (i18n key, e.g. 'kyc.step.phone'), `desc` → `descKey`. DOC_TYPES: `label` → `labelKey` ('kyc.doc.passportRf' etc).
+- Added `const { t } = useI18n()` to PhoneStep, DocumentStep, SelfieStep, AddressBindingStep, QualificationStep, VerifiedCard, EsiaButton, ComplianceBadges, KycView.
+- PhoneStep: "Введите корректный номер телефона", "SMS-код отправлен" + demo description, "Введите 4-значный код", "Телефон подтверждён", "Телефон подтверждён • {phone}", "Номер телефона", "Отправить код", "SMS-код (4 цифры)", "Демо-код: 0000", "Подтвердить".
+- DocumentStep: "OCR завершён" + desc, "Документ верифицирован • {label}", "Тип документа", select items via t(d.labelKey), "Загрузить фото документа", "JPG / PNG / HEIC • до 10 МБ", "2.4 МБ • загружено", "OCR-распознавание документа…", "Данные извлечены: ФИО, серия/номер, адрес", "Продолжить".
+- SelfieStep: "Liveness-проверка пройдена", "Liveness пройдена • биометрия закреплена", "Селфи с документом", "Liveness-проверка: моргание, поворот головы, 3D-карта лица", "Анализ биометрии…", "Проверка пройдена", "Начать проверку liveness", "Продолжить".
+- AddressBindingStep: "Согласие получено • адрес-идентификаторы привязываются...", "Адрес-идентификатор (ФЗ-1194918-8)", full description, bullets (1=1 личность, реестр 24/7, анонимные запрещены), consent checkbox text, "Принять и продолжить".
+- QualificationStep: "Тест пройден" + desc, "Активы подтверждены" + desc, "Квалификация инвестора" + desc, "Пройти тест" + desc, "Подтвердить активы ≥3 млн ₽" + desc, dialog "Тест квалификации инвестора" + "Демонстрационный режим..." + "Вопрос {n} из 25", "Отмена" (used common.cancel).
+- VerifiedCard: "Начата повторная верификация", "ВЕРИФИКАЦИЯ ПРОЙДЕНА", "Уровень 2 • Полный доступ", description, "Уровень KYC", "Адрес-идентификатор", badges (Телефон/Паспорт РФ/Liveness/Квалификация), "Пройти верификацию заново".
+- EsiaButton: "Войти через Госуслуги (ЕСИА)".
+- ComplianceBadges: "Соответствие законодательству", "152-ФЗ (ПДн)", "115-ФЗ (AML)", "1194918-8 (ЦРА)".
+- KycView: 4 toasts (dataReceived/dataDesc/doneTitle/doneDesc/successTitle/successDesc for ESIA flow + qualification), "Верификация" header, "Личность подтверждена • статус:", "Уровень", "5 шагов для полного доступа • ~5 минут через Госуслуги", "Прогресс", "Шаг {n} из {N}", stepper labels + descs via t(s.titleKey)/t(s.descKey), "Шаг {n}. {title}" step header, "Далее", "Назад".
+
+View 4 — compliance-view.tsx (774→776 lines):
+- Imported useI18n.
+- Converted module-level SEVERITY_CONFIG: `label` → `labelKey` ('compliance.severity.critical' etc).
+- Converted STATUS_LABEL → STATUS_LABEL_KEY, TYPE_LABEL → TYPE_LABEL_KEY.
+- Converted module-level `timeAgoShort(iso)` → `timeAgoShort(iso, t)`: now returns `${sec}${t('compliance.time.sec')}` etc. Top-level function taking t as parameter (not a hook), so no lint issue.
+- Added `const { t } = useI18n()` to AlertListItem, ShapExplainer, AlertDetail, EmptyDetail, QuarantineCard, ComplianceView.
+- AlertListItem: severity badge via t(sev.labelKey), type via t(TYPE_LABEL_KEY[type]), status via t(STATUS_LABEL_KEY[status]), timeAgo via timeAgoShort(createdAt, t).
+- ShapExplainer: "SHAP-объяснения недоступны для данного алерта." → t('compliance.shap.empty'); "повышает риск"/"снижает риск" → t('compliance.shap.increase/decrease').
+- AlertDetail: handleAction signature changed `(status, labelKey, toastKey?)` — pushes notification with `t('compliance.toast.alertWord') + t(labelKey)` and toast with `t(toastKey)` or `t('compliance.toast.statusChanged') + t(STATUS_LABEL_KEY[status])`. All action labels (Одобрить/Отклонить/Эскалировать/SAR-отчёт) translated; action toasts (одобрен/отклонён/эскалирован/переведён в SAR + SAR-отчёт сформирован для Росфинмониторинга). Card title via t(TYPE_LABEL_KEY[type]), status badge via t(STATUS_LABEL_KEY[status]), severity via t(sev.labelKey). Meta: "Тип сущности"/"Создан" + timeAgo + t('compliance.time.ago') for " назад". SHAP section "SHAP объяснение" + "ML-интерпретация решения • для регулятора". Actions title "Действия". Handled state "Алерт обработан • действия заблокированы". Critical quarantine "Критический алерт — требуется карантин" + description.
+- EmptyDetail: "Выберите алерт" + "Кликните по элементу списка слева...".
+- QuarantineCard: "Карантин активов (m-of-n)", full description, "Критических в работе:", "Авто-отчёт в Росфинмониторинг", toast (title + desc), button "Перевести в карантин".
+- ComplianceView: header badges ("115-ФЗ", "Росфинмониторинг"), "{n} активных", title "Комплаенс-консоль", subtitle "AML-мониторинг • 115-ФЗ • Росфинмониторинг". 4 KPI cards (Открытые алерты/Критические/Средний risk score/Обработано сегодня) via t('compliance.kpi.*') + sub-texts. Feed "Лента алертов" + empty state. Loading skeleton "Загрузка деталей алерта…" + hint. Footer 3 items (ML-модель/WORM-аудит/Отчётность в Росфинмониторинг 24/7).
+
+View 5 — profile-view.tsx (1011→1014 lines):
+- Imported useI18n.
+- Converted module-level TABS: `label` → `labelKey` ('profile.tab.overview' etc).
+- Converted REFERRAL_STATUS_INFO: `label` → `labelKey' ('profile.status.REWARDED' etc).
+- Added `const { t, locale, setLocale } = useI18n()` to ProfileView (uses setLocale for language switcher).
+- `useState(apiUser?.name || userName || 'Иван Иванов')` → fallback to '' (avoids hardcoded Russian); uses t('profile.defaultName') at render time via displayName.
+- `useState(language)` initialized from `locale` instead of hardcoded 'ru'.
+- handleLogout/handleSaveSettings/handleCopyReferral/handleShare: toasts translated. handleSaveSettings now also calls `setLocale(language as 'ru' | 'en')` to actually persist the language choice.
+- LoginRequired CTA: title + desc + button translated.
+- Header: KYC label (Без верификации/Уровень 1/Уровень 2), CTA button (Управление/Пройти верификацию), logout button "Выйти".
+- Sidebar nav: t(t.labelKey) for each tab.
+- Overview tab: 3 KPI cards (Общий баланс/+2.18% за 24ч, Открытые позиции/Активных сделок, KYC уровень/Верифицирован/Не пройден/На проверке), "Мои активы" section, "Последние сделки" + "Вся история" + empty "Сделок пока нет. Начать торговать".
+- Assets tab: "Активы" + subtitle "Реальные цены по рынку", 5 column headers (Актив/Доступно/Заблокировано/Цена/Стоимость), RUB asset name "Российский рубль" → t('wallet.asset.rub') (reused wallet.asset.* keys).
+- History tab: "История операций" + subtitle, 5 column headers (Время/Тип/Детали/Сумма/Статус), empty "История пуста", buy/sell badges (Покупка/Продажа), tx type labels (Пополнение/Вывод/Сделка/Платёж/Комиссия), status badges (Выполнено/В ожидании/Ошибка).
+- Security tab: 2FA (title + subtitle + active state with device), Antiphishing (title + subtitle + toast + "Ваш код" label + code), Whitelist (title + subtitle + "Подтверждён" badge), Login History (title + "Сейчас" + "Ошибка" + empty), Active Sessions (title + "Завершить все" + toast + "Текущая" + "Завершить" + toast + empty).
+- Referrals tab: badge "РЕФЕРАЛЬНАЯ ПРОГРАММА", title "Приглашайте друзей — зарабатывайте", description, code/link labels, share buttons (Telegram/WhatsApp/"ВКонтакте"/Email), 3 stat cards (Приглашено/activeOf, Заработано/Доступно к выводу, Структура/levelsShort/level2Hint), "Ваши приглашённые" + "Всего:", referral status badges via t(info.labelKey), empty "Вы ещё никого не пригласили...", "Как это работает" + 3 steps.
+- Settings tab: "Личные данные" + "Имя" + Email + "Сохранить изменения", "Уведомления" + 4 notif toggles (Push/Email/SMS/Trades with descs), "Язык и оформление" + "Язык интерфейса" + Русский/English + dark theme card ("Тёмная тема"/"Активна по умолчанию"/"Включена"), "Опасная зона" + description + "Выйти из аккаунта".
+- Fixed 2 accidental `}}` extra-brace bugs in security tab (current/failed session badges) introduced during edit — caught by file re-read.
+
+View 6 — admin-view.tsx (1015→1018 lines):
+- Imported useI18n.
+- Converted module-level PAYMENT_STATUS_LABEL → PAYMENT_STATUS_LABEL_KEY, ALERT_STATUS_LABEL → ALERT_STATUS_LABEL_KEY.
+- Converted SEVERITY_CONFIG: `label` → `labelKey'. Converted TYPE_LABEL → TYPE_LABEL_KEY.
+- StatCard: added useI18n; `deltaSuffix = 'за 24ч'` default → `deltaSuffix?: string` prop with `effectiveDeltaSuffix = deltaSuffix ?? t('admin.deltaSuffix')` at render.
+- Added `const { t } = useI18n()` to RecentTradesTable, KycAndPairsCard, RecentUsersList, RecentPaymentsList, AlertsTable, AdminView.
+- RecentTradesTable: title "Последние сделки", 6 column headers (Пара/Сторона/Цена/Кол-во/Сумма/Время), empty "Сделок пока нет".
+- KycAndPairsCard: title "Распределение KYC", donut center label "всего", 3 legend labels (Lv.0 — Гость/Lv.1 — Документ/Lv.2 — Полная), "Топ пар по объёму" + empty "Нет данных по парам", chart tooltip "Объём".
+- RecentUsersList: "Последние пользователи" + empty "Нет пользователей".
+- RecentPaymentsList: "Последние платежи" + empty "Нет платежей" + status badge via t(PAYMENT_STATUS_LABEL_KEY[status]).
+- AlertsTable: title "Инциденты и алерты", "Открыть AML" button, handleClick toast (title + desc), empty "Нет активных алертов" + hint, 6 column headers (Sev/Тип/Risk/Статус/Описание/Время), severity title attr via t(sev.labelKey), type via t(TYPE_LABEL_KEY[type]), status via t(ALERT_STATUS_LABEL_KEY[status]).
+- AdminView: refresh toast (title + desc), header access badge "Доступ: Compliance Officer / Admin", title "Операционная панель", subtitle "Данные из БД реального времени" + updated time "• обновлено", refresh button "Обновить". Skeleton: "Последние сделки" + 6 column headers (same as RecentTradesTable). 5 KPI cards (Пользователи/новых:, Объём 24ч/сделок:, Сделок 24ч/всего:, Открытых алертов/критических:, P2P сделки/открытые). Footer: "Авто-обновление каждые 20 секунд" + "Источник: Prisma + реальное время".
+
+VERIFICATION:
+- `curl -s http://localhost:3000 -o /dev/null -w "%{http_code}"` → 200 ✓
+- `cd /home/z/my-project && bun run lint 2>&1 | tail -10` → "$ eslint ." only (0 errors, 0 warnings) ✓
+- Cyrillic check: `grep -c "[А-Яа-яЁё]"` for each of 6 views → 0/0/0/0/0/0 (all Russian strings translated) ✓
+- `tail -50 /home/z/my-project/dev.log` → "✓ Compiled in 56-228ms", "GET / 200 in 16-364ms", no errors/warnings ✓
+- agent-browser eval: not available in this session — trusted the established useI18n pattern (works in 10 already-translated views per worklog).
+
+Files modified:
+- src/lib/i18n.ts — added 10 new wallet.* keys (network.btc/eth/bnb, asset.rub/usdt/btc/eth, col.rubValue/usdValue) in RU+EN; fixed EN wallet.deposit.warningMid + warningEnd for proper sentence structure.
+- src/components/views/wallet-view.tsx — refactored NETWORKS_BY_ASSET to id-only, added networkLabel(id, t) helper, statusBadge(status, t), added useI18n to 6 components, replaced ~50 RU strings with t() calls.
+- src/components/views/payments-view.tsx — converted STATUS_LABEL/DESCRIPTION to KEY maps, added corridorName(id, t) + corridorEta(id, t) helpers, added useI18n to 6 components, replaced ~40 RU strings.
+- src/components/views/kyc-view.tsx — converted STEPS + DOC_TYPES to key-based, added useI18n to 9 components, replaced ~60 RU strings.
+- src/components/views/compliance-view.tsx — converted SEVERITY_CONFIG/STATUS_LABEL/TYPE_LABEL to key-based, refactored timeAgoShort(iso, t) to take t param, added useI18n to 6 components, replaced ~50 RU strings.
+- src/components/views/profile-view.tsx — converted TABS + REFERRAL_STATUS_INFO to key-based, added useI18n to ProfileView (also wires setLocale for language switcher), replaced ~90 RU strings. Fixed 2 accidental `}}` extra-brace bugs.
+- src/components/views/admin-view.tsx — converted PAYMENT_STATUS_LABEL/ALERT_STATUS_LABEL/SEVERITY_CONFIG/TYPE_LABEL to key-based, added useI18n to 6 components (StatCard uses t for deltaSuffix default), replaced ~60 RU strings.
+
+Summary of keys added per view (approximate counts including existing pre-populated keys):
+- wallet: ~80 keys (75 pre-existing + 10 new = 85 total)
+- payments: ~50 keys (all pre-existing)
+- kyc: ~95 keys (all pre-existing)
+- compliance: ~75 keys (all pre-existing)
+- profile: ~130 keys (all pre-existing)
+- admin: ~75 keys (all pre-existing)
+
+Total: ~510 i18n keys across the 6 sections, fully populated in RU+EN. All 6 views now render with 0 Russian strings when locale='en' (verified via grep — 0 Cyrillic lines per view). Pattern matches the 10 already-translated views: `import { useI18n } from '@/lib/use-i18n'` + `const { t } = useI18n()` + `{t('section.key')}` in JSX.
+
+Stage Summary:
+- ALL 6 REMAINING VIEWS TRANSLATED: wallet, payments, kyc, compliance, profile, admin.
+- Combined with the 10 already-translated views (nav, header, footer, auth, home, trade, markets, margin, p2p, portfolio, analytics, news, help), the РусКрипто SPA is now 100% i18n RU/EN complete across all 16 views.
+- Helper-function pattern preserved: top-level helper functions (networkLabel, corridorName, corridorEta, timeAgoShort, statusBadge) take `t` as parameter rather than calling useI18n directly — satisfies react-hooks/rules-of-hooks lint rule.
+- Module-level constants (SEVERITY_CONFIG, STATUS_LABEL, TYPE_LABEL, TABS, DOC_TYPES, REFERRAL_STATUS_INFO, STEPS) refactored from direct string values to i18n key strings, with t() called at render time.
+- Brand names ("РусКрипто", "Госуслуги", "СБП", "Tinkoff", "Binance", "Gazprombank"), currency codes/symbols (₽, $, BTC, USDT, ETH, RUB, USD, CNY, AED, TRY, INR, KZT, AMD), technical acronyms (KYC, AML, SAR, SHAP, WORM, OCR, ESIA, EU/CC/saga), and universal tech names (Bitcoin Network, Ethereum ERC-20, BNB Smart Chain, Bitcoin, Ethereum, Tether USD, Telegram, WhatsApp, Email, Push, SMS) kept untranslated as instructed.
+- Profile-view language switcher now actually changes the app locale (calls setLocale(language)) — was previously only updating local state.
+- Lint clean, dev server clean (no errors/warnings), curl 200, all Cyrillic removed from 6 views.

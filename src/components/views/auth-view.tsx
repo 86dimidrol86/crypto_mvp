@@ -17,6 +17,7 @@ import {
   LogOut,
   UserCircle,
   Landmark,
+  User,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
@@ -77,7 +78,7 @@ export function AuthView() {
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (mode === 'register') {
@@ -101,28 +102,47 @@ export function AuthView() {
     }
 
     setLoading(true)
-    setTimeout(() => {
-      const name = mode === 'register' ? email.split('@')[0] : 'Иван Иванов'
-      login(email, name)
-      setLoading(false)
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name: mode === 'register' ? email.split('@')[0] : undefined }),
+      })
+      const u = await res.json()
+      login(u.email, u.name, u.role, u.id)
       toast.success(mode === 'register' ? 'Аккаунт создан' : 'Добро пожаловать', {
-        description: `Вы вошли как ${email}`,
+        description: `${u.name} • роль: ${u.role}`,
       })
       setView('home')
-    }, 800)
+    } catch {
+      toast.error('Ошибка входа')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleGosuslugi = () => {
+  const handleQuickLogin = async (loginEmail: string, label: string) => {
     setLoading(true)
-    setTimeout(() => {
-      login('ivan.ivanov@gosuslugi.ru', 'Иван Иванов')
-      setLoading(false)
-      toast.success('Вход через Госуслуги выполнен', {
-        description: 'ЕСИА • уровень учётной записи: подтверждённая',
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail }),
+      })
+      const u = await res.json()
+      login(u.email, u.name, u.role, u.id)
+      toast.success(`Вход выполнен: ${label}`, {
+        description: `${u.name} • роль: ${u.role}`,
       })
       setView('home')
-    }, 900)
+    } catch {
+      toast.error('Ошибка входа')
+    } finally {
+      setLoading(false)
+    }
   }
+
+  const handleGosuslugi = () => handleQuickLogin('ivan.ivanov@gosuslugi.ru', 'Госуслуги')
 
   // If already authed
   if (isAuthed) {
@@ -393,6 +413,45 @@ export function AuthView() {
                 <Building2 className="w-4 h-4" />
                 {t('auth.gosuslugi')}
               </Button>
+
+              {/* Demo accounts quick login */}
+              <div className="mt-3 pt-3 border-t border-border">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground text-center mb-2">
+                  Демо-аккаунты (пароль любой)
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('user@ruscrypto.ru', 'Пользователь')}
+                    disabled={loading}
+                    className="flex flex-col items-center gap-1 p-2 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 transition text-center"
+                  >
+                    <User className="w-4 h-4 text-primary" />
+                    <span className="text-[10px] font-medium">Пользователь</span>
+                    <span className="text-[8px] text-muted-foreground">USER</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('admin@ruscrypto.ru', 'Администратор')}
+                    disabled={loading}
+                    className="flex flex-col items-center gap-1 p-2 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 transition text-center"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-primary" />
+                    <span className="text-[10px] font-medium">Администратор</span>
+                    <span className="text-[8px] text-muted-foreground">ADMIN</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('compliance@ruscrypto.ru', 'Комплаенс')}
+                    disabled={loading}
+                    className="flex flex-col items-center gap-1 p-2 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 transition text-center"
+                  >
+                    <Scale className="w-4 h-4 text-primary" />
+                    <span className="text-[10px] font-medium">Комплаенс</span>
+                    <span className="text-[8px] text-muted-foreground">COMPLIANCE</span>
+                  </button>
+                </div>
+              </div>
 
               {/* Toggle link */}
               <div className="text-center text-sm text-muted-foreground mt-4">
