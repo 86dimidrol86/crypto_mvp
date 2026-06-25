@@ -374,7 +374,7 @@ export default function CryptoExchangeApp() {
         {/* Desktop sidebar */}
         <aside
           className={cn(
-            'hidden lg:flex shrink-0 flex-col border-r border-border bg-sidebar/40 sticky top-[72px] h-[calc(100vh-72px)] overflow-hidden transition-[width] duration-200',
+            'hidden lg:flex shrink-0 flex-col border-r border-border bg-sidebar/40 sticky top-0 h-screen overflow-hidden transition-[width] duration-200',
             collapsed ? 'w-[68px]' : 'w-64'
           )}
         >

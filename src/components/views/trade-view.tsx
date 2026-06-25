@@ -1389,6 +1389,7 @@ export function TradeView() {
   const [tickers, setTickers] = useState<CoinTicker[]>([])
   const [livePrice, setLivePrice] = useState<number>(0)
   const [highlight, setHighlight] = useState<'up' | 'down' | null>(null)
+  const { t } = useI18n()
 
   const layout = useTradeLayout()
 

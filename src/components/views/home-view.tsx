@@ -296,7 +296,7 @@ function MarketGrid() {
 
   return (
     <section className="border-b border-border py-6">
-      <div className="px-3 lg:px-5">
+      <div className="max-w-[1400px] mx-auto px-3 lg:px-5">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
           <div>
             <h2 className="text-xl lg:text-2xl font-bold">{t('home.market.title')}</h2>
@@ -339,32 +339,32 @@ function MarketGrid() {
                   <Card
                     key={coin.id}
                     className={cn(
-                      'p-2.5 cursor-pointer transition-all hover:border-primary/40 hover:-translate-y-0.5 group flex flex-row items-stretch gap-2 py-2.5',
+                      'p-2 cursor-pointer transition-all hover:border-primary/40 hover:-translate-y-0.5 group flex flex-row items-center gap-2 py-2',
                       status === 'up' && 'ring-1 ring-success/40',
                       status === 'down' && 'ring-1 ring-destructive/40'
                     )}
                     onClick={() => goTrade(coin.symbol)}
                   >
                     {/* Left column: icon + name+% + price */}
-                    <div className="flex flex-col items-center justify-center shrink-0 w-[60px]">
-                      <CoinIcon symbol={coin.symbol} size={32} />
-                      <span className="font-semibold text-xs mt-1">{coin.symbol}</span>
+                    <div className="flex flex-col items-center justify-center shrink-0 w-[52px] gap-0.5">
+                      <CoinIcon symbol={coin.symbol} size={28} />
+                      <span className="font-semibold text-[11px] leading-none">{coin.symbol}</span>
                       <span
                         className={cn(
-                          'flex items-center gap-0.5 text-[10px] font-medium px-1 py-0.5 rounded mt-0.5',
+                          'flex items-center gap-0.5 text-[9px] font-medium px-1 py-0.5 rounded',
                           up ? 'text-success bg-success/10' : 'text-destructive bg-destructive/10'
                         )}
                       >
-                        {up ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+                        {up ? <TrendingUp className="w-2 h-2" /> : <TrendingDown className="w-2 h-2" />}
                         {formatPercent(coin.change24h)}
                       </span>
-                      <div className="text-xs font-mono font-bold tabular-nums mt-0.5 text-center leading-tight">
+                      <div className="text-[10px] font-mono font-bold tabular-nums text-center leading-tight">
                         {formatPrice(price, currency)}
                       </div>
                     </div>
-                    {/* Right: larger sparkline filling remaining space */}
-                    <div className="flex-1 min-w-0 flex items-center justify-center overflow-hidden">
-                      <Sparkline data={generateSpark(coin.change24h)} width={140} height={60} />
+                    {/* Right: sparkline filling remaining space */}
+                    <div className="flex-1 min-w-0 h-[64px] flex items-stretch overflow-hidden">
+                      <Sparkline data={generateSpark(coin.change24h)} width={200} height={60} fill />
                     </div>
                   </Card>
                 )

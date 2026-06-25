@@ -7,9 +7,10 @@ interface SparklineProps {
   color?: string
   width?: number
   height?: number
+  fill?: boolean // if true, svg fills parent (w-full h-full)
 }
 
-export function Sparkline({ data, color, width = 120, height = 36 }: SparklineProps) {
+export function Sparkline({ data, color, width = 120, height = 36, fill }: SparklineProps) {
   const [up, setUp] = useState(true)
   useEffect(() => {
     if (data.length >= 2) setUp(data[data.length - 1] >= data[0])
@@ -27,6 +28,28 @@ export function Sparkline({ data, color, width = 120, height = 36 }: SparklinePr
     .join(' ')
   const areaPoints = `0,${height} ${points} ${width},${height}`
   const gradId = `sg-${Math.random().toString(36).slice(2, 8)}`
+  if (fill) {
+    return (
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="w-full h-full overflow-visible">
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={stroke} stopOpacity="0.3" />
+            <stop offset="100%" stopColor={stroke} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <polygon points={areaPoints} fill={`url(#${gradId})`} />
+        <polyline
+          points={points}
+          fill="none"
+          stroke={stroke}
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+    )
+  }
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="overflow-visible shrink-0 max-w-full" style={{ width, height }}>
       <defs>
