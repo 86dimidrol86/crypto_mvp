@@ -51,32 +51,35 @@ bun install
 
 ## Шаг 3. Настройка базы данных
 
-### 3.1. Файл окружения `.env`
-
-Создайте файл `.env` в корне проекта:
-
-```bash
-# Linux / macOS
-cat > .env << 'EOF'
-DATABASE_URL=file:./db/custom.db
-EOF
-
-# Windows (PowerShell)
-echo "DATABASE_URL=file:./db/custom.db" > .env
-```
-
-> **Примечание:** Используется SQLite — отдельный сервер БД не требуется. Файл БД создастся автоматически в `db/custom.db`.
-
-### 3.2. Создание директории для БД
+### 3.1. Создание директории для БД
 
 ```bash
 mkdir -p db
 ```
 
+### 3.2. Файл окружения `.env`
+
+Создайте файл `.env` в корне проекта с **абсолютным путём** к БД.
+
+**Linux / macOS** (замените `/path/to/crypto_mvp` на реальный путь, узнайте через `pwd`):
+```bash
+echo "DATABASE_URL=file:$(pwd)/db/custom.db" > .env
+cat .env  # проверьте, что путь корректный
+```
+
+**Windows (PowerShell):**
+```powershell
+echo "DATABASE_URL=file:$(Get-Location)/db/custom.db" > .env
+```
+
+> ⚠️ **Важно:** Используйте именно **абсолютный путь** (`file:/home/user/crypto_mvp/db/custom.db`), а не относительный (`file:./db/custom.db`). Относительный путь может вызывать ошибку `Unable to open the database file` при запуске seed-скриптов.
+
+> **Примечание:** Используется SQLite — отдельный сервер БД не требуется. Файл БД создастся автоматически в `db/custom.db`.
+
 ### 3.3. Генерация Prisma Client + создание схемы БД
 
 ```bash
-# Генерация типизированного клиента Prisma
+# Генерация типизированного клиента Prisma (обязательно после создания .env)
 bun run db:generate
 
 # Применение схемы к БД (создаёт таблицы)
@@ -84,6 +87,8 @@ bun run db:push
 ```
 
 После этого в `db/custom.db` появится схема из 12 таблиц: User, Balance, Order, Trade, Transaction, P2POffer, P2PDeal, CrossBorderPayment, ComplianceAlert, KycDocument, LoginEvent, Referral.
+
+> Если `db:push` выдаёт ошибку — проверьте, что `db/` директория существует и `.env` содержит корректный абсолютный путь.
 
 ---
 
@@ -180,9 +185,9 @@ cd crypto_mvp
 # 2. Установить зависимости
 bun install
 
-# 3. Настроить БД
-echo "DATABASE_URL=file:./db/custom.db" > .env
+# 3. Настроить БД (ВАЖНО: абсолютный путь!)
 mkdir -p db
+echo "DATABASE_URL=file:$(pwd)/db/custom.db" > .env
 bun run db:generate
 bun run db:push
 
@@ -227,9 +232,34 @@ netstat -ano | findstr :3000
 taskkill /PID <PID> /F
 ```
 
+### Ошибка Prisma «Unable to open the database file» (Error code 14)
+
+**Причина:** Prisma не может найти или создать файл БД — обычно из-за относительного пути в `.env` или отсутствующей директории `db/`.
+
+**Решение:**
+```bash
+# 1. Убедитесь, что директория db существует
+mkdir -p db
+
+# 2. Пересоздайте .env с АБСОЛЮТНЫМ путём (замените на ваш реальный путь!)
+echo "DATABASE_URL=file:$(pwd)/db/custom.db" > .env
+cat .env  # проверьте — должно быть: file:/Users/.../crypto_mvp/db/custom.db
+
+# 3. Регенерируйте Prisma Client (он читает .env при генерации)
+bun run db:generate
+
+# 4. Примените схему
+bun run db:push
+
+# 5. Запустите seed
+bun prisma/seed-extended.ts
+```
+
 ### Ошибка Prisma «database connection failed»
 ```bash
 rm -f db/custom.db
+echo "DATABASE_URL=file:$(pwd)/db/custom.db" > .env
+bun run db:generate
 bun run db:push
 bun prisma/seed-extended.ts
 ```
