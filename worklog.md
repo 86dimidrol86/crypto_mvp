@@ -1054,3 +1054,25 @@ Stage Summary:
 - VERIFICATION: agent-browser confirmed news view, price alerts (19 bell icons), CSV button (disabled correctly when no trades), home sections present. VLM confirmed empty space filled.
 - UNRESOLVED/RISKS: profile-view still has MOCK_LOGIN_HISTORY/SESSIONS + hardcoded referral (low priority). market-service WS only connects via gateway in preview (direct localhost:3000 QA falls back to mock — acceptable). Portfolio performance chart still mock 30-day data (low priority).
 - NEXT PHASE RECOMMENDATIONS: (1) migrate profile referral/login-history to API; (2) portfolio performance chart from real trade PnL over time; (3) add an Admin/Operations mini-panel for compliance officer role; (4) internationalization (RU/EN toggle in settings); (5) more micro-animations + skeleton loaders across remaining views.
+
+---
+Task ID: FIX-hydration
+Agent: Orchestrator
+Task: Fix React hydration mismatch error (server/client text mismatch in NewsTicker timeAgo).
+
+Work Log:
+- Root cause: timeAgo() uses Date.now() → server renders "43 мин назад" at SSR time, client hydrates later with "35 мин назад" → React hydration mismatch. Error surfaced in NewsTicker (always-rendered in Header) but same pattern existed in news-view, compliance-view, markets-view, payments-view, portfolio-view.
+- Created src/lib/use-mounted.ts — useMounted() hook (useState false → useEffect setMounted true).
+- Applied mounted guard to all timeAgo/Date.now-in-render sites:
+  • page.tsx NewsTicker: {mounted ? timeAgo(n.publishedAt) : ''}
+  • news-view NewsCard: {mounted ? timeAgo(item.publishedAt) : ''}
+  • compliance-view AlertListItem + AlertDetail: timeAgoShort + toLocaleString guarded
+  • markets-view MyAlertsSection: timeAgo(a.triggeredAt) guarded
+  • payments-view MyPayments: timeAgo(p.createdAt) guarded
+  • portfolio-view: new Date().toLocaleTimeString guarded
+- QA via agent-browser: reloaded each affected view (news, compliance, payments, markets, portfolio) — 0 hydration errors in console. Lint clean.
+
+Stage Summary:
+- Hydration mismatch RESOLVED. SSR renders empty string for relative-time/Date cells; client fills them after mount.
+- Git: commit 94b16d3 pushed to origin/spa-mvp.
+- Note: analytics-view line 148 uses {data && ...} guard (data null at SSR) so it was already safe — no change needed.
