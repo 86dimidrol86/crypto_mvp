@@ -1,8 +1,10 @@
 # 📖 Документация РусКрипто — Криптобиржа РФ
 
-**Версия:** 1.0 (MVP)  
-**Дата:** Июнь 2026  
+**Версия:** 2.0 (MVP с ролями FINANCE + BANK)  
+**Дата:** Июль 2026  
 **Статус:** Демонстрационный прототип для инвесторов
+
+> **Что нового в v2.0:** добавлены роли FINANCE (Финансовый контролёр) и BANK (Портал банка), 9 новых моделей Prisma, 14 новых эндпоинтов `/api/finance/*`, 5 новых эндпоинтов `/api/bank-portal/*`, модульные переключатели P2P/Кросс-бордер, реальные sparkline-данные через Binance klines API. Всего: 18 разделов, 5 ролей, 33 API-эндпоинта, 21 модель БД.
 
 ---
 
@@ -11,7 +13,7 @@
 1. [Обзор платформы](#1-обзор-платформы)
 2. [Архитектура системы](#2-архитектура-системы)
 3. [Схема базы данных](#3-схема-базы-данных)
-4. [Разделы платформы (16 модулей)](#4-разделы-платформы)
+4. [Разделы платформы (18 модулей)](#4-разделы-платформы)
 5. [Глоссарий терминов](#5-глоссарий-терминов)
 6. [API-эндпоинты](#6-api-эндпоинты)
 7. [Технологический стек](#7-технологический-стек)
@@ -26,19 +28,27 @@
 ### Ключевые особенности
 - **Спот-торги** с live order book (WebSocket realtime)
 - **Маржинальная торговля** с плечом до 20x и контролем рисков
-- **P2P-торговля** с эскроу и чатом
-- **Кросс-бордер платежи** по 6 коридорам (RU-CN, RU-AE, RU-TR, RU-IN, RU-KZ, RU-AM)
+- **P2P-торговля** с эскроу и чатом (может быть отключена администратором)
+- **Кросс-бордер платежи** по 6 коридорам (RU-CN, RU-AE, RU-TR, RU-IN, RU-KZ, RU-AM; может быть отключена)
 - **AML-комплаенс-консоль** с SHAP-объяснимостью ML-модели
 - **KYC-верификация** через Госуслуги (ЕСИА)
-- **ИИ-помощник** для консультаций пользователей
-- **RU/EN локализация** всех разделов
+- **ИИ-помощник** для консультаций пользователей (z-ai-web-dev-sdk с fallback)
+- **RU/EN локализация** всех разделов (~2200 ключей i18n)
+- **Реальные sparklines** через Binance klines API (24h close prices)
+- **Финансовый модуль** (роль FINANCE): 9 табов — банки, комиссии, лимиты, счета, свёрка, коридоры, отчёты, вебхуки
+- **Портал банка** (роль BANK): 5 табов — дашборд, транзакции, настройки (read-only), свёрка, отчёты
+- **Модульные переключатели** в админке (P2P / Кросс-бордер можно включать/отключать)
 
-### Демо-аккаунты
+### Демо-аккаунты (5 ролей)
 | Роль | Email | Доступ |
 |---|---|---|
-| Пользователь | user@ruscrypto.ru | Стандартные разделы |
-| Администратор | admin@ruscrypto.ru | + операционная панель |
-| Комплаенс-офицер | compliance@ruscrypto.ru | + AML-консоль |
+| Пользователь (USER) | user@ruscrypto.ru | Стандартные разделы |
+| Администратор (ADMIN) | admin@ruscrypto.ru | + операционная панель + управление модулями |
+| Комплаенс-офицер (COMPLIANCE) | compliance@ruscrypto.ru | + AML-консоль |
+| Финансовый контролёр (FINANCE) | finance@ruscrypto.ru | + раздел «Финансы» (банки, комиссии, свёрка) |
+| Банк ВТБ (BANK) | bank@vtb.ru | Только «Портал банка» + публичные разделы |
+| Банк Альфа (BANK) | bank@alfa.ru | Только «Портал банка» + публичные разделы |
+| Банк Сбер (BANK) | bank@sber.ru | Только «Портал банка» + публичные разделы |
 
 ---
 
@@ -50,48 +60,60 @@
 ┌─────────────────────────────────────────────────────────┐
 │                    Браузер (клиент)                       │
 │  Next.js 16 SPA (single / route, client-side view routing)│
-│  16 разделов • Zustand store (persist) • i18n RU/EN      │
+│  18 разделов • 5 ролей • Zustand store (persist)          │
+│  i18n RU/EN (~2200 ключей) • enabledModules {p2p,cb}     │
 └──────────┬──────────────────────────┬────────────────────┘
            │ HTTP API (REST)            │ WebSocket (socket.io)
            ▼                            ▼
 ┌─────────────────────┐        ┌─────────────────────┐
 │  Next.js API Routes  │        │  Market Service      │
 │  (порт 3000)         │        │  (порт 3003)         │
-│  14 эндпоинтов       │        │  Live order book     │
+│  33 эндпоинта        │        │  Live order book     │
 │  Prisma ORM          │        │  Price ticks         │
-└──────────┬───────────┘        │  Trades tape         │
-           │                    └─────────────────────┘
+│  ┌────────────────┐ │        │  Trades tape         │
+│  │ /api/auth,...  │ │        └─────────────────────┘
+│  │ /api/finance/* │ │                  ▲
+│  │ /api/bank-     │ │                  │ sparkline (24h)
+│  │   portal/*     │ │        ┌─────────────────────┐
+│  └────────────────┘ │        │  Binance klines API  │
+└──────────┬───────────┘        └─────────────────────┘
+           │
            ▼
 ┌─────────────────────┐        ┌─────────────────────┐
 │  SQLite (Prisma)     │        │  Внешние API          │
-│  12 моделей          │        │  Binance (котировки)  │
+│  21 модель           │        │  Binance (котировки)  │
 │  db/custom.db        │        │  ЦБ РФ (USD/RUB)      │
-└─────────────────────┘        │  z-ai-sdk (LLM)       │
-                                └─────────────────────┘
+│  ┌─────────────────┐ │        │  z-ai-sdk (LLM)       │
+│  │ User+bankId     │ │        │  Bank APIs (ВТБ SOAP, │
+│  │ Bank* (9 мод.)  │ │        │  Альфа REST — sandbox)│
+│  └─────────────────┘ │        └─────────────────────┘
+└─────────────────────┘
 ```
 
 ### Компоненты
 
 | Компонент | Технология | Порт | Назначение |
 |---|---|---|---|
-| **Фронтенд (SPA)** | Next.js 16 + React 19 + TypeScript | 3000 | Все 16 разделов, routing, UI |
-| **API** | Next.js API Routes | 3000 | REST-эндпоинты, Prisma-персистенция |
+| **Фронтенд (SPA)** | Next.js 16 + React 19 + TypeScript | 3000 | Все 18 разделов, routing, UI, role-gating |
+| **API** | Next.js API Routes | 3000 | 33 REST-эндпоинта, Prisma-персистенция |
 | **WebSocket сервис** | socket.io (Bun) | 3003 | Realtime order book, prices, trades |
-| **База данных** | SQLite + Prisma ORM | — | 12 моделей, демо-данные |
-| **LLM-сервис** | z-ai-web-dev-sdk | — | ИИ-помощник (/api/help/chat) |
-| **Внешние котировки** | Binance API + exchangerate API | — | Live-цены топ-20 криптовалют |
+| **База данных** | SQLite + Prisma ORM | — | 21 модель, демо-данные (5 банков, ~18 000 tx) |
+| **LLM-сервис** | z-ai-web-dev-sdk | — | ИИ-помощник (/api/help/chat) + fallback на справку |
+| **Внешние котировки** | Binance API (ticker + klines) + exchangerate API | — | Live-цены топ-20 криптовалют + sparkline 24h |
+| **Bank APIs (sandbox)** | ВТБ (SOAP, GOST TLS), Альфа (REST, OAuth) | — | Интеграционные заглушки для банков-партнёров |
 
 ### Паттерны
 - **Single-page app** — один маршрут `/` с client-side переключением разделов (Zustand store)
 - **Hybrid data** — API (Prisma) + Zustand store (fallback/resilience)
-- **Persisted state** — балансы, сделки, настройки, locale, layout сохраняются в localStorage
-- **Role-gating** — раздел «Админка» виден только ADMIN/COMPLIANCE
+- **Persisted state** — балансы, сделки, настройки, locale, layout, enabledModules сохраняются в localStorage
+- **Role-gating (5 ролей)** — разделы «Админка» (ADMIN/COMPLIANCE), «Финансы» (ADMIN/FINANCE), «Портал банка» (BANK) видны только соответствующим ролям; роль BANK дополнительно скрывает admin/finance/compliance
+- **Module toggles** — P2P и кросс-бордер можно отключать через админку (admin), состояние в `enabledModules` (Zustand persist)
 
 ---
 
 ## 3. Схема базы данных
 
-### ER-диаграмма (12 моделей)
+### ER-диаграмма (21 модель)
 
 ```
 ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
@@ -105,99 +127,88 @@
 │ kycStatus     │   │└──────────────┘     └──────────────┘
 │ qualified     │   │
 │ role          │   │     ┌──────────────┐     ┌──────────────┐
-│ referralCode  │   ├─────│    Order     │     │    Trade     │
-│ createdAt     │   │     │──────────────│     │──────────────│
-└──────┬───────┘   │     │ id (PK)      │◄──┐│ id (PK)      │
+│ bankId (FK?)  │───┼────►│    Bank       │◄────│ User (BANK)  │
+│ referralCode  │   │     │──────────────│     │ role=BANK    │
+│ createdAt     │   │     │ id, name, bic│     └──────────────┘
+└──────┬───────┘   │     │ swift, inn   │
+       │           │     │ type, status │
+       │           │     │ apiProtocol  │
+       │           │     │ cryptoProt.  │
+       │           │     │ isSandbox    │
+       │           │     └───┬──┬──┬────┘
+       │           │         │  │  │
+       │           │     ┌───┘  │  └──┐
+       │           │     ▼      ▼     ▼
+       │           │  BankFee BankLimit BankAccount
+       │           │  BankTransaction BankReconciliation
+       │           │  BankWebhookLog BankComplianceExport
+       │           │
+       │           │     CorridorConfig (RU-CN, RU-AE, ...)
+       │           │
+       │           │     ┌──────────────┐     ┌──────────────┐
+       │           ├─────│    Order     │     │    Trade     │
+       │           │     │──────────────│     │──────────────│
+       │           │     │ id (PK)      │◄──┐│ id (PK)      │
        │           │     │ userId (FK)  │   ││ orderId (FK) │
-       │           │     │ pair         │   ││ userId (FK)  │
-       │           │     │ side         │   ││ pair         │
-       │           │     │ type         │   ││ side         │
-       │           │     │ price        │   ││ price        │
-       │           │     │ quantity     │   ││ quantity     │
-       │           │     │ filledQty    │   ││ total        │
-       │           │     │ status       │   ││ fee          │
-       │           │     │ createdAt    │   ││ createdAt    │
+       │           │     │ pair/side    │   ││ userId (FK)  │
+       │           │     │ type         │   ││ pair/side    │
+       │           │     │ price/qty    │   ││ price/qty    │
+       │           │     │ status       │   ││ total/fee    │
        │           │     └──────────────┘   │└──────────────┘
        │           │                        │
        │           │     ┌──────────────┐   │
        │           ├─────│ Transaction  │   │
-       │           │     │──────────────│   │
-       │           │     │ id (PK)      │   │
        │           │     │ userId (FK)  │   │
-       │           │     │ type         │   │
-       │           │     │ asset        │   │
-       │           │     │ amount       │   │
-       │           │     │ status       │   │
+       │           │     │ type/asset   │   │
+       │           │     │ amount/status│   │
        │           │     │ address      │   │
-       │           │     │ createdAt    │   │
        │           │     └──────────────┘   │
        │           │                        │
        │           │     ┌──────────────┐   │
        │           ├─────│  P2POffer    │   │
-       │           │     │──────────────│   │
-       │           │     │ id (PK)      │◄──┐
-       │           │     │ userId (FK)  │   │
-       │           │     │ type         │   │ ┌──────────────┐
-       │           │     │ asset/fiat   │   │ │   P2PDeal    │
-       │           │     │ price/amount │   │ │──────────────│
+       │           │     │ userId (FK)  │◄──┐
+       │           │     │ type/asset   │   │ ┌──────────────┐
+       │           │     │ price/amount │   │ │   P2PDeal    │
        │           │     │ method       │   ├─│ offerId (FK) │
-       │           │     │ active       │   │ │ buyerId (FK) │
-       │           │     └──────────────┘   │ │ asset/amount │
-       │           │                        │ │ price/total  │
-       │           │     ┌──────────────┐   │ │ status       │
-       │           ├─────│CrossBorderPay│   │ └──────────────┘
-       │           │     │──────────────│   │
-       │           │     │ id (PK)      │   │
+       │           │     └──────────────┘   │ │ buyerId (FK) │
+       │           │                        │ │ status       │
+       │           │     ┌──────────────┐   │ └──────────────┘
+       │           ├─────│CrossBorderPay│   │
        │           │     │ userId (FK)  │   │
        │           │     │ corridor     │   │
-       │           │     │ from/to cur  │   │
        │           │     │ amount       │   │
-       │           │     │ receiveAmt   │   │
        │           │     │ fee/rate     │   │
-       │           │     │ beneficiary  │   │
-       │           │     │ status       │   │
+       │           │     │ status (7)   │   │
        │           │     └──────────────┘   │
        │           │                        │
        │           │     ┌──────────────┐   │
        │           ├─────│ComplianceAlert│  │
-       │           │     │──────────────│   │
-       │           │     │ id (PK)      │   │
        │           │     │ userId (FK?) │   │
-       │           │     │ type         │   │
-       │           │     │ severity     │   │
+       │           │     │ type/severity│   │
        │           │     │ riskScore    │   │
-       │           │     │ description  │   │
        │           │     │ status       │   │
-       │           │     │ ruleId       │   │
        │           │     └──────────────┘   │
        │           │                        │
        │           │     ┌──────────────┐   │
        │           ├─────│  LoginEvent  │   │
-       │           │     │──────────────│   │
-       │           │     │ id (PK)      │   │
        │           │     │ userId (FK)  │   │
        │           │     │ ip/device    │   │
-       │           │     │ location     │   │
        │           │     │ success      │   │
        │           │     └──────────────┘   │
        │           │                        │
        │           │     ┌──────────────┐   │
        │           └─────│   Referral   │   │
-       │                 │──────────────│   │
-       │                 │ id (PK)      │   │
        │                 │ code         │   │
-       │                 │ referrerId(FK)│  │
-       │                 │ referredEmail│   │
+       │                 │ referrerId   │   │
        │                 │ reward       │   │
-       │                 │ status       │   │
        │                 └──────────────┘   │
 ```
 
-### Описание моделей
+### 3.1. Базовые модели (12)
 
 | Модель | Назначение | Ключевые поля |
 |---|---|---|
-| **User** | Пользователь платформы | email, role (USER/ADMIN/COMPLIANCE), kycLevel (0-2), referralCode |
+| **User** | Пользователь платформы | email, role (USER/ADMIN/COMPLIANCE/FINANCE/BANK), kycLevel (0-2), bankId (для BANK), referralCode |
 | **Balance** | Баланс пользователя по активам | userId, asset (RUB/USDT/BTC/...), amount, locked |
 | **Order** | Торговый ордер | pair, side (buy/sell), type (limit/market), price, quantity, status |
 | **Trade** | Исполненная сделка | orderId, pair, side, price, quantity, total, fee |
@@ -209,6 +220,22 @@
 | **KycDocument** | KYC-документ | docType, status |
 | **LoginEvent** | Запись входа пользователя | ip, device, location, success |
 | **Referral** | Реферал | code, referrerId, referredEmail, reward |
+
+### 3.2. Банковские/финансовые модели (9) — NEW в v2.0
+
+| Модель | Назначение | Ключевые поля |
+|---|---|---|
+| **Bank** | Банк-партнёр | name, bic, swift, type, status, apiProtocol (REST/SOAP), cryptoProtocol (GOST_TLS_1_3/STANDARD_TLS), isSandbox, webhookUrl |
+| **BankFee** | Комиссия банка по типу операции | bankId, operationType (DEPOSIT/WITHDRAW/CROSS_BORDER/SBP_TRANSFER), feeType (PERCENT/FIXED/COMBINED), payer (USER/EXCHANGE), tiers |
+| **BankLimit** | Лимиты банка (4 типа) | bankId, dailyLimit, monthlyLimit, perTransactionLimit, perUserDailyLimit (115-ФЗ), alertThreshold, autoSuspendOnLimit |
+| **BankAccount** | Корр./операционный счёт биржи в банке | bankId, accountNumber, currency, balance, minBalance, type (CORRESPONDENT/OPERATIONAL/RESERVE), lastSyncAt |
+| **BankTransaction** | Банковская транзакция | bankId, userId?, type, amount, fee, feePayer, status (COMPLETED/PENDING/FAILED/SUSPENDED_BY_BANK), bankReference, isThreshold (>600K ₽) |
+| **BankReconciliation** | Свёрка с банковской выпиской | bankId, period, statementFile, totalTransactions, matchedCount, unmatchedInternal, unmatchedBank, status, discrepancyAmount, resolvedBy |
+| **BankWebhookLog** | Лог вебхуков от банков | bankId, eventType (PAYMENT_STATUS_CHANGED/REFUND/REVERSAL), payload, status (RECEIVED/PROCESSED/FAILED) |
+| **BankComplianceExport** | Выгрузка комплаенс-данных для банка (по 115-ФЗ) | bankId, period, format (XML/CSV/JSON), status, fileUrl, requestedBy |
+| **CorridorConfig** | Настройка кросс-бордер коридора | corridorId (RU-CN), senderBankId, receiverBankId, liquidityBridge, feePercent, etaMin/etaMax, minAmount/maxAmount, active |
+
+> Все 9 моделей реализованы в `prisma/schema.prisma` и заполняются скриптом `prisma/seed-finance.ts`.
 
 ---
 
@@ -262,7 +289,7 @@
 **Назначение:** Список всех торговых пар с расширенными функциями.
 
 **Что можно делать:**
-- Таблица 20 пар с реальными ценами (Binance), изменениями, объёмами, спарклайнами
+- Таблица 20 пар с реальными ценами (Binance), изменениями, объёмами, **реальными sparklines 24h** (Binance klines API — close prices)
 - Сортировка по цене/изменению/объёму
 - Поиск по символу/названию
 - Табы: Все / Фавориты / Рост / Падение
@@ -394,6 +421,7 @@
 - Последние пользователи (email, name, KYC, role, время)
 - Последние платежи (коридор, сумма, статус, бенефициар)
 - Инциденты и алерты (severity, risk, статус, описание)
+- **Управление модулями** (NEW): переключатели P2P / Кросс-бордер — отключение скрывает раздел из навигации для всех пользователей; состояние хранится в `enabledModules` (Zustand persist)
 - Обновление каждые 20 сек
 
 ### 4.16. Вход (`auth`)
@@ -401,10 +429,60 @@
 
 **Что можно делать:**
 - Вход / Регистрация (email + пароль)
-- **3 демо-аккаунта** (Пользователь / Администратор / Комплаенс) — быстрый вход
+- **7 демо-аккаунтов** (5 ролей × до 3 банков) — быстрый вход:
+  - USER (`user@ruscrypto.ru`), ADMIN (`admin@ruscrypto.ru`), COMPLIANCE (`compliance@ruscrypto.ru`)
+  - FINANCE (`finance@ruscrypto.ru`)
+  - BANK × 3 (`bank@vtb.ru`, `bank@alfa.ru`, `bank@sber.ru`)
 - Госуслуги (ЕСИА) — демо-вход
 - 152-ФЗ consent
 - Если уже залогинен — welcome screen с переходом в профиль
+
+### 4.17. Финансы (`finance`) — NEW в v2.0
+**Назначение:** Финансовый контролёр биржи — управление банками-партнёрами, комиссиями, лимитами, сверкой.
+
+**Доступ:** только роль ADMIN или FINANCE (role-gating в NAV).
+
+**9 табов:**
+
+| Таб | Назначение |
+|---|---|
+| **Дашборд** | 4 KPI (оборот 24ч, комиссии, активных банков, транзакций + thresholdOps badge), bar chart оборота по банкам, line chart 30-дневной динамики, таблица топ-5 банков (объём/комиссии/доля/дневной usage% с progress bar/статус), алерты (limitAlerts + lowBalanceAccounts). Фильтр периода: 1ч / 24ч / 7д / 30д |
+| **Банки** | CRUD таблица 5 банков (ВТБ, Альфа, Сбер, Газпром, Тинькофф): name, BIC, type badge, priority, apiProtocol+cryptoProtocol badge (GOST=gold/STANDARD=muted), status. Модальное окно добавления/редактирования со всеми полями (реквизиты + регуляторные + технические: apiProtocol, cryptoProtocol, OAuth, sandbox) |
+| **Комиссии** | Accordion по банкам; по 4 типа операции (DEPOSIT/WITHDRAW/CROSS_BORDER/SBP_TRANSFER) — feeType, %, fixed, min/max, payer (USER/EXCHANGE), preview расчёта на 100K ₽. PATCH / DELETE / archive |
+| **Лимиты** | Карточка по каждому банку: dailyLimit/monthlyLimit/perTransactionLimit/perUserDailyLimit + progress bar (green<50%/yellow 50-80%/red>80%) + реальный `todayUsage` из БД. alertThreshold, autoSuspendOnLimit. LimitEditDialog |
+| **Счета** | Таблица 9 счетов: bank, accountNumber (mono), currency, balance, minBalance, type (CORRESPONDENT/OPERATIONAL/RESERVE), lastSyncAt. Красная строка + AlertCircle если balance<minBalance. Кнопка «Синхр.» → POST /api/finance/banks/[id]/accounts |
+| **Свёрка** | Список сверок (bank, period, status MATCHED/DISCREPANCY/PENDING, matched/total, discrepancyAmount). Создать сверку (выбор банка+месяц). Детальная карточка + «Разрешить расхождения» (PATCH /api/finance/reconciliation/[id]) |
+| **Коридоры** | Таблица 6 коридоров (RU-CN, RU-AE, RU-TR, RU-IN, RU-KZ, RU-AM): флаг+id, senderBank, liquidityBridge, feePercent, etaMin-etaMax, min-max amount, active toggle (PATCH), edit |
+| **Отчёты** | 3 типа отчётов: Пороговые >600K ₽ (115-ФЗ) / Оборот по банкам / Комплаенс-выгрузка. Фильтр по месяцу. Формирование → таблица результатов. **CSV-экспорт** (Blob + download) |
+| **Вебхуки** | Таблица 10 webhook logs: bank, eventType badge (PAYMENT_STATUS_CHANGED/SUSPENDED/REFUND), payload (expandable), status (PROCESSED/RECEIVED/FAILED), createdAt. Инфо-нота: «Вебхуки от банков автоматически обновляют статусы транзакций» |
+
+**Реализованный регуляторный функционал:**
+- ВТБ: apiProtocol=SOAP, cryptoProtocol=GOST_TLS_1_3, OAuth2, signingCertificate (CryptoPro)
+- Альфа: apiProtocol=REST, paymentPageMode=HOSTED, merchantLogin
+- Для всех: isSandbox, webhookUrl, webhookSecret, dataProcessorAgreement, licenseStatus, capitalRequirement
+
+### 4.18. Портал банка (`bank-portal`) — NEW в v2.0
+**Назначение:** Отдельный портал для представителей банков-партнёров (роль BANK).
+
+**Доступ:** только роль BANK (одновременно скрывает admin/finance/compliance из навигации).
+
+**5 табов:**
+
+| Таб | Назначение |
+|---|---|
+| **Дашборд** | KPI по банку-партнёру: оборот за день/неделю/месяц, кол-во транзакций, средний чек, комиссии собраны. Графики динамики |
+| **Транзакции** | Реестр банковских транзакций по своему банку: фильтр по типу (DEPOSIT/WITHDRAW/CROSS_BORDER/SBP), статусу (COMPLETED/PENDING/FAILED/SUSPENDED_BY_BANK), пороговые >600K ₽ (115-ФЗ) отдельно подсвечены. Поиск по bankReference |
+| **Настройки** | **Read-only** просмотр реквизитов своего банка: БИК, SWIFT, ИНН, корр. счёт, контакты, apiEndpoint, apiProtocol/cryptoProtocol, webhookUrl. Изменения невозможны — это делает FINANCE/ADMIN |
+| **Свёрка** | Просмотр сверок по своему банку (read-only), статусы (MATCHED/DISCREPANCY/PENDING), детализация. Комментарии банка по расхождениям |
+| **Отчёты** | Формирование пороговых отчётов (>600K ₽ — 115-ФЗ), оборот по типам операций. CSV-экспорт. Запрос комплаенс-выгрузки (если требуется по запросу Росфинмониторинга) |
+
+**Особенности роли BANK:**
+- В навигации видны **только** разделы: Главная, Новости, Справка, Рынки, **Портал банка**, Профиль, Вход (т.е. `bank-portal` + публичные)
+- Не видит: Торги, Маржа, P2P, Кросс-бордер, Кошелёк, Портфель, Аналитику, KYC, Комплаенс, Админку, Финансы
+- `user.bankId` привязан к конкретному банку — все данные в портале фильтруются по этому bankId
+- 3 демо-аккаунта: `bank@vtb.ru` (ВТБ), `bank@alfa.ru` (Альфа), `bank@sber.ru` (Сбер)
+
+> Подробнее см. отдельный документ `06-BANK-PORTAL.md`.
 
 ---
 
@@ -425,7 +503,7 @@
 | **TIF (Time in Force)** | Время жизни ордера: GTC (до отмены), IOC (немедленно или отмена), FOK (полностью или отмена). |
 | **Maker / Taker** | Maker — создаёт ликвидность (лимитный ордер). Taker — забирает ликвидность (рыночный ордер). |
 | **Depth chart** | Визуализация глубины рынка: cumulative объём bids (зелёный) и asks (красный) по уровням цен. |
-| **Sparkline** | Мини-график изменения цены без осей (для быстрого визуального обзора тренда). |
+| **Sparkline** | Мини-график изменения цены без осей (для быстрого визуального обзора тренда). На РусКрипто заполняется реальными close-prices за 24h через Binance klines API. |
 
 ### Маржинальная торговля
 
@@ -507,15 +585,35 @@
 | **Росфинмониторинг** | Федеральная служба по финансовому мониторингу (получает SAR-отчёты). |
 | **FSTEC** | Федеральная служба по техническому и экспортному контролю (сертификация HSM, ЦОД). |
 
+### Банки и финансы (NEW в v2.0)
+
+| Термин | Определение |
+|---|---|
+| **Роль BANK** | Специальная роль пользователя-представителя банка-партнёра. Видит только «Портал банка» + публичные разделы. Привязан к `user.bankId`. |
+| **Портал банка** | Отдельный UI для роли BANK с 5 табами: Дашборд, Транзакции, Настройки (read-only), Свёрка, Отчёты. Не позволяет изменять реквизиты банка — это делает FINANCE. |
+| **Свёрка (Reconciliation)** | Сопоставление банковской выписки с внутренними транзакциями биржи. Статусы: PENDING → IN_PROGRESS → MATCHED / DISCREPANCY. Поля: matchedCount, unmatchedInternal, unmatchedBank, discrepancyAmount. |
+| **GOST TLS** | ГОСТ-шифрование TLS 1.3 (Кузнечик/Магма). Требуется ВТБ для интеграционного взаимодействия. Обычный HTTPS недостаточен. Поле `cryptoProtocol: GOST_TLS_1_3` в модели Bank. |
+| **SOAP** | Simple Object Access Protocol — XML-протокол для интеграции. ВТБ использует SOAP (ИБК — Интеграционный Банк-Клиент), в отличие от Альфы (REST). Поле `apiProtocol: SOAP` в Bank. |
+| **Module toggles** | Переключатели в админке для отключения модулей P2P и Кросс-бордер. Состояние хранится в `enabledModules: { p2p, crossBorder }` (Zustand persist). При отключении модуль исчезает из навигации для всех пользователей. |
+| **Threshold operation** | Операция >600 000 ₽ — порог 115-ФЗ для обязательного контроля. Поле `isThreshold` в BankTransaction auto-flag при >600K. |
+| **Портал банка: threshold reports** | Отчёт по пороговым операциям за период (>600K ₽), формируется представителем банка (роль BANK) через `/api/bank-portal/reports`. |
+| **Webhook банка** | HTTP-callback от банка о статусе платежа (PAYMENT_STATUS_CHANGED, REFUND, REVERSAL). Логируется в BankWebhookLog, обновляет BankTransaction.status. |
+| **Банк-корреспондент** | Банк, в котором у биржи открыт корреспондентский счёт для fiat on/off ramp. |
+| **Коридор (Corridor)** | Тоже что и в cross-border, но с привязкой к банкам: `CorridorConfig { corridorId, senderBankId, receiverBankId, liquidityBridge, feePercent, etaMin/etaMax }`. |
+
 ---
 
 ## 6. API-эндпоинты
+
+Всего 33 эндпоинта в 11 группах. Ролевые ограничения: USER (базовые), ADMIN/COMPLIANCE (+ admin/compliance), FINANCE/ADMIN (+ finance), BANK (+ bank-portal).
+
+### 6.1. Базовые эндпоинты (24)
 
 | Метод | Путь | Назначение |
 |---|---|---|
 | GET | `/api/auth?email=...` | Текущий пользователь |
 | POST | `/api/auth` | Вход/регистрация (демо) |
-| GET | `/api/market` | Котировки топ-20 криптовалют |
+| GET | `/api/market` | Котировки топ-20 криптовалют + sparkline 24h |
 | GET | `/api/wallet` | Балансы + транзакции |
 | POST | `/api/wallet` | Депозит (адрес) / вывод |
 | GET | `/api/orders` | История ордеров/сделок |
@@ -536,7 +634,46 @@
 | GET | `/api/profile/login-history` | История входов |
 | GET | `/api/profile/referral` | Реферальный код + статистика |
 | GET | `/api/profile/sessions` | Активные сессии |
-| POST | `/api/help/chat` | ИИ-консультант (LLM) |
+| POST | `/api/help/chat` | ИИ-консультант (z-ai-web-dev-sdk с fallback) |
+
+### 6.2. Финансовый модуль `/api/finance/*` (14) — NEW в v2.0
+
+**Доступ:** только роли FINANCE и ADMIN.
+
+| Метод | Путь | Назначение |
+|---|---|---|
+| GET | `/api/finance/dashboard?period=1h\|24h\|7d\|30d` | KPI + графики по банкам |
+| GET | `/api/finance/banks` | Список банков-партнёров |
+| POST | `/api/finance/banks` | Добавить банк |
+| PATCH | `/api/finance/banks/{id}` | Редактировать банк |
+| DELETE | `/api/finance/banks/{id}` | Деактивировать банк (без удаления) |
+| GET | `/api/finance/banks/{id}/fees` | Комиссии банка |
+| POST | `/api/finance/banks/{id}/fees` | Настроить комиссию |
+| PATCH | `/api/finance/banks/{id}/fees` | Обновить комиссию (архив/archive) |
+| GET | `/api/finance/banks/{id}/limits` | Лимиты банка + todayUsage |
+| PATCH | `/api/finance/banks/{id}/limits` | Обновить лимиты |
+| GET | `/api/finance/banks/{id}/accounts` | Корр. счета банка |
+| POST | `/api/finance/banks/{id}/accounts` | Синхронизировать баланс (mock bank API) |
+| GET | `/api/finance/reconciliation` | Список сверок |
+| POST | `/api/finance/reconciliation` | Создать сверку (загрузить выписку) |
+| PATCH | `/api/finance/reconciliation/{id}` | Разрешить расхождения |
+| GET | `/api/finance/corridors` | Настройка кросс-бордер коридоров |
+| PATCH | `/api/finance/corridors` | Обновить коридор (active toggle) |
+| GET | `/api/finance/reports?type=threshold\|bank-volumes\|compliance-export&period=YYYY-MM` | Регуляторные отчёты (CSV) |
+| GET | `/api/finance/webhooks` | Лог вебхуков от банков |
+| POST | `/api/finance/webhooks/{bankSlug}` | Приём вебхука от банка (callback) |
+
+### 6.3. Портал банка `/api/bank-portal/*` (5) — NEW в v2.0
+
+**Доступ:** только роль BANK (привязанная к конкретному `user.bankId`). Все данные фильтруются по bankId пользователя.
+
+| Метод | Путь | Назначение |
+|---|---|---|
+| GET | `/api/bank-portal/dashboard?period=1h\|24h\|7d\|30d` | KPI дашборда по своему банку |
+| GET | `/api/bank-portal/transactions?type=...&status=...&threshold=...` | Реестр транзакций своего банка |
+| GET | `/api/bank-portal/settings` | Реквизиты своего банка (read-only) |
+| GET | `/api/bank-portal/reconciliation` | Сверки по своему банку (read-only) |
+| GET | `/api/bank-portal/reports?type=threshold\|volumes&period=YYYY-MM` | Пороговые/оборотные отчёты своего банка (CSV) |
 
 ---
 
@@ -556,15 +693,18 @@
 - **socket.io-client** (WebSocket)
 
 ### Бэкенд
-- **Next.js API Routes** (14 эндпоинтов)
-- **Prisma ORM 6** + **SQLite**
-- **z-ai-web-dev-sdk** (LLM для ИИ-помощника)
-- **socket.io** (mini-service на порту 3003)
+- **Next.js API Routes** (33 эндпоинта в 11 группах)
+- **Prisma ORM 6** + **SQLite** (21 модель)
+- **z-ai-web-dev-sdk** (LLM для ИИ-помощника, fallback на справку)
+- **socket.io** (mini-service на порту 3003 — live order book)
+- **ВТБ-адаптер** (SOAP + GOST TLS — sandbox)
+- **Альфа-адаптер** (REST + OAuth — sandbox)
 
 ### Внешние API
-- **Binance API** — live-котировки криптовалют
+- **Binance API** — live-котировки + **klines (24h close prices)** для sparklines
 - **exchangerate-api.com** — курс USD/RUB
 - **TradingView** — графики (iframe embed)
+- **Bank APIs (sandbox)** — ВТБ (api.vtb.ru/ibk), Альфа (alfa.rbslnk.ru)
 
 ### DevOps
 - **Bun** (runtime + package manager)
@@ -575,7 +715,7 @@
 
 ## 8. Безопасность и комплаенс
 
-### Реализованные меры (MVP)
+### Реализованные меры (MVP v2.0)
 - ✅ KYC 3 уровня (L0/L1/L2) + Госуслуги (ЕСИА)
 - ✅ Адрес-идентификаторы (привязка криптоадресов к личности)
 - ✅ AML-мониторинг (5 типов алертов, rules-based)
@@ -586,18 +726,31 @@
 - ✅ 2FA (mock), anti-phishing код, whitelist адресов
 - ✅ Квалификационный тест инвестора
 - ✅ Валютный контроль 173-ФЗ (авто-документы)
-- ✅ RU/EN локализация
+- ✅ RU/EN локализация (~2200 ключей)
+- ✅ **5 ролей RBAC** (USER/ADMIN/COMPLIANCE/FINANCE/BANK) с role-gating на фронтенде + API
+- ✅ **Module toggles** — P2P и кросс-бордер отключаемы через админку (Zustand persist `enabledModules`)
+- ✅ **Bank portal role-gating** — роль BANK видит только `bank-portal` + публичные разделы; автоматически скрывает admin/finance/compliance
+- ✅ **Регуляторные поля банков** (licenseStatus, capitalRequirement, dataProcessorAgreement, isSandbox, signingCertificate)
+- ✅ **Пороговые операции** (auto-flag при >600K ₽, 115-ФЗ) в BankTransaction
+- ✅ **Свёрка с банками** (BankReconciliation: matchedCount/unmatchedInternal/unmatchedBank/discrepancyAmount)
+- ✅ **Вебхуки от банков** (BankWebhookLog: PAYMENT_STATUS_CHANGED/REFUND/REVERSAL)
+- ✅ **Комплаенс-выгрузка для банков** по запросу (BankComplianceExport, 115-ФЗ)
+- ✅ **CSV-экспорт** всех отчётов (пороговые/оборотные/комплаенс)
+- ✅ **ВТБ-совместимость** — apiProtocol=SOAP, cryptoProtocol=GOST_TLS_1_3 (sandbox)
+- ✅ **Альфа-совместимость** — apiProtocol=REST, paymentPageMode=HOSTED, OAuth (sandbox)
 
 ### Требуется для production (см. документ «План перехода в production»)
 - 🔲 Реальный matching engine (Rust)
 - 🔲 HSM + hot/warm/cold кастодия
-- 🔲 GOST 28147-89 шифрование
-- 🔲 mTLS + JWT auth
-- 🔲 PostgreSQL + Kafka + Redis
+- 🔲 GOST 28147-89 шифрование (полное, не только в sandbox-схеме)
+- 🔲 mTLS + JWT auth (сейчас mock-аутентификация)
+- 🔲 PostgreSQL + Kafka + Redis (сейчас SQLite)
 - 🔲 Kubernetes + 2 ЦОД (active-active)
 - 🔲 Лицензия ЦБ РФ
 - 🔲 Пентесты + аудит безопасности
+- 🔲 Реальные bank API интеграции (сейчас sandbox-заглушки для ВТБ/Альфа)
+- 🔲 Реальная ЕСИА SAML/OAuth интеграция (сейчас demo-login)
 
 ---
 
-*Документ актуален на дату: Июнь 2026. Версия MVP 1.0.*
+*Документ актуален на дату: Июль 2026. Версия MVP 2.0 (5 ролей, 18 разделов, 33 API, 21 модель БД).*

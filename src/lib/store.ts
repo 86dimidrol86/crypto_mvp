@@ -74,13 +74,19 @@ interface AppState {
   locale: Locale
   setLocale: (l: Locale) => void
 
+  // module toggles (админ может отключать модули)
+  enabledModules: { p2p: boolean; crossBorder: boolean }
+  setModuleEnabled: (module: 'p2p' | 'crossBorder', enabled: boolean) => void
+
   // auth (демо)
   isAuthed: boolean
   userEmail: string | null
   userName: string | null
   userRole: string
   userId: string | null
-  login: (email: string, name?: string, role?: string, id?: string) => void
+  userBankId: string | null
+  userBankName: string | null
+  login: (email: string, name?: string, role?: string, id?: string, bankId?: string, bankName?: string) => void
   logout: () => void
 
   // kyc
@@ -424,20 +430,30 @@ export const useAppStore = create<AppState>()(
       locale: 'ru',
       setLocale: (l) => set({ locale: l }),
 
+      enabledModules: { p2p: true, crossBorder: true },
+      setModuleEnabled: (module, enabled) =>
+        set((s) => ({
+          enabledModules: { ...s.enabledModules, [module]: enabled },
+        })),
+
       isAuthed: false,
       userEmail: null,
       userName: null,
       userRole: 'USER',
       userId: null,
-      login: (email, name, role, id) =>
+      userBankId: null,
+      userBankName: null,
+      login: (email, name, role, id, bankId, bankName) =>
         set({
           isAuthed: true,
           userEmail: email,
           userName: name || email.split('@')[0],
           userRole: role || 'USER',
           userId: id || null,
+          userBankId: bankId || null,
+          userBankName: bankName || null,
         }),
-      logout: () => set({ isAuthed: false, userEmail: null, userName: null, userRole: 'USER', userId: null }),
+      logout: () => set({ isAuthed: false, userEmail: null, userName: null, userRole: 'USER', userId: null, userBankId: null, userBankName: null }),
 
       kycLevel: 0,
       kycStatus: 'UNINITIATED',
@@ -825,6 +841,8 @@ export const useAppStore = create<AppState>()(
         userName: s.userName,
         userRole: s.userRole,
         userId: s.userId,
+        userBankId: s.userBankId,
+        userBankName: s.userBankName,
         kycLevel: s.kycLevel,
         kycStatus: s.kycStatus,
         balances: s.balances,
@@ -836,6 +854,7 @@ export const useAppStore = create<AppState>()(
         currency: s.currency,
         sidebarCollapsed: s.sidebarCollapsed,
         locale: s.locale,
+        enabledModules: s.enabledModules,
         marginPositions: s.marginPositions,
         marginAccount: s.marginAccount,
         priceAlerts: s.priceAlerts,

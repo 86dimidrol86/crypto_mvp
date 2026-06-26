@@ -18,6 +18,8 @@ import {
   Bell,
   Menu,
   X,
+  Landmark,
+  Building2,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import type { ViewId } from '@/lib/types'
@@ -62,6 +64,8 @@ import { AdminView } from '@/components/views/admin-view'
 import { MarginView } from '@/components/views/margin-view'
 import { NewsView } from '@/components/views/news-view'
 import { HelpView } from '@/components/views/help-view'
+import { FinanceView } from '@/components/views/finance-view'
+import { BankPortalView } from '@/components/views/bank-portal-view'
 import { HelpChatWidget } from '@/components/help-chat-widget'
 import { HelpCircle } from 'lucide-react'
 
@@ -89,6 +93,8 @@ const NAV: NavItem[] = [
   { id: 'kyc', label: 'nav.kyc', i18n: true, icon: ShieldCheck, group: 'nav.group.akkaunt', groupI18n: true },
   { id: 'compliance', label: 'nav.compliance', i18n: true, icon: Scale, group: 'nav.group.akkaunt', groupI18n: true },
   { id: 'admin', label: 'nav.admin', i18n: true, icon: ShieldCheck, group: 'nav.group.akkaunt', groupI18n: true },
+  { id: 'finance', label: 'nav.finance', i18n: true, icon: Landmark, group: 'nav.group.akkaunt', groupI18n: true },
+  { id: 'bank-portal', label: 'Портал банка', icon: Building2, group: 'nav.group.akkaunt', groupI18n: false },
   { id: 'profile', label: 'nav.profile', i18n: true, icon: UserCircle, group: 'nav.group.akkaunt', groupI18n: true },
 ]
 
@@ -109,6 +115,8 @@ const VIEW_COMPONENTS: Record<ViewId, React.ComponentType> = {
   profile: ProfileView,
   auth: AuthView,
   admin: AdminView,
+  finance: FinanceView,
+  'bank-portal': BankPortalView,
 }
 
 function SidebarContent({ onNavigate, collapsed }: { onNavigate?: () => void; collapsed?: boolean }) {
@@ -116,12 +124,26 @@ function SidebarContent({ onNavigate, collapsed }: { onNavigate?: () => void; co
   const setView = useAppStore((s) => s.setView)
   const alerts = useAppStore((s) => s.alerts)
   const userRole = useAppStore((s) => s.userRole)
+  const enabledModules = useAppStore((s) => s.enabledModules)
   const openAlerts = alerts.filter((a) => a.status === 'OPEN').length
   const { t } = useI18n()
 
   const isAdmin = userRole === 'ADMIN' || userRole === 'COMPLIANCE'
-  // Filter admin nav item for non-admin users
-  const visibleNav = NAV.filter((n) => n.id !== 'admin' || isAdmin)
+  const isFinance = userRole === 'ADMIN' || userRole === 'FINANCE'
+  const isBank = userRole === 'BANK'
+  // Filter role-gated items + disabled modules (p2p, crossBorder)
+  // BANK role: only sees bank-portal + public sections, not admin/finance/compliance
+  const visibleNav = NAV.filter(
+    (n) =>
+      (n.id !== 'admin' || isAdmin) &&
+      (n.id !== 'finance' || isFinance) &&
+      (n.id !== 'compliance' || isAdmin) &&
+      (n.id !== 'bank-portal' || isBank) &&
+      (n.id !== 'p2p' || enabledModules.p2p) &&
+      (n.id !== 'payments' || enabledModules.crossBorder) &&
+      // BANK role doesn't see admin/finance/compliance even if somehow allowed above
+      (!isBank || !['admin', 'finance', 'compliance'].includes(n.id))
+  )
   const groups = Array.from(new Set(visibleNav.map((n) => n.group)))
 
   const handleClick = (id: ViewId) => {

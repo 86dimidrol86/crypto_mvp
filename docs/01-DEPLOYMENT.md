@@ -86,13 +86,15 @@ bun run db:generate
 bun run db:push
 ```
 
-После этого в `db/custom.db` появится схема из 12 таблиц: User, Balance, Order, Trade, Transaction, P2POffer, P2PDeal, CrossBorderPayment, ComplianceAlert, KycDocument, LoginEvent, Referral.
+После этого в `db/custom.db` появится схема из 21 таблицы: User, Balance, Order, Trade, Transaction, P2POffer, P2PDeal, CrossBorderPayment, ComplianceAlert, KycDocument, LoginEvent, Referral + Bank, BankFee, BankLimit, BankAccount, BankTransaction, BankReconciliation, BankWebhookLog, BankComplianceExport, CorridorConfig.
 
 > Если `db:push` выдаёт ошибку — проверьте, что `db/` директория существует и `.env` содержит корректный абсолютный путь.
 
 ---
 
 ## Шаг 4. Заполнение БД демо-данными (seed)
+
+### 4.1. Базовый seed (пользователи, сделки, P2P, комплаенс)
 
 ```bash
 bun prisma/seed-extended.ts
@@ -105,7 +107,28 @@ bun prisma/seed-extended.ts
 - **8 комплаенс-алертов**, **3 кросс-бордер платежа**, **18 P2P-офферов**
 - **8 login events**, **3 реферала**, балансы для 10 пользователей
 
-В консоли появятся учётные данные демо-аккаунтов.
+### 4.2. Финансовый seed (банки, транзакции, порталы банков)
+
+```bash
+bun prisma/seed-finance.ts
+```
+
+Скрипт создаст:
+- **5 банков-партнёров**: ВТБ (GOST TLS + SOAP), Альфа-Банк (REST + OAuth), Сбербанк, Газпромбанк, Тинькофф
+- **20 комиссий** (BankFee по 4 на банк: DEPOSIT/WITHDRAW/CROSS_BORDER/SBP_TRANSFER)
+- **5 лимитов** (BankLimit на банк: дневной/месячный/per-tx/per-user)
+- **9 счетов** (BankAccount — корр./операционный/резервный)
+- **~18 000 банковских транзакций** за июнь-июль (~300 в день)
+- **5 сверок** (BankReconciliation: 2 MATCHED, 2 DISCREPANCY, 1 PENDING)
+- **10 записей вебхуков** (BankWebhookLog: PAYMENT_STATUS_CHANGED, SUSPENDED, REFUND)
+- **6 коридоров** CrossBorder (RU-CN, RU-AE, RU-TR, RU-IN, RU-KZ, RU-AM)
+- **3 demo-аккаунта роли BANK**:
+  - `bank@vtb.ru` — Сергей ВТБ, привязан к ВТБ
+  - `bank@alfa.ru` — Мария Альфа, привязана к Альфа-Банк
+  - `bank@sber.ru` — Дмитрий Сбер, привязан к Сбербанк
+- **1 FINANCE-аккаунт**: `finance@ruscrypto.ru` (Дмитрий Финансов)
+
+В консоли появятся учётные данные всех 7 демо-аккаунтов (4 базовых + FINANCE + 3 BANK).
 
 ---
 
@@ -157,8 +180,14 @@ bun run dev
 | 👤 Пользователь | `user@ruscrypto.ru` | любой | Торги, кошелёк, портфель, P2P, кросс-бордер, комплаенс |
 | 🛡️ Администратор | `admin@ruscrypto.ru` | любой | + раздел «Админка» (операционная панель) |
 | ⚖️ Комплаенс | `compliance@ruscrypto.ru` | любой | + раздел «Админка» (AML-алерты, пользователи) |
+| 💰 Финансы | `finance@ruscrypto.ru` | любой | + раздел «Финансы» (банки, комиссии, сверка, коридоры) |
+| 🏦 Банк (ВТБ) | `bank@vtb.ru` | любой | Только «Портал банка» + публичные разделы |
+| 🏦 Банк (Альфа) | `bank@alfa.ru` | любой | Только «Портал банка» + публичные разделы |
+| 🏦 Банк (Сбер) | `bank@sber.ru` | любой | Только «Портал банка» + публичные разделы |
 
 Также доступен вход через «Госуслуги (ЕСИА)» (демо-режим → `ivan.ivanov@gosuslugi.ru`).
+
+> 💡 **5 ролей:** USER, ADMIN, COMPLIANCE, FINANCE, BANK. Каждая имеет свой набор доступных разделов (role-gating в `src/app/page.tsx`, `SidebarContent`).
 
 ---
 
@@ -191,13 +220,16 @@ echo "DATABASE_URL=file:$(pwd)/db/custom.db" > .env
 bun run db:generate
 bun run db:push
 
-# 4. Заполнить демо-данными
+# 4. Заполнить демо-данными (пользователи + сделки)
 bun prisma/seed-extended.ts
 
-# 5. В отдельном терминале — WebSocket сервис
+# 5. Заполнить демо-данными (банки + финансовые транзакции + портал банка)
+bun prisma/seed-finance.ts
+
+# 6. В отдельном терминале — WebSocket сервис
 cd mini-services/market-service && bun install && bun run dev &
 
-# 6. Запустить приложение
+# 7. Запустить приложение
 cd ../..
 bun run dev
 ```
@@ -217,7 +249,9 @@ bun run dev
 | `bun run db:push` | Применить изменения Prisma-схемы к БД |
 | `bun run db:generate` | Регенерация Prisma Client |
 | `bun run db:reset` | Сброс БД (⚠️ удаляет все данные) |
-| `bun prisma/seed-extended.ts` | Заполнить БД демо-данными |
+| `bun prisma/seed.ts` | Базовый seed (только пользователи) |
+| `bun prisma/seed-extended.ts` | Расширенный seed: 29 пользователей, 60 сделок, P2P, комплаенс |
+| `bun prisma/seed-finance.ts` | Финансовый seed: 5 банков, ~18 000 транзакций, 3 BANK-аккаунта |
 
 ---
 
@@ -327,6 +361,41 @@ curl http://localhost:3003
 # Ожидаемый ответ: {"code":0,"message":"Transport unknown"} — это нормально для socket.io
 ```
 
+### В preview видна старая версия приложения
+Если после push в репозиторий в Preview-панели показывается старая версия:
+```bash
+# 1. Принудительно получить последние изменения из origin
+git fetch origin
+git reset --hard origin/main   # или origin/spa-mvp, если работаете в этой ветке
+
+# 2. Перегенерировать Prisma + пересоздать БД (если менялась схема)
+bun run db:generate
+bun run db:push
+bun prisma/seed-extended.ts
+bun prisma/seed-finance.ts
+
+# 3. Перезапустить dev-сервер (Ctrl+C в терминале, затем)
+bun run dev
+```
+
+Если используется sandbox-preview: очистите кэш браузера (Ctrl+Shift+R) или откройте в инкогнито-режиме.
+
+### Раздел «Финансы» / «Портал банка» не виден в навигации
+Эти разделы role-gated:
+- **Финансы** — только для ролей ADMIN и FINANCE
+- **Портал банка** — только для роли BANK (одновременно скрывает admin/finance/compliance)
+- **Комплаенс** — только для ADMIN и COMPLIANCE
+
+Если раздела нет — вы вошли не под той ролью. Выйдите и войдите под соответствующим демо-аккаунтом (см. Шаг 7).
+
+### Модули P2P / Кросс-бордер отсутствуют в навигации
+Эти модули можно отключать через админку:
+- Войдите как `admin@ruscrypto.ru` → раздел «Админка» → блок «Управление модулями»
+- Переключатели: «P2P-торговля» и «Кросс-бордер платежи»
+- Состояние сохраняется в localStorage (Zustand persist) — `enabledModules: { p2p, crossBorder }`
+
+Если после reset-state модули всё ещё скрыты — `localStorage.clear()` в DevTools браузера, обновите страницу.
+
 ### ИИ-помощник не отвечает
 Проверьте endpoint:
 ```bash
@@ -347,33 +416,41 @@ curl -X POST http://localhost:3000/api/help/chat \
 crypto_mvp/
 ├── src/
 │   ├── app/
-│   │   ├── api/              # API-роуты (14 эндпоинтов)
+│   │   ├── api/              # API-роуты (33 эндпоинта)
+│   │   │   ├── auth/, market/, wallet/, orders/, p2p/, payments/
+│   │   │   ├── compliance/, kyc/, analytics/, portfolio/history/
+│   │   │   ├── admin/stats/, profile/{login-history,referral,sessions}/
+│   │   │   ├── help/chat/                        # LLM-помощник
+│   │   │   ├── finance/                          # 14 эндпоинтов: dashboard, banks, banks/[id], banks/[id]/{fees,limits,accounts}, reconciliation, reconciliation/[id], corridors, reports, webhooks, webhooks/[bankSlug]
+│   │   │   └── bank-portal/                      # 5 эндпоинтов: dashboard, transactions, settings, reconciliation, reports
 │   │   ├── globals.css       # Тема (золото + dark navy)
 │   │   ├── layout.tsx        # Root layout + ThemeProvider
-│   │   └── page.tsx          # SPA shell (sidebar + header + view router)
+│   │   └── page.tsx          # SPA shell (sidebar + header + view router + role-gating)
 │   ├── components/
 │   │   ├── ui/               # shadcn/ui компоненты (40+)
-│   │   ├── views/            # 16 разделов (home, trade, margin, ...)
+│   │   ├── views/            # 18 разделов (home, news, help, trade, markets, margin, p2p, payments, wallet, portfolio, analytics, kyc, compliance, admin, finance, bank-portal, profile, auth)
 │   │   ├── logo.tsx          # SVG-логотип
 │   │   ├── price-ticker.tsx  # Бегущий тикер топ-20 криптовалют
 │   │   ├── help-chat-widget.tsx  # Floating ИИ-помощник
 │   │   └── ...
 │   └── lib/
-│       ├── store.ts          # Zustand store (состояние + persist)
+│       ├── store.ts          # Zustand store (состояние + persist + enabledModules)
 │       ├── db.ts             # Prisma client
-│       ├── market.ts         # Котировки Binance + fallback
-│       ├── i18n.ts           # RU/EN словарь (~500 ключей)
-│       ├── help-content.ts   # 14 статей справки
+│       ├── market.ts         # Котировки Binance + fallback (sparkline 24h)
+│       ├── i18n.ts           # RU/EN словарь (~2200 ключей)
+│       ├── help-content.ts   # 15 статей справки
 │       └── ...
 ├── prisma/
-│   ├── schema.prisma         # Схема БД (12 моделей)
+│   ├── schema.prisma         # Схема БД (21 модель: User с bankId + 9 bank/finance моделей)
 │   ├── seed.ts               # Базовый seed
-│   └── seed-extended.ts      # Расширенный seed (демо-данные)
+│   ├── seed-extended.ts      # Расширенный seed (29 пользователей, 60 сделок)
+│   └── seed-finance.ts       # Финансовый seed (5 банков, ~18 000 tx, 3 BANK-аккаунта)
 ├── mini-services/
-│   └── market-service/       # socket.io WebSocket (порт 3003)
+│   └── market-service/       # socket.io WebSocket (порт 3003) — live order book
 ├── public/
 │   ├── favicon.svg           # Логотип РусКрипто
 │   └── logo.svg
+├── docs/                     # Документация (7 файлов)
 ├── .env                      # DATABASE_URL
 └── package.json
 ```

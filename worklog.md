@@ -1700,3 +1700,169 @@ Stage Summary:
 - ALL 8 TASKS COMPLETE.
 - 16 views (added help). Full-width trade/margin. Compact home market grid with expand. Logo in sidebar. 29 DB users + 60 trades. 3 demo accounts with role-gating. 100% i18n RU/EN. RusCrypto favicon. Help center + AI chatbot (z-ai-web-dev-sdk LLM).
 - Git: commit 94b5fce pushed to origin/spa-mvp.
+
+---
+Task ID: FIN-FRONTEND
+Agent: fullstack-developer (FIN-FRONTEND)
+Task: Build Finance View frontend for РусКрипто crypto exchange SPA — 9 tabs (Дашборд, Банки, Комиссии, Лимиты, Счета, Свёрка, Коридоры, Отчёты, Вебхуки). Gold (#F0B90B) + dark navy theme (dark default).
+
+Work Log:
+1. Read context: docs/05-FINANCE-ROLE-DESIGN.md (10 cases, 9 tabs full design), src/app/page.tsx (SPA shell, NAV array, VIEW_COMPONENTS, SidebarContent role-gating pattern for 'admin'), src/components/views/admin-view.tsx (style reference: KPI cards, recharts, compact padding px-3 lg:px-5 py-4), src/lib/{store,use-api,format,use-i18n,types}.ts. Verified all /api/finance/* endpoints working via curl.
+
+2. STEP 1: Created src/components/views/finance-view.tsx (~3030 lines, 'use client', exports `FinanceView`). Single Tabs component with 9 TabsContent:
+   - Tab 1 (Дашборд): 4 KPI StatCards (Оборот 24ч, Комиссии, Активных банков, Транзакций + thresholdOps badge), Bar chart (perBank volume24h, gold #F0B90B bars), Line chart (30-day series, gold + dashed green fees line), perBank table (name, volume, fees, share%, dailyUsage% with progress bar, status badge), Alerts card (limitAlerts + lowBalanceAccounts).
+   - Tab 2 (Банки): Table (name+initials icon, BIC, type badge, priority, apiProtocol+cryptoProtocol badge with GOST=gold/STANDARD=muted, status badge ACTIVE green/SUSPENDED yellow/INACTIVE gray), "Добавить банк" button → Dialog with all fields (name, bic, swift, inn, correspondentAccount, type select, priority, licenseStatus, capitalRequirement, dataProcessorAgreement, apiProtocol, cryptoProtocol, apiEndpoint, paymentPageMode, contact person/phone/email, isSandbox switch). Row click → edit Dialog. Sandbox badge in row.
+   - Tab 3 (Комиссии): Accordion by bank, each row shows operationType badge (DEPOSIT green/WITHDRAW red/CROSS_BORDER gold/SBP yellow), feeType, feePercent%, feeFixed, feeMin, feeMax, payer badge, 100K ₽ preview computation (formatPrice), Edit button → FeeEditDialog with all fields + live preview.
+   - Tab 4 (Лимиты): Card per bank with daily/monthly/perTransaction/perUserDaily limits, progress bar (green<50%/yellow 50-80%/red>80%), alertThreshold, autoSuspendOnLimit badge, Edit button → LimitEditDialog.
+   - Tab 5 (Счета): Table (bank name, accountNumber mono, currency badge, balance formatPrice, minBalance, type badge CORRESPONDENT/OPERATIONAL/RESERVE, lastSyncAt timeAgo). Red row + AlertCircle icon when balance < minBalance. "Синхр." button per row → POST /api/finance/banks/[id]/accounts → toast.
+   - Tab 6 (Свёрка): List (bank name, period, status badge MATCHED green/DISCREPANCY red/PENDING yellow, matched/total, discrepancyAmount). "Новая свёрка" button → Dialog (bank select, month input). Row click → detail Dialog with stats grid + "Разрешить расхождения" button → PATCH.
+   - Tab 7 (Коридоры): Table (corridorId+flag emoji, senderBank lookup, liquidityBridge, feePercent, etaMin-etaMax, min-max amount, active toggle button ON green/OFF gray, edit pencil). Edit → CorridorEditDialog. Active toggle → PATCH /api/finance/corridors.
+   - Tab 8 (Отчёты): 3 report cards (Пороговые >600K / Оборот по банкам / Комплаенс-выгрузка) — selectable. Month input. "Сформировать" → fetch /api/finance/reports?type=...&period=... → results table (threshold=transactions table, bank-volumes=banks table). "Экспорт CSV" → generate CSV via Blob+download.
+   - Tab 9 (Вебхуки): Table (bank name, eventType badge gold, payload truncated expandable on click, status badge PROCESSED green/RECEIVED gold/FAILED red, createdAt timeAgo). Info note "Вебхуки от банков автоматически обновляют статусы транзакций".
+   - Parent FinanceView: header with FINANCE CONSOLE badge + LIVE indicator + Landmark icon title + "Обновить" button (refreshKey state). Horizontal scrollable TabsList with icons + t() labels.
+   - Used: useApi (with refresh polling), apiPost, apiPatch, useMounted (for timeAgo hydration), useI18n (for t() core labels), toast (sonner), formatPrice/formatNumber/formatDateTime/timeAgo, framer-motion (entrance animations), recharts (BarChart, LineChart with CartesianGrid + Tooltip), shadcn/ui (Tabs, Card, Badge, Button, Dialog, Select, Switch, Progress, Accordion, ScrollArea, Input, Label, Separator, KpiCardSkeleton/TableSkeleton from page-skeleton).
+   - Compact padding: max-w-[1600px] mx-auto px-3 lg:px-5 py-4. Russian UI (most strings as literals), t() for nav/title/subtitle/tab labels. Font-mono tabular-nums for all numeric displays.
+
+3. STEP 2: Updated src/lib/types.ts — added 'finance' to ViewId union.
+
+4. STEP 3: Updated src/app/page.tsx:
+   - Added `Landmark` to lucide-react import.
+   - Added `import { FinanceView } from '@/components/views/finance-view'`.
+   - Added NAV entry: `{ id: 'finance', label: 'nav.finance', i18n: true, icon: Landmark, group: 'nav.group.akkaunt', groupI18n: true }`.
+   - Added to VIEW_COMPONENTS: `finance: FinanceView,`.
+   - Updated SidebarContent filter: `const isFinance = userRole === 'ADMIN' || userRole === 'FINANCE'` + `visibleNav = NAV.filter((n) => (n.id !== 'admin' || isAdmin) && (n.id !== 'finance' || isFinance))` — finance nav only visible to ADMIN/FINANCE roles.
+
+5. STEP 4: i18n keys added to src/lib/i18n.ts (RU + EN dicts):
+   - nav.finance: 'Финансы' / 'Finance'
+   - finance.title: 'Финансы' / 'Finance'
+   - finance.subtitle: 'Финансовый контролёр' / 'Financial Controller'
+   - finance.tab.{dashboard,banks,fees,limits,accounts,reconciliation,corridors,reports,webhooks} — full RU+EN labels.
+
+6. Backend fix (small gap): Created /api/finance/webhooks/route.ts with GET handler (was returning 404 because only /api/finance/webhooks/[bankSlug]/route.ts existed with a GET that doesn't use params, but Next.js requires explicit /route.ts for the no-slug path). GET returns last 50 webhook logs with bank included. Verified: curl /api/finance/webhooks now returns 200 with 10 webhook entries (PAYMENT_STATUS_CHANGED, SUSPENDED, REFUND events).
+
+7. AuthView update: Added 4th quick-login button "Финансы" (FINANCE role, finance@ruscrypto.ru) using Landmark icon. Changed grid from grid-cols-3 to grid-cols-2 sm:grid-cols-4 for responsive layout (2 cols on mobile, 4 on sm+).
+
+8. Cleanup: Removed unused imports (XCircle, ArrowRight, Settings2) and unused `const { t } = useI18n()` / `const mounted = useMounted()` declarations from DashboardTab, BanksTab, FeesTab where they weren't actually referenced.
+
+QA verification:
+- `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000` = 200 ✓
+- `curl /api/finance/dashboard` = 200 ✓
+- `curl /api/finance/banks` = 200 ✓ (5 banks: Альфа-Банк, ВТБ, Газпромбанк, Сбербанк, Тинькофф)
+- `curl /api/finance/banks/[id]/limits` = 200 ✓
+- `curl /api/finance/reconciliation` = 200 ✓
+- `curl /api/finance/corridors` = 200 ✓ (6 corridors RU-CN/AE/TR/IN/KZ/AM)
+- `curl /api/finance/reports?type=threshold&period=2026-06` = 200 ✓ (224 transactions, 606M ₽ total)
+- `curl /api/finance/reports?type=bank-volumes&period=2026-06` = 200 ✓
+- `curl /api/finance/webhooks` = 200 ✓ (after route.ts fix, 10 webhook logs)
+- `curl /api/auth?email=finance@ruscrypto.ru` = 200 ✓ (role: FINANCE, name: Дмитрий Финансов)
+- `bun run lint` = exit 0 (0 errors, 0 warnings) ✓
+- Dev server log: no errors after compile ✓
+
+Stage Summary:
+- Finance View frontend complete: 9 tabs, ~3030 lines, fully functional with all 9 backend endpoints wired.
+- Dark navy + gold (#F0B90B) theme. Compact padding px-3 lg:px-5 py-4. Responsive (mobile-first, sm/md/lg/xl breakpoints). Tabular-nums font-mono for all numeric displays. Skeletons while loading (KpiCardSkeleton, TableSkeleton). Toast notifications for all mutations. Framer-motion entrance animations on rows/cards.
+- Role-gating: 'finance' nav item only visible to ADMIN/FINANCE users (filter alongside existing 'admin' pattern). Added FINANCE quick-login button to auth-view.
+- Backend gap fix: added /api/finance/webhooks/route.ts (GET handler) — was 404 because only [bankSlug]/route.ts existed.
+- All i18n keys populated in RU+EN. Russian UI literals for non-core labels (per task spec — "Russian UI (with t() for core labels)").
+- Verified end-to-end: login as finance@ruscrypto.ru → "Финансы" appears in nav sidebar under "Аккаунт" group → click → 9 tabs render with real DB data.
+
+---
+Task ID: DOCS-UPDATE
+Agent: fullstack-developer (DOCS-UPDATE)
+Task: Update ALL documentation in /home/z/my-project/docs/ to reflect current state of project (18 views, 5 roles, 33 API, 21 models). Update existing 5 docs + create 2 new docs (06-BANK-PORTAL.md, 07-CHANGELOG.md).
+
+Work Log:
+1. Read /home/z/my-project/worklog.md (1767 lines) — recent entries from FIN-FRONTEND agent showing Finance View completion, BANK role + bank-portal-view (5 tabs, 3 demo accounts), module toggles, real sparklines via Binance klines. Read all 5 existing docs (01-DEPLOYMENT 398 lines, 02-DOCUMENTATION 603 lines, 03-PRODUCTION-ROADMAP 374 lines, 04-PRESENTATION-SCRIPT 360 lines, 05-FINANCE-ROLE-DESIGN 765 lines).
+
+2. Verified current state of project against task description:
+   - 18 views: ls src/components/views/ confirms 18 view files (home, news, help, trade, markets, margin, p2p, payments, wallet, portfolio, analytics, kyc, compliance, admin, finance, bank-portal, profile, auth)
+   - 5 roles: prisma/schema.prisma User.role = "USER|COMPLIANCE|ADMIN|FINANCE|BANK", User.bankId field confirmed
+   - 21 Prisma models: grep -c "^model" = 21 (User, Balance, Order, Trade, Transaction, P2POffer, P2PDeal, CrossBorderPayment, ComplianceAlert, KycDocument, LoginEvent, Referral + Bank, BankFee, BankLimit, BankAccount, BankTransaction, BankReconciliation, BankWebhookLog, BankComplianceExport, CorridorConfig)
+   - 33 API endpoints: ls src/app/api/ + recursive = 33 routes across 11 groups (auth, market, wallet, orders, p2p, payments, compliance, kyc, analytics, portfolio/history, admin/stats, profile/{login-history,referral,sessions}, help/chat, finance/{dashboard,banks,banks/[id],banks/[id]/fees,banks/[id]/limits,banks/[id]/accounts,reconciliation,reconciliation/[id],corridors,reports,webhooks,webhooks/[bankSlug]}, bank-portal/{dashboard,transactions,settings,reconciliation,reports})
+   - 7 demo accounts: confirmed in seed-extended.ts (4 base: user/admin/compliance/gosuslugi) + seed-finance.ts (finance + 3 BANK: bank@vtb.ru/alfa.ru/sber.ru with bankId FK to VTB/Alfa/Sber)
+   - Module toggles: confirmed in src/lib/store.ts (enabledModules: {p2p, crossBorder}) + admin-view.tsx (toggle handlers)
+   - Role-gating in src/app/page.tsx SidebarContent (isBank filter + !isBank || !['admin','finance','compliance'].includes(n.id))
+   - i18n keys: ~935 RU + ~935 EN top-level keys, ~2200 with sub-keys
+   - package.json: @dnd-kit/core 6.3.1, react-resizable-panels 3.0.3, socket.io-client 4.8.3, z-ai-web-dev-sdk 0.0.18
+
+3. Updated docs/01-DEPLOYMENT.md:
+   - Шаг 3.3: changed "12 таблиц" → "21 таблица" + listed all 21 models
+   - Шаг 4: split into 4.1 (seed-extended.ts) + 4.2 (NEW: seed-finance.ts) with full breakdown of seed contents (5 banks, 20 fees, 5 limits, 9 accounts, ~18K tx, 5 reconciliations, 10 webhooks, 6 corridors, 3 BANK accounts + 1 FINANCE)
+   - Шаг 7: added 5th+6th+7th demo accounts (FINANCE + 3 BANK: bank@vtb.ru/alfa.ru/sber.ru) + note about 5 roles
+   - Полный цикл команд: added step 5 (bun prisma/seed-finance.ts)
+   - Команды разработки: added seed.ts/seed-extended.ts/seed-finance.ts rows
+   - Решение проблем: added 3 new sections — "В preview видна старая версия" (git fetch + reset --hard origin/main), "Раздел «Финансы»/«Портал банка» не виден" (role-gating explanation), "Модули P2P/Кросс-бордер отсутствуют" (admin toggle explanation)
+   - Структура проекта: updated tree — 33 endpoints (with finance/14 + bank-portal/5 breakdown), 18 views, 21 models, ~2200 i18n keys, 15 help articles, 3 seed scripts, docs folder with 7 files
+
+4. Updated docs/02-DOCUMENTATION.md (major rewrite):
+   - Header: version 1.0 → 2.0, date Июнь → Июль 2026, added "Что нового в v2.0" callout block
+   - Section 1 (Обзор): added 4 new key features (real sparklines, Финансовый модуль, Портал банка, module toggles), expanded demo accounts table from 3 to 7 entries (5 roles, including 3 BANK accounts)
+   - Section 2 (Архитектура): rewrote ASCII diagram with 18 разделов/5 ролей/33 эндпоинта/21 модель, added Binance klines + Bank APIs sandbox, updated Components table, added Module toggles + Role-gating (5 ролей) to Паттерны
+   - Section 3 (БД): rewrote ER-diagram (added Bank + 9 related models, User.bankId FK, simplified non-essential entities), split model descriptions into 3.1 Базовые модели (12) + 3.2 NEW Банковские/финансовые модели (9) with detailed field tables
+   - Section 4: added new 4.15 admin "Управление модулями" + 4.16 auth 7 демо-аккаунтов, added NEW 4.17 Финансы (9 табов detailed table) + NEW 4.18 Портал банка (5 табов detailed table) with role-gating specifics
+   - Section 5 (Глоссарий): added new "Банки и финансы (NEW в v2.0)" subsection with 11 new terms: BANK role, Портал банка, Reconciliation, GOST TLS, SOAP, Module toggles, Threshold operation, threshold reports, Webhook банка, Банк-корреспондент, Коридор (CorridorConfig). Updated Sparkline definition to mention real Binance klines
+   - Section 6 (API): restructured into 6.1 Базовые (24) + 6.2 NEW Финансовый модуль (14) + 6.3 NEW Портал банка (5) = 33 total, with full endpoint tables including query params
+   - Section 7 (Tech stack): backend 14→33 endpoints + 12→21 models, added z-ai fallback, socket.io port 3003, ВТБ-адаптер (SOAP+GOST), Альфа-адаптер (REST+OAuth); external APIs added klines for sparklines + Bank APIs sandbox
+   - Section 8 (Безопасность): expanded Реализованные меры with 11 NEW items (5 ролей RBAC, Module toggles, Bank portal role-gating, регуляторные поля, threshold ops, reconciliation, webhooks, compliance export, CSV export, ВТБ/Альфа compatibility); added 2 new gaps to "Требуется для production" (реальные bank API интеграции, реальная ЕСИА)
+   - Footer: updated to MVP v2.0 (5 ролей, 18 разделов, 33 API, 21 модель БД)
+
+5. Updated docs/03-PRODUCTION-ROADMAP.md:
+   - Header: статус MVP → MVP v2.0
+   - Added new section "Что уже реализовано в MVP v2.0" before Сводная оценка (15 bullet points listing FINANCE/BANK roles, 9 new models, 19 new endpoints, module toggles, bank portal role-gating, real sparklines, CSV export, ВТБ/Альфа compatibility, threshold ops, i18n ~2200 keys, 15 articles + AI bot, 5 banks seed)
+   - Section 5 (Платежи/Cross-border): rewrote table with MVP v2.0 column showing partial completion — Банк-партнёр 🟡 (API+портал есть, нужны реальные connections), Bank API 🟡 (schema + sandbox заглушки, нет реальных calls), Bank Portal 🟢 (готов MVP-уровень), Reconciliation 🟢 (готов MVP-уровень), Corridor plugins 🟡 (schema + 6 corridors seed), Module toggles 🟢 (готово, можно в prod), Threshold reports 🟢 (готов MVP-уровень)
+   - Footer: updated to Июль 2026 with v2.0 summary
+
+6. Updated docs/04-PRESENTATION-SCRIPT.md:
+   - СЛАЙД 3 (Что мы построили): rewrote "Цифры MVP" → "Цифры MVP v2.0" with 10 bullet points (18 разделов, 5 ролей, 33 API, 21 модель, 7 демо-аккаунтов, ~18K tx, WebSocket + sparklines, ИИ-помощник, i18n ~2200, module toggles); tech stack added react-resizable-panels + @dnd-kit
+   - СЛАЙД 11 (Роли и админка): expanded from 3 ролей to 5 (USER/ADMIN/COMPLIANCE/FINANCE/BANK), added FINANCE description + BANK description (bank@vtb.ru demo), added Module toggles demo instruction (показать отключение P2P)
+   - NEW СЛАЙД 11.1 (Демонстрация — Финансы и Портал банка): full script for FINANCE walkthrough (9 tabs: Дашборд/Банки/Комиссии/Лимиты/Свёрка/Коридоры/Отчёты with ВТБ SOAP/GOST mention) + BANK walkthrough (bank@vtb.ru login, 5 tabs including read-only Настройки, strict role-gating visibility)
+   - СЛАЙД 14 (Дорожная карта): "Что уже есть" updated from 6 to 10 bullet points (18 разделов, 5 ролей, sparklines via Binance klines, 29 users + 5 banks + ~18K tx, 33 API, module toggles, AI bot, i18n ~2200)
+   - Q&A "Сколько уже пользователей?": updated "29 пользователей" → "29 пользователей + 5 банков-партнёров с ~18 000 банковских транзакций за июнь-июль"
+
+7. Updated docs/05-FINANCE-ROLE-DESIGN.md:
+   - Added new Section 12 "Implementation Status — Реализовано в MVP v2.0" after Section 11 (which was the регуляторные требования section):
+     - 12.1: Status table for all 10 кейсов (Кейс 1-10) — all ✅ Готово with implementation references (API paths + UI tabs + seed references). Added 2 additional кейсы: 11 Вебхуки ✅, 12 ЭП 🟡 Частично (поле signingCertificate есть, реальная подпись требует CryptoPro в prod)
+     - 12.2: Реализованные регуляторные требования — ФЗ-1194918-8 (licenseStatus, capitalRequirement), 115-ФЗ (isThreshold >600K, perUserDailyLimit 300K, BankComplianceExport), 152-ФЗ (dataProcessorAgreement, pdConsent), ВТБ (SOAP+GOST+OAuth+CryptoPro), Альфа (REST+HOSTED+merchantLogin+OAuth), sandbox mode
+     - 12.3: План реализации — статус по фазам A-E: A ✅ (schema 9 models + 14 API + role-gating), B ✅ (finance-view.tsx ~3030 lines, 9 tabs, i18n), C 🟡 Частично (module toggles done, wallet/payments integration оставлено на prod), D ✅ (seed-finance.ts 425 lines, 5 banks + ~18K tx + 3 BANK accounts + 1 FINANCE), E ✅ (docs + QA clean). Итог: ~12 дней, 1 fullstack dev
+     - 12.4: Bank Portal as separate role BANK — cross-reference to 06-BANK-PORTAL.md, key differences table FINANCE vs BANK (привязка, права на банки/комиссии/лимиты/счета/свёрку/коридоры/отчёты/вебхуки, видимость навигации, скрывает, API)
+     - 12.5: Итог реализации — 8 ✅ bullets + следующий шаг (production-интеграция с реальными bank API — Фаза 4 Production Roadmap)
+
+8. Created NEW docs/06-BANK-PORTAL.md (360 lines):
+   - Section 1: Обзор — назначение (visibility по операциям через свой банк, self-service сверки/отчёты, SoD), локация в коде (bank-portal-view.tsx, /api/bank-portal/*, User.role BANK, User.bankId FK)
+   - Section 2: Role-gating — что видит BANK (7 разделов: home/news/help/markets/bank-portal/profile/auth), что скрыто (12 разделов с ❌), реализация role-gating (SidebarContent filter code snippet)
+   - Section 3: Демо-аккаунты — 3 банка (bank@vtb.ru Сергей ВТБ, bank@alfa.ru Мария Альфа, bank@sber.ru Дмитрий Сбер), пароль любой, особенности привязки bankId
+   - Section 4: 5 табов — detailed description of each tab: 4.1 Дашборд (KPI + фильтр периода), 4.2 Транзакции (реестр + фильтры по типу/статусу/пороговым + поиск), 4.3 Настройки (read-only + SoD explanation), 4.4 Свёрка (read-only + комментарии), 4.5 Отчёты (2 типа + CSV export + compliance export request)
+   - Section 5: API endpoints (5) — full table with query params, role check + bankId filter explanation, file locations
+   - Section 6: Регуляторные возможности — 6.1 ФЗ-115 (threshold ops, SUSPENDED_BY_BANK, compliance export), 6.2 ФЗ-152 (limited data visibility, dataProcessorAgreement), 6.3 ФЗ-1194918-8 (licenseStatus, capitalRequirement, bank API compatibility), 6.4 SoD principle (что может/не может делать BANK)
+   - Section 7: Отличия от роли FINANCE — comparison table (привязка, права на банки/комиссии/лимиты/счета/свёрку/коридоры/отчёты/вебхуки, видимость, API, demo accounts)
+   - Section 8: Демо-сценарий — 7-step script for investor demo (login bank@vtb.ru → Дашборд → Транзакции → Настройки read-only → Свёрка → Отчёты CSV → optional bank@alfa.ru comparison) + ключевой месседж
+   - Технические детали: schema snippet (User.bankId FK, Bank fields), file locations table, related docs cross-references
+
+9. Created NEW docs/07-CHANGELOG.md (320 lines):
+   - Format based on Keep a Changelog
+   - MVP v2.0 (2026-07-02): role BANK + Портал банка (5 tabs, 3 demo accounts), module toggles, real sparklines (Binance klines), FINANCE demo account, ~18K tx seed, /api/finance/dashboard period filter, todayUsage real from DB, compliance-export report type, 3 bug fixes (bank portal Reports crash, 3 Финансы баги, tx generation upper bound)
+   - MVP v1.5 (2026-06-26): full Финансы module (роль FINANCE, 9 tabs, 14 API, ~3030 lines, seed-finance.ts), 9 new Prisma models, регуляторный анализ (ВТБ SOAP/GOST, Альфа REST/OAuth, sandbox mode), 05-FINANCE-ROLE-DESIGN.md doc, 02-DOCUMENTATION.md update
+   - MVP v1.4 (2026-06-25): ИИ-помощник + Справочный центр (z-ai-web-dev-sdk + fallback, 15 bilingual articles, help-view, help-chat-widget), 8-task user-batch (full-width trade/margin, compact market grid, logo в sidebar, extended seed 29 users/60 trades, 3 demo accounts role-gating, i18n full EN ~2200 keys, favicon, help center), 3 bug fixes
+   - MVP v1.3 (2026-06-25): маржинальная торговля (1x-20x, auto-ликвидация, resizable+drag), compact trade-view (react-resizable-panels + @dnd-kit), collapsible sidebar, mock→real аналитика (реальные метрики из БД)
+   - MVP v1.2 (2026-06-25): полиш home+trade, новости (15 статей), price alerts, CSV-экспорт, реальный PnL-график в портфеле
+   - MVP v1.1 (2026-06-25): бэкенд + Prisma (12 моделей, 14 API), socket.io realtime (mini-service порт 3003), P2P-торговля с эскроу, кросс-бордер платежи (6 коридоров, 7-шаговый Saga), AML-комплаенс (5 типов алертов, SHAP, SAR), KYC wizard (5 шагов + Госуслуги)
+   - MVP v1.0 (2026-06-25): Initial release — Next.js 16 + React 19 + TS 5 + Tailwind 4 + shadcn/ui + Zustand 5, 11 разделов (home/trade/markets/wallet/portfolio/analytics/kyc/compliance/profile/admin/auth), тёмная тема золотая гамма, регуляторное соответствие (ФЗ-1194918-8/115/152/173)
+   - Сводка версий table (v1.0 → v2.0 progression: 11→18 разделов, 1→5 ролей, 0→33 API, 0→21 моделей, 0→7 demo accounts)
+   - Ключевые архитектурные решения (8 points)
+   - Технологический стек (current) — full breakdown фронтенд/бэкенд/внешние API
+
+10. Verification:
+    - `bun run lint` → exit 0 (0 errors, 0 warnings) ✓
+    - `git status -s` → 7 docs changed (5 modified + 2 new) ✓
+    - `git commit -m "docs: актуализация всей документации — 18 views, 5 roles, 33 API, 21 models"` → commit d53d8de, 7 files changed, 1213 insertions(+), 139 deletions(-) ✓
+    - dev.log: dev server running clean (GET / 200, /api/finance/dashboard 200) ✓
+
+Stage Summary:
+- ALL 7 DOCS COMPLETE: 5 updated (01-DEPLOYMENT, 02-DOCUMENTATION, 03-PRODUCTION-ROADMAP, 04-PRESENTATION-SCRIPT, 05-FINANCE-ROLE-DESIGN) + 2 new (06-BANK-PORTAL, 07-CHANGELOG).
+- Total: 3574 lines of documentation (vs 2499 before — +1075 lines, +43%).
+- All numbers updated consistently across docs: 18 views, 5 roles, 33 API, 21 models, 7 demo accounts, ~18K bank transactions, ~2200 i18n keys, 15 help articles.
+- New sections clearly marked "NEW в v2.0" or with section 12 "Implementation Status".
+- Russian language maintained throughout (existing convention).
+- No existing content removed — only additions + targeted updates.
+- Cross-references between docs (06-BANK-PORTAL.md ↔ 05-FINANCE-ROLE-DESIGN.md section 12.4 ↔ 02-DOCUMENTATION.md section 4.18).
+- Lint clean, commit pushed, worklog appended.

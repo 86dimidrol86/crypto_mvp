@@ -28,6 +28,7 @@ import {
   CartesianGrid,
   ResponsiveContainer,
 } from 'recharts'
+import { useAppStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/use-i18n'
 import { Card } from '@/components/ui/card'
@@ -115,6 +116,7 @@ function StatCard({ title, value, delta, icon: Icon, color, positive = true }: S
 
 export function AnalyticsView() {
   const { t } = useI18n()
+  const enabledModules = useAppStore((s) => s.enabledModules)
   const [period, setPeriod] = useState<Period>('24h')
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -208,7 +210,9 @@ export function AnalyticsView() {
                   <span className="text-muted-foreground">{t('analytics.tradesInDb')} <span className="font-mono text-foreground">{data.summary.totalTrades}</span></span>
                   <span className="text-muted-foreground">{t('analytics.usersWord')} <span className="font-mono text-foreground">{data.summary.totalUsers}</span></span>
                   <span className="text-muted-foreground">{t('analytics.paymentsWord')} <span className="font-mono text-foreground">{data.summary.totalPayments}</span></span>
-                  <span className="text-muted-foreground">{t('analytics.p2pWord')} <span className="font-mono text-foreground">{data.summary.p2pDeals}</span></span>
+                  {enabledModules.p2p && (
+                    <span className="text-muted-foreground">{t('analytics.p2pWord')} <span className="font-mono text-foreground">{data.summary.p2pDeals}</span></span>
+                  )}
                   <span className="text-muted-foreground">{t('analytics.feesCollected')} <span className="font-mono text-primary">{formatPrice(data.summary.totalFees, 'rub')}</span></span>
                 </div>
               </Card>

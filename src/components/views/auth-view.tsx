@@ -109,7 +109,7 @@ export function AuthView() {
         body: JSON.stringify({ email, name: mode === 'register' ? email.split('@')[0] : undefined }),
       })
       const u = await res.json()
-      login(u.email, u.name, u.role, u.id)
+      login(u.email, u.name, u.role, u.id, u.bankId, u.bankName)
       toast.success(mode === 'register' ? 'Аккаунт создан' : 'Добро пожаловать', {
         description: `${u.name} • роль: ${u.role}`,
       })
@@ -130,7 +130,7 @@ export function AuthView() {
         body: JSON.stringify({ email: loginEmail }),
       })
       const u = await res.json()
-      login(u.email, u.name, u.role, u.id)
+      login(u.email, u.name, u.role, u.id, u.bankId, u.bankName)
       toast.success(`Вход выполнен: ${label}`, {
         description: `${u.name} • роль: ${u.role}`,
       })
@@ -419,7 +419,7 @@ export function AuthView() {
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground text-center mb-2">
                   Демо-аккаунты (пароль любой)
                 </div>
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
                   <button
                     type="button"
                     onClick={() => handleQuickLogin('user@ruscrypto.ru', 'Пользователь')}
@@ -449,6 +449,26 @@ export function AuthView() {
                     <Scale className="w-4 h-4 text-primary" />
                     <span className="text-[10px] font-medium">Комплаенс</span>
                     <span className="text-[8px] text-muted-foreground">COMPLIANCE</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('finance@ruscrypto.ru', 'Финансовый контролёр')}
+                    disabled={loading}
+                    className="flex flex-col items-center gap-1 p-2 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 transition text-center"
+                  >
+                    <Landmark className="w-4 h-4 text-primary" />
+                    <span className="text-[10px] font-medium">Финансы</span>
+                    <span className="text-[8px] text-muted-foreground">FINANCE</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('bank@vtb.ru', 'Представитель банка')}
+                    disabled={loading}
+                    className="flex flex-col items-center gap-1 p-2 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 transition text-center"
+                  >
+                    <Building2 className="w-4 h-4 text-primary" />
+                    <span className="text-[10px] font-medium">Банк (ВТБ)</span>
+                    <span className="text-[8px] text-muted-foreground">BANK</span>
                   </button>
                 </div>
               </div>

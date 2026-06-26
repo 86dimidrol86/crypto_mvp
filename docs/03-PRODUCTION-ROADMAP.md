@@ -1,8 +1,30 @@
 # 🎯 План перехода РусКрипто из MVP в Production
 
-**Текущий статус:** MVP (демонстрационный прототип для инвесторов)  
+**Текущий статус:** MVP v2.0 (демонстрационный прототип для инвесторов с ролями FINANCE + BANK)  
 **Целевой статус:** Production-ready криптобиржа, лицензия ЦБ РФ  
 **Горизонт планирования:** 12–15 месяцев
+
+---
+
+## ✅ Что уже реализовано в MVP v2.0 (для учёта в плане)
+
+> По сравнению с первоначальным MVP v1.0 (3 роли, 16 разделов) добавлено:
+> - **Роль FINANCE** (Финансовый контролёр) — раздел «Финансы» (9 табов)
+> - **Роль BANK** (представитель банка) — раздел «Портал банка» (5 табов, read-only настройки)
+> - **9 новых моделей Prisma** (Bank, BankFee, BankLimit, BankAccount, BankTransaction, BankReconciliation, BankWebhookLog, BankComplianceExport, CorridorConfig)
+> - **19 новых API-эндпоинтов** (`/api/finance/*` — 14, `/api/bank-portal/*` — 5)
+> - **Module toggles** — P2P и кросс-бордер отключаемы через админку (Zustand persist `enabledModules`)
+> - **Bank portal role-gating** — роль BANK видит только `bank-portal` + публичные разделы
+> - **Реальные sparklines** через Binance klines API (24h close prices)
+> - **CSV-экспорт** всех финансовых отчётов
+> - **ВТБ-совместимость** (SOAP + GOST TLS — sandbox)
+> - **Альфа-совместимость** (REST + OAuth — sandbox)
+> - **Пороговые операции** (auto-flag при >600K ₽, 115-ФЗ) в BankTransaction
+> - **i18n** ~2200 ключей RU/EN (все 18 разделов переведены)
+> - **15 статей справки** + ИИ-чатбот (z-ai-web-dev-sdk с fallback)
+> - **5 банков** в seed (ВТБ, Альфа, Сбер, Газпром, Тинькофф) с ~18 000 транзакций
+
+**Итог v2.0:** 18 разделов • 5 ролей • 33 API • 21 модель БД • ~18 000 банковских транзакций в демо-базе.
 
 ---
 
@@ -78,13 +100,18 @@
 
 ### 5. Платежи / Cross-border
 
-| Компонент | MVP | Production | Приоритет |
+| Компонент | MVP v2.0 | Production | Приоритет |
 |---|---|---|---|
-| **Банк-партнёр** | Нет | Корреспондентский счёт в банке-партнёре (Сбер/Газпромбанк/ВТБ) | 🔴 Критич. |
-| **Fiat on/off ramp** | Нет | Интеграция СБП + банковские переводы (RUB deposit/withdraw) | 🔴 Критич. |
-| **Corridor plugins** | 6 статичных | CorridorPlugin interface (validate/execute/settle/compensate), real liquidity bridges | 🟡 Высок. |
+| **Банк-партнёр** | ✅ Schema + seed (5 банков: ВТБ, Альфа, Сбер, Газпром, Тинькофф) + CRUD через FINANCE | Корреспондентский счёт в банке-партнёре (Сбер/Газпромбанк/ВТБ) — реальные договоры | 🟡 Частично (API + портал есть, нужны реальные bank API connections) |
+| **Bank API интеграция** | ✅ Schema (apiProtocol, cryptoProtocol, OAuth, signingCertificate) + sandbox-заглушки ВТБ (SOAP/GOST) и Альфа (REST/OAuth) | Реальные API connections: ВТБ ИБК (SOAP, GOST TLS 1.3), Альфа REST, OAuth-токены, ЭП (CryptoPro) | 🟡 Частично (модели и UI готовы, нет реальных API calls) |
+| **Bank Portal** | ✅ Реализован (роль BANK, 5 табов, 5 API-эндпоинтов, 3 демо-аккаунта: ВТБ/Альфа/Сбер) | Доработать: реальные webhook callbacks от банков, async-выписки ВТБ (предзаказ → poll), подпись ЭП платёжных поручений | 🟢 Готов MVP-уровень |
+| **Reconciliation** | ✅ Реализован (BankReconciliation: matched/unmatched, discrepancyAmount, resolve) | Авто-загрузка выписок по расписанию, ML-матчинг, авто-разрешение типовых расхождений | 🟢 Готов MVP-уровень |
+| **Fiat on/off ramp** | Mock (адреса генерируются, реального зачисления нет) | Интеграция СБП + банковские переводы (RUB deposit/withdraw через bank API) | 🔴 Критич. |
+| **Corridor plugins** | ✅ Schema (CorridorConfig: corridorId, senderBankId, receiverBankId, liquidityBridge, feePercent, etaMin/etaMax) + 6 коридоров в seed | CorridorPlugin interface (validate/execute/settle/compensate), real liquidity bridges | 🟡 Частично |
 | **SWIFT/SPFS** | Нет | Интеграция с SWIFT (или SPFS как fallback) для международных переводов | 🟡 Высок. |
-| **Валютный контроль** | Mock (note) | Авто-генерация паспорта сделки (>50K USD), УФЭД, MinIO хранение (GOST-encrypted) | 🔴 Критич. |
+| **Валютный контроль** | Mock (note в UI) | Авто-генерация паспорта сделки (>50K USD), УФЭД, MinIO хранение (GOST-encrypted) | 🔴 Критич. |
+| **Module toggles** | ✅ Реализовано (P2P / Кросс-бордер отключаемы через админку, Zustand persist `enabledModules`) | — | 🟢 Готово (можно использовать в production) |
+| **Threshold reports (115-ФЗ)** | ✅ Реализовано (auto-flag при >600K ₽, отчёты через `/api/finance/reports` и `/api/bank-portal/reports`, CSV-экспорт) | Доп: авто-отправка в Росфинмониторинг по расписанию | 🟢 Готов MVP-уровень |
 
 ### 6. Инфраструктура
 
@@ -371,4 +398,4 @@
 
 ---
 
-*Документ актуален на: Июнь 2026. Оценки основаны на PRD и архитектурной документации проекта.*
+*Документ актуален на: Июль 2026. Оценки основаны на PRD и архитектурной документации проекта. Учтено текущее состояние MVP v2.0 (5 ролей, 18 разделов, 33 API, 21 модель БД, Bank Portal, module toggles).*

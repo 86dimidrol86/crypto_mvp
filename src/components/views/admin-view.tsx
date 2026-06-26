@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
+const PresentationView = lazy(() => import('@/components/views/presentation-view').then(m => ({ default: m.PresentationView })))
 import { motion } from 'framer-motion'
 import {
   BarChart3,
@@ -17,6 +18,9 @@ import {
   Scale,
   Clock,
   Send,
+  Settings,
+  Power,
+  PlayCircle,
 } from 'lucide-react'
 import {
   BarChart,
@@ -42,6 +46,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
+import { Switch } from '@/components/ui/switch'
 import { KpiCardSkeleton, TableSkeleton } from '@/components/page-skeleton'
 
 // ─── Types (returned by /api/admin/stats) ────────────────────────────────────
@@ -824,10 +829,90 @@ function AlertsTable({ alerts }: { alerts: AdminRecentAlert[] }) {
 }
 
 // ─── Main View ───────────────────────────────────────────────────────────────
+// ─── Module Settings — toggle P2P / Cross-border modules ─────────────────────
+function ModuleSettings() {
+  const { t } = useI18n()
+  const enabledModules = useAppStore((s) => s.enabledModules)
+  const setModuleEnabled = useAppStore((s) => s.setModuleEnabled)
+
+  const modules = [
+    {
+      key: 'p2p' as const,
+      name: 'P2P Торговля',
+      desc: 'Прямая торговля между пользователями (эскроу, чат, объявления)',
+      enabled: enabledModules.p2p,
+    },
+    {
+      key: 'crossBorder' as const,
+      name: 'Кросс-бордер платежи',
+      desc: 'Международные переводы через криптокоридоры (RU-CN, RU-AE, RU-TR и др.)',
+      enabled: enabledModules.crossBorder,
+    },
+  ]
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Settings className="w-4 h-4 text-primary" />
+          Управление модулями платформы
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-xs text-muted-foreground">
+          Отключите модули, которые не используются на текущем этапе. Отключённые модули
+          исчезнут из меню, главной страницы и всех разделов платформы.
+        </p>
+        {modules.map((m) => (
+          <div
+            key={m.key}
+            className={cn(
+              'flex items-center justify-between gap-4 p-3 rounded-xl border transition',
+              m.enabled ? 'border-border bg-card' : 'border-dashed border-border/60 bg-muted/20'
+            )}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className={cn(
+                  'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
+                  m.enabled ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'
+                )}
+              >
+                <Power className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-medium text-sm">{m.name}</div>
+                <div className="text-xs text-muted-foreground truncate">{m.desc}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className={cn('text-xs font-medium', m.enabled ? 'text-success' : 'text-muted-foreground')}>
+                {m.enabled ? 'Включён' : 'Отключён'}
+              </span>
+              <Switch
+                checked={m.enabled}
+                onCheckedChange={(checked) => {
+                  setModuleEnabled(m.key, checked)
+                  toast.success(
+                    `${m.name} ${checked ? 'включён' : 'отключён'}`,
+                    { description: checked ? 'Модуль снова виден в интерфейсе' : 'Модуль скрыт из всех разделов' }
+                  )
+                }}
+              />
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
 export function AdminView() {
   const { t } = useI18n()
   const mounted = useMounted()
+  const enabledModules = useAppStore((s) => s.enabledModules)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [showPresentation, setShowPresentation] = useState(false)
   const url = refreshKey ? `/api/admin/stats?r=${refreshKey}` : '/api/admin/stats'
   const { data, loading } = useApi<AdminStats>(url, { refresh: 20000 })
 
@@ -967,14 +1052,16 @@ export function AdminView() {
                 tone={stats && stats.criticalAlerts > 0 ? 'danger' : 'warning'}
                 index={3}
               />
-              <StatCard
-                title={t('admin.kpi.p2p')}
-                value={stats ? formatNumber(stats.openP2PDeals, 0) : '—'}
-                sub={t('admin.kpi.p2pSub')}
-                icon={Users}
-                iconTone="bg-orange-500/15 text-orange-400"
-                index={4}
-              />
+              {enabledModules.p2p && (
+                <StatCard
+                  title={t('admin.kpi.p2p')}
+                  value={stats ? formatNumber(stats.openP2PDeals, 0) : '—'}
+                  sub={t('admin.kpi.p2pSub')}
+                  icon={Users}
+                  iconTone="bg-orange-500/15 text-orange-400"
+                  index={4}
+                />
+              )}
             </div>
 
             {/* Row 2 — Recent trades (left, 2/3) + KYC donut & top pairs (right, 1/3) */}
@@ -999,6 +1086,28 @@ export function AdminView() {
             {/* Row 4 — Incidents & alerts */}
             <AlertsTable alerts={stats?.recentAlerts ?? []} />
 
+            {/* Row 5 — Module settings */}
+            <ModuleSettings />
+
+            {/* Presentation access (hidden) */}
+            <Card className="p-4 border-dashed border-primary/20 bg-primary/5">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center">
+                    <PlayCircle className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium">Презентация для инвесторов</div>
+                    <div className="text-xs text-muted-foreground">Интерактивная презентация платформы (14 слайдов)</div>
+                  </div>
+                </div>
+                <Button size="sm" onClick={() => setShowPresentation(true)} className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1.5">
+                  <PlayCircle className="w-4 h-4" />
+                  Открыть
+                </Button>
+              </div>
+            </Card>
+
             {/* Footer */}
             <Card className="bg-card/40 border-dashed">
               <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-2 p-4 text-[11px] text-muted-foreground">
@@ -1015,6 +1124,13 @@ export function AdminView() {
           </>
         )}
       </div>
+
+      {/* Presentation overlay */}
+      {showPresentation && (
+        <Suspense fallback={<div className="fixed inset-0 z-50 bg-background flex items-center justify-center"><div className="text-muted-foreground">Загрузка...</div></div>}>
+          <PresentationView onClose={() => setShowPresentation(false)} />
+        </Suspense>
+      )}
     </div>
   )
 }

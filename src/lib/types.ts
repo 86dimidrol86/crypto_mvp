@@ -14,6 +14,8 @@ export type ViewId =
   | 'kyc'
   | 'compliance'
   | 'admin'
+  | 'finance'
+  | 'bank-portal'
   | 'profile'
   | 'auth'
   | 'help'
