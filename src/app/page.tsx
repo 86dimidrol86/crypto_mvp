@@ -18,6 +18,7 @@ import {
   Bell,
   Menu,
   X,
+  Landmark,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import type { ViewId } from '@/lib/types'
@@ -62,6 +63,7 @@ import { AdminView } from '@/components/views/admin-view'
 import { MarginView } from '@/components/views/margin-view'
 import { NewsView } from '@/components/views/news-view'
 import { HelpView } from '@/components/views/help-view'
+import { FinanceView } from '@/components/views/finance-view'
 import { HelpChatWidget } from '@/components/help-chat-widget'
 import { HelpCircle } from 'lucide-react'
 
@@ -89,6 +91,7 @@ const NAV: NavItem[] = [
   { id: 'kyc', label: 'nav.kyc', i18n: true, icon: ShieldCheck, group: 'nav.group.akkaunt', groupI18n: true },
   { id: 'compliance', label: 'nav.compliance', i18n: true, icon: Scale, group: 'nav.group.akkaunt', groupI18n: true },
   { id: 'admin', label: 'nav.admin', i18n: true, icon: ShieldCheck, group: 'nav.group.akkaunt', groupI18n: true },
+  { id: 'finance', label: 'nav.finance', i18n: true, icon: Landmark, group: 'nav.group.akkaunt', groupI18n: true },
   { id: 'profile', label: 'nav.profile', i18n: true, icon: UserCircle, group: 'nav.group.akkaunt', groupI18n: true },
 ]
 
@@ -109,6 +112,7 @@ const VIEW_COMPONENTS: Record<ViewId, React.ComponentType> = {
   profile: ProfileView,
   auth: AuthView,
   admin: AdminView,
+  finance: FinanceView,
 }
 
 function SidebarContent({ onNavigate, collapsed }: { onNavigate?: () => void; collapsed?: boolean }) {
@@ -120,8 +124,11 @@ function SidebarContent({ onNavigate, collapsed }: { onNavigate?: () => void; co
   const { t } = useI18n()
 
   const isAdmin = userRole === 'ADMIN' || userRole === 'COMPLIANCE'
-  // Filter admin nav item for non-admin users
-  const visibleNav = NAV.filter((n) => n.id !== 'admin' || isAdmin)
+  const isFinance = userRole === 'ADMIN' || userRole === 'FINANCE'
+  // Filter admin/finance nav items for users without appropriate role
+  const visibleNav = NAV.filter(
+    (n) => (n.id !== 'admin' || isAdmin) && (n.id !== 'finance' || isFinance)
+  )
   const groups = Array.from(new Set(visibleNav.map((n) => n.group)))
 
   const handleClick = (id: ViewId) => {

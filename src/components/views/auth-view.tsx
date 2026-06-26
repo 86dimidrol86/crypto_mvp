@@ -419,7 +419,7 @@ export function AuthView() {
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground text-center mb-2">
                   Демо-аккаунты (пароль любой)
                 </div>
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                   <button
                     type="button"
                     onClick={() => handleQuickLogin('user@ruscrypto.ru', 'Пользователь')}
@@ -449,6 +449,16 @@ export function AuthView() {
                     <Scale className="w-4 h-4 text-primary" />
                     <span className="text-[10px] font-medium">Комплаенс</span>
                     <span className="text-[8px] text-muted-foreground">COMPLIANCE</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('finance@ruscrypto.ru', 'Финансовый контролёр')}
+                    disabled={loading}
+                    className="flex flex-col items-center gap-1 p-2 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 transition text-center"
+                  >
+                    <Landmark className="w-4 h-4 text-primary" />
+                    <span className="text-[10px] font-medium">Финансы</span>
+                    <span className="text-[8px] text-muted-foreground">FINANCE</span>
                   </button>
                 </div>
               </div>

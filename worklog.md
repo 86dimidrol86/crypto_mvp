@@ -1700,3 +1700,68 @@ Stage Summary:
 - ALL 8 TASKS COMPLETE.
 - 16 views (added help). Full-width trade/margin. Compact home market grid with expand. Logo in sidebar. 29 DB users + 60 trades. 3 demo accounts with role-gating. 100% i18n RU/EN. RusCrypto favicon. Help center + AI chatbot (z-ai-web-dev-sdk LLM).
 - Git: commit 94b5fce pushed to origin/spa-mvp.
+
+---
+Task ID: FIN-FRONTEND
+Agent: fullstack-developer (FIN-FRONTEND)
+Task: Build Finance View frontend for РусКрипто crypto exchange SPA — 9 tabs (Дашборд, Банки, Комиссии, Лимиты, Счета, Свёрка, Коридоры, Отчёты, Вебхуки). Gold (#F0B90B) + dark navy theme (dark default).
+
+Work Log:
+1. Read context: docs/05-FINANCE-ROLE-DESIGN.md (10 cases, 9 tabs full design), src/app/page.tsx (SPA shell, NAV array, VIEW_COMPONENTS, SidebarContent role-gating pattern for 'admin'), src/components/views/admin-view.tsx (style reference: KPI cards, recharts, compact padding px-3 lg:px-5 py-4), src/lib/{store,use-api,format,use-i18n,types}.ts. Verified all /api/finance/* endpoints working via curl.
+
+2. STEP 1: Created src/components/views/finance-view.tsx (~3030 lines, 'use client', exports `FinanceView`). Single Tabs component with 9 TabsContent:
+   - Tab 1 (Дашборд): 4 KPI StatCards (Оборот 24ч, Комиссии, Активных банков, Транзакций + thresholdOps badge), Bar chart (perBank volume24h, gold #F0B90B bars), Line chart (30-day series, gold + dashed green fees line), perBank table (name, volume, fees, share%, dailyUsage% with progress bar, status badge), Alerts card (limitAlerts + lowBalanceAccounts).
+   - Tab 2 (Банки): Table (name+initials icon, BIC, type badge, priority, apiProtocol+cryptoProtocol badge with GOST=gold/STANDARD=muted, status badge ACTIVE green/SUSPENDED yellow/INACTIVE gray), "Добавить банк" button → Dialog with all fields (name, bic, swift, inn, correspondentAccount, type select, priority, licenseStatus, capitalRequirement, dataProcessorAgreement, apiProtocol, cryptoProtocol, apiEndpoint, paymentPageMode, contact person/phone/email, isSandbox switch). Row click → edit Dialog. Sandbox badge in row.
+   - Tab 3 (Комиссии): Accordion by bank, each row shows operationType badge (DEPOSIT green/WITHDRAW red/CROSS_BORDER gold/SBP yellow), feeType, feePercent%, feeFixed, feeMin, feeMax, payer badge, 100K ₽ preview computation (formatPrice), Edit button → FeeEditDialog with all fields + live preview.
+   - Tab 4 (Лимиты): Card per bank with daily/monthly/perTransaction/perUserDaily limits, progress bar (green<50%/yellow 50-80%/red>80%), alertThreshold, autoSuspendOnLimit badge, Edit button → LimitEditDialog.
+   - Tab 5 (Счета): Table (bank name, accountNumber mono, currency badge, balance formatPrice, minBalance, type badge CORRESPONDENT/OPERATIONAL/RESERVE, lastSyncAt timeAgo). Red row + AlertCircle icon when balance < minBalance. "Синхр." button per row → POST /api/finance/banks/[id]/accounts → toast.
+   - Tab 6 (Свёрка): List (bank name, period, status badge MATCHED green/DISCREPANCY red/PENDING yellow, matched/total, discrepancyAmount). "Новая свёрка" button → Dialog (bank select, month input). Row click → detail Dialog with stats grid + "Разрешить расхождения" button → PATCH.
+   - Tab 7 (Коридоры): Table (corridorId+flag emoji, senderBank lookup, liquidityBridge, feePercent, etaMin-etaMax, min-max amount, active toggle button ON green/OFF gray, edit pencil). Edit → CorridorEditDialog. Active toggle → PATCH /api/finance/corridors.
+   - Tab 8 (Отчёты): 3 report cards (Пороговые >600K / Оборот по банкам / Комплаенс-выгрузка) — selectable. Month input. "Сформировать" → fetch /api/finance/reports?type=...&period=... → results table (threshold=transactions table, bank-volumes=banks table). "Экспорт CSV" → generate CSV via Blob+download.
+   - Tab 9 (Вебхуки): Table (bank name, eventType badge gold, payload truncated expandable on click, status badge PROCESSED green/RECEIVED gold/FAILED red, createdAt timeAgo). Info note "Вебхуки от банков автоматически обновляют статусы транзакций".
+   - Parent FinanceView: header with FINANCE CONSOLE badge + LIVE indicator + Landmark icon title + "Обновить" button (refreshKey state). Horizontal scrollable TabsList with icons + t() labels.
+   - Used: useApi (with refresh polling), apiPost, apiPatch, useMounted (for timeAgo hydration), useI18n (for t() core labels), toast (sonner), formatPrice/formatNumber/formatDateTime/timeAgo, framer-motion (entrance animations), recharts (BarChart, LineChart with CartesianGrid + Tooltip), shadcn/ui (Tabs, Card, Badge, Button, Dialog, Select, Switch, Progress, Accordion, ScrollArea, Input, Label, Separator, KpiCardSkeleton/TableSkeleton from page-skeleton).
+   - Compact padding: max-w-[1600px] mx-auto px-3 lg:px-5 py-4. Russian UI (most strings as literals), t() for nav/title/subtitle/tab labels. Font-mono tabular-nums for all numeric displays.
+
+3. STEP 2: Updated src/lib/types.ts — added 'finance' to ViewId union.
+
+4. STEP 3: Updated src/app/page.tsx:
+   - Added `Landmark` to lucide-react import.
+   - Added `import { FinanceView } from '@/components/views/finance-view'`.
+   - Added NAV entry: `{ id: 'finance', label: 'nav.finance', i18n: true, icon: Landmark, group: 'nav.group.akkaunt', groupI18n: true }`.
+   - Added to VIEW_COMPONENTS: `finance: FinanceView,`.
+   - Updated SidebarContent filter: `const isFinance = userRole === 'ADMIN' || userRole === 'FINANCE'` + `visibleNav = NAV.filter((n) => (n.id !== 'admin' || isAdmin) && (n.id !== 'finance' || isFinance))` — finance nav only visible to ADMIN/FINANCE roles.
+
+5. STEP 4: i18n keys added to src/lib/i18n.ts (RU + EN dicts):
+   - nav.finance: 'Финансы' / 'Finance'
+   - finance.title: 'Финансы' / 'Finance'
+   - finance.subtitle: 'Финансовый контролёр' / 'Financial Controller'
+   - finance.tab.{dashboard,banks,fees,limits,accounts,reconciliation,corridors,reports,webhooks} — full RU+EN labels.
+
+6. Backend fix (small gap): Created /api/finance/webhooks/route.ts with GET handler (was returning 404 because only /api/finance/webhooks/[bankSlug]/route.ts existed with a GET that doesn't use params, but Next.js requires explicit /route.ts for the no-slug path). GET returns last 50 webhook logs with bank included. Verified: curl /api/finance/webhooks now returns 200 with 10 webhook entries (PAYMENT_STATUS_CHANGED, SUSPENDED, REFUND events).
+
+7. AuthView update: Added 4th quick-login button "Финансы" (FINANCE role, finance@ruscrypto.ru) using Landmark icon. Changed grid from grid-cols-3 to grid-cols-2 sm:grid-cols-4 for responsive layout (2 cols on mobile, 4 on sm+).
+
+8. Cleanup: Removed unused imports (XCircle, ArrowRight, Settings2) and unused `const { t } = useI18n()` / `const mounted = useMounted()` declarations from DashboardTab, BanksTab, FeesTab where they weren't actually referenced.
+
+QA verification:
+- `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000` = 200 ✓
+- `curl /api/finance/dashboard` = 200 ✓
+- `curl /api/finance/banks` = 200 ✓ (5 banks: Альфа-Банк, ВТБ, Газпромбанк, Сбербанк, Тинькофф)
+- `curl /api/finance/banks/[id]/limits` = 200 ✓
+- `curl /api/finance/reconciliation` = 200 ✓
+- `curl /api/finance/corridors` = 200 ✓ (6 corridors RU-CN/AE/TR/IN/KZ/AM)
+- `curl /api/finance/reports?type=threshold&period=2026-06` = 200 ✓ (224 transactions, 606M ₽ total)
+- `curl /api/finance/reports?type=bank-volumes&period=2026-06` = 200 ✓
+- `curl /api/finance/webhooks` = 200 ✓ (after route.ts fix, 10 webhook logs)
+- `curl /api/auth?email=finance@ruscrypto.ru` = 200 ✓ (role: FINANCE, name: Дмитрий Финансов)
+- `bun run lint` = exit 0 (0 errors, 0 warnings) ✓
+- Dev server log: no errors after compile ✓
+
+Stage Summary:
+- Finance View frontend complete: 9 tabs, ~3030 lines, fully functional with all 9 backend endpoints wired.
+- Dark navy + gold (#F0B90B) theme. Compact padding px-3 lg:px-5 py-4. Responsive (mobile-first, sm/md/lg/xl breakpoints). Tabular-nums font-mono for all numeric displays. Skeletons while loading (KpiCardSkeleton, TableSkeleton). Toast notifications for all mutations. Framer-motion entrance animations on rows/cards.
+- Role-gating: 'finance' nav item only visible to ADMIN/FINANCE users (filter alongside existing 'admin' pattern). Added FINANCE quick-login button to auth-view.
+- Backend gap fix: added /api/finance/webhooks/route.ts (GET handler) — was 404 because only [bankSlug]/route.ts existed.
+- All i18n keys populated in RU+EN. Russian UI literals for non-core labels (per task spec — "Russian UI (with t() for core labels)").
+- Verified end-to-end: login as finance@ruscrypto.ru → "Финансы" appears in nav sidebar under "Аккаунт" group → click → 9 tabs render with real DB data.
