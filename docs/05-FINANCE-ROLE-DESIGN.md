@@ -612,3 +612,154 @@ role String @default("USER") // USER|COMPLIANCE|ADMIN|FINANCE
 ---
 
 *Документ подготовлен для реализации. Общий срок: 11–14 дней, 1–2 разработчика.*
+
+---
+
+## 11. Требования законодательства РФ и банков — Анализ и корректировки
+
+### 11.1. Требования ФЗ-1194918-8 (криптобиржи)
+
+**Из анализа законопроекта ЦБ РФ и Минфина:**
+
+1. **Лицензирование операторов** — криптобиржи, обменники, брокеры, депозитарии должны получить лицензию ЦБ РФ или войти в реестр. **Корректировка:** поле `licenseStatus` в модели Bank (требуется для каждого банка-партнёра).
+
+2. **Внутренний контроль и управление рисками** — обязательны для криптоорганизаций. Банк-партнёр должен видеть, что биржа имеет AML-процедуры. **Корректировка:** выгрузка комплаенс-статуса в bank API.
+
+3. **Все операции через лицензированных посредников** — с 1 июля 2027 г. запрет на сделки без лицензированного оператора. Fiat-каналы только через банки. **Уже учтено** в архитектуре.
+
+4. **Требования к капиталу** — ЦБ установит требования к капиталу криптоорганизаций. Банки-партнёры могут требовать подтверждения капитала. **Корректировка:** поле `capitalRequirement` в bank contract.
+
+### 11.2. Требования 115-ФЗ (AML/ПОД/ФТ)
+
+**Ключевые требования к банкам при работе с криптоплатформами:**
+
+1. **Идентификация клиентов** — банк обязан идентифицировать клиентов криптобиржи при fiat-операциях. **Корректировка:** при создании BankTransaction передавать `userId`, `kycLevel`, `userFullName` в bank API.
+
+2. **Пороговые операции** — операции >600 000 ₽ подлежат обязательному контролю. Банк уведомляется. **Корректировка:** поле `isThresholdOperation` в BankTransaction + auto-flag при >600K.
+
+3. **Обязательный контроль** — подозрительные операции (структурирование, необычный характер). Банк может запросить детали. **Корректировка:** API `/api/finance/banks/{id}/compliance-export` — выгрузка транзакций для банка.
+
+4. **Приостановление операций** — банк может приостановить операцию на 2 дня для проверки. **Корректировка:** статус `SUSPENDED_BY_BANK` в BankTransaction + alert FINANCE.
+
+5. **Хранение информации** — 5 лет. Банк требует доступ к истории. **Корректировка:** WORM-хранение BankTransaction, API для выгрузки по запросу.
+
+### 11.3. Требования 152-ФЗ (Персональные данные)
+
+- При передаче данных пользователя в банк — требуется согласие. **Корректировка:** чекбокс согласия в KYC + поле `pdConsentForBank` в User.
+- Банк-партнёр выступает оператором ПДн. **Корректировка:** поле `dataProcessorAgreement` в Bank (договор с банком как оператором ПДн).
+
+### 11.4. Требования ВТБ (из документации API ВТБ)
+
+**Из анализа docs.vtb.ru и ИБК (Интеграционный Банк-Клиент):**
+
+1. **ГОСТ-шифрование** — ВТБ требует поддержку ГОСТ TLS 1.3 для интеграционного взаимодействия. Обычный HTTPS недостаточен. **Корректировка:** поле `cryptoProtocol: GOST_TLS_1_3 | STANDARD_TLS` в Bank + middleware для ГОСТ-шифрования.
+
+2. **SOAP-протокол** — ИБК ВТБ использует SOAP, не REST. **Корректировка:** поле `apiProtocol: REST | SOAP | GRAPHQL` в Bank + адаптер SOAP→REST.
+
+3. **OAuth2 авторизация** — ВТБ СБП требует OAuth2 для получения токена. **Корректировка:** поля `oauthServerUrl`, `oauthClientId`, `oauthClientSecret` в Bank (encrypted).
+
+4. **Электронная подпись (ЭП)** — рублёвые платёжные поручения требуют ЭП. **Корректировка:** поле `signingCertificate` в Bank + интеграция с CryptoPro.
+
+5. **Выписки** — ВТБ API поддерживает предзаказ выписки (async). **Корректировка:** async-задача в BankReconciliation для получения выписки.
+
+6. **Тестовая среда** — ВТБ предоставляет sandbox для тестирования. **Корректировка:** поле `isSandbox: Boolean` в Bank для демо-режима.
+
+### 11.5. Требования Альфа-Банк (из Alfa API)
+
+**Из анализа alfa.ru.org и платёжной документации:**
+
+1. **REST API + JSON** — Альфа использует REST, проще чем ВТБ. **Корректировка:** apiProtocol = REST.
+
+2. **Платёжная страница на стороне банка** — для СБП C2B Альфа предлагает hosted page. **Корректировка:** поле `paymentPageMode: HOSTED | API` в Bank.
+
+3. **Динамический QR-код** — СБП через динамический QR. **Корректировка:** метод `generateSBPQR()` в bank integration adapter.
+
+4. **Вебхуки** — Альфа присылает webhook о статусе платежа. **Корректировка:** endpoint `/api/finance/webhooks/alfa` для приёма callback.
+
+5. **Аутентификация мерчанта** — логин/пароль API-пользователя или OAuth. **Корректировка:** поля `merchantLogin`, `merchantPassword` (encrypted).
+
+6. **Тестовая среда** — sandbox.alfabank.ru. **Корректировка:** поле `isSandbox`.
+
+### 11.6. Сводные корректировки в модели Bank
+
+**Добавить поля:**
+```
+// Регуляторные
+licenseStatus        String?  // статус лицензии банка
+capitalRequirement   Float?   // требование к капиталу
+dataProcessorAgreement String? // договор обработки ПДн
+
+// Технические (API интеграция)
+apiProtocol          String   @default("REST") // REST|SOAP|GRAPHQL
+cryptoProtocol       String   @default("STANDARD_TLS") // GOST_TLS_1_3|STANDARD_TLS
+oauthServerUrl       String?
+oauthClientId        String?  // encrypted
+oauthClientSecret    String?  // encrypted
+merchantLogin        String?  // encrypted
+merchantPassword     String?  // encrypted
+signingCertificate   String?  // ЭП (CryptoPro)
+paymentPageMode      String   @default("API") // HOSTED|API
+isSandbox            Boolean  @default(true)
+
+// Вебхуки
+webhookUrl           String?  // URL для callback от банка
+webhookSecret        String?  // секрет для верификации
+```
+
+**Новые модели:**
+
+```prisma
+model BankWebhookLog {
+  id          String   @id @default(cuid())
+  bankId      String
+  eventType   String   // PAYMENT_STATUS_CHANGED|REFUND|REVERSAL
+  payload     String   // JSON body
+  processedAt DateTime?
+  status      String   @default("RECEIVED") // RECEIVED|PROCESSED|FAILED
+  createdAt   DateTime @default(now())
+}
+
+model BankComplianceExport {
+  id          String   @id @default(cuid())
+  bankId      String
+  period      String   // "2026-06"
+  format      String   // XML|CSV|JSON
+  status      String   @default("PENDING") // PENDING|GENERATED|SENT
+  fileUrl     String?
+  requestedBy String?  // bank request reference
+  createdAt   DateTime @default(now())
+}
+```
+
+### 11.7. Корректировки в кейсы
+
+**Кейс 1 (Банки):** добавить поля регуляторного и технического соответствия.
+
+**Кейс 4 (Дашборд):** добавить метрику «пороговые операции» (кол-во tx >600K, передано банку).
+
+**Кейс 5 (Свёрка):** поддержать async-выписки ВТБ (предзаказ → poll → готово).
+
+**Кейс 10 (Отчёты):** добавить «Выгрузка комплаенс-данных для банка» (по запросу банка по 115-ФЗ).
+
+**Новый Кейс 11: Вебхуки от банков**
+- Приём callback от банков о статусе платежей
+- Обновление BankTransaction.status
+- Alert FINANCE при SUSPENDED_BY_BANK
+- Логирование всех вебхуков (BankWebhookLog)
+
+**Новый Кейс 12: Управление ЭП (электронной подписью)**
+- Загрузка/обновление сертификатов ЭП для каждого банка
+- Подписание рублёвых платёжных поручений (требование ВТБ)
+- Интеграция с CryptoPro
+
+### 11.8. Обновлённый план реализации
+
+| Фаза | Срок | Изменения |
+|---|---|---|
+| A. Backend + Data Model | 4–5 дней (+1) | +9 регуляторных/технических полей в Bank +2 новые модели (BankWebhookLog, BankComplianceExport) + ГОСТ-adapter + SOAP-adapter |
+| B. Frontend — Finance View | 5–6 дней (+1) | +вебхук-лог таб +ЭП-менеджмент +регуляторные поля в форме банка |
+| C. Интеграция | 3–4 дня (+1) | +ГОСТ-TLS middleware для ВТБ +вебхук endpoints +пороговые операции auto-flag |
+| D. Демо + Seed | 1 день | ВТБ (GOST/SOAP/sandbox) + Альфа (REST/OAuth/sandbox) с реальными требованиями |
+| E. Документация + QA | 1 день | +раздел «Регуляторные требования» в docs |
+| **Итого** | **14–17 дней** | **(+3 дня на регуляторные требования)** |
+

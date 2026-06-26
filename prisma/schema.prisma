@@ -18,7 +18,7 @@ model User {
   kycLevel      Int      @default(0) // 0=guest, 1=L1 doc, 2=L2 full
   kycStatus     String   @default("UNINITIATED") // UNINITIATED|PHONE_VERIFIED|DOC_VERIFIED|SELFIE_VERIFIED|ACTIVE
   qualified     Boolean  @default(false) // квалифицированный инвестор
-  role          String   @default("USER") // USER|COMPLIANCE|ADMIN
+  role          String   @default("USER") // USER|COMPLIANCE|ADMIN|FINANCE
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -189,4 +189,186 @@ model Referral {
   reward        Float    @default(0)
   status        String   @default("REGISTERED") // REGISTERED|VERIFIED|REWARDED
   createdAt     DateTime @default(now())
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Финансовый модуль: банки-партнёры, комиссии, лимиты, счета, свёрка
+// ═══════════════════════════════════════════════════════════════════════
+
+model Bank {
+  id                  String   @id @default(cuid())
+  name                String   // "ВТБ", "Альфа-Банк"
+  bic                 String   @unique // БИК
+  swift               String?  // SWIFT код
+  inn                 String?  // ИНН
+  correspondentAccount String? // Корр. счёт
+  type                String   // FIAT_DEPOSIT|FIAT_WITHDRAW|CROSS_BORDER|SBP
+  status              String   @default("ACTIVE") // ACTIVE|INACTIVE|SUSPENDED
+  priority            Int      @default(1) // 1=основной, 2=резервный
+  logoUrl             String?
+  contactPerson       String?
+  contactPhone        String?
+  contactEmail        String?
+  contractDate        DateTime?
+  contractExpiry      DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Регуляторные требования (ФЗ-1194918-8, 115-ФЗ, 152-ФЗ)
+  licenseStatus       String?  // статус лицензии банка
+  capitalRequirement  Float?   // требование к капиталу
+  dataProcessorAgreement String? // договор обработки ПДн (152-ФЗ)
+
+  // Технические (API интеграция)
+  apiEndpoint         String?  // URL bank API
+  apiProtocol         String   @default("REST") // REST|SOAP|GRAPHQL
+  cryptoProtocol      String   @default("STANDARD_TLS") // GOST_TLS_1_3|STANDARD_TLS
+  oauthServerUrl      String?
+  oauthClientId       String?  // encrypted
+  oauthClientSecret   String?  // encrypted
+  merchantLogin       String?  // encrypted
+  merchantPassword    String?  // encrypted
+  signingCertificate  String?  // ЭП (CryptoPro) для ВТБ
+  paymentPageMode     String   @default("API") // HOSTED|API
+  isSandbox           Boolean  @default(true)
+
+  // Вебхуки
+  webhookUrl          String?  // URL для callback от банка
+  webhookSecret       String?  // секрет для верификации
+
+  fees                BankFee[]
+  limits              BankLimit?
+  accounts            BankAccount[]
+  transactions        BankTransaction[]
+  reconciliations     BankReconciliation[]
+  webhookLogs         BankWebhookLog[]
+  complianceExports   BankComplianceExport[]
+}
+
+model BankFee {
+  id              String   @id @default(cuid())
+  bankId          String
+  bank            Bank     @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  operationType   String   // DEPOSIT|WITHDRAW|CROSS_BORDER|SBP_TRANSFER
+  feeType         String   // PERCENT|FIXED|COMBINED
+  feePercent      Float    @default(0)
+  feeFixed        Float    @default(0)
+  feeMin          Float    @default(0)
+  feeMax          Float?   // null = без максимума
+  payer           String   @default("USER") // USER|EXCHANGE
+  tiers           String?  // JSON: [{from,to,percent}]
+  currency        String   @default("RUB")
+  effectiveFrom   DateTime @default(now())
+  effectiveTo     DateTime?
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model BankLimit {
+  id                  String   @id @default(cuid())
+  bankId              String   @unique
+  bank                Bank     @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  dailyLimit          Float    @default(50000000) // 50M ₽
+  monthlyLimit        Float    @default(500000000) // 500M ₽
+  perTransactionLimit Float    @default(1000000) // 1M ₽
+  perUserDailyLimit   Float    @default(300000) // 300K (115-ФЗ)
+  currency            String   @default("RUB")
+  alertThreshold      Float    @default(0.8) // 80%
+  autoSuspendOnLimit  Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model BankAccount {
+  id            String   @id @default(cuid())
+  bankId        String
+  bank          Bank     @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  accountNumber String   // номер счёта
+  currency      String   @default("RUB")
+  balance       Float    @default(0) // из bank API
+  minBalance    Float    @default(1000000) // alert threshold
+  type          String   @default("CORRESPONDENT") // CORRESPONDENT|OPERATIONAL|RESERVE
+  lastSyncAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BankTransaction {
+  id              String   @id @default(cuid())
+  bankId          String
+  bank            Bank     @relation(fields: [bankId], references: [id])
+  transactionId   String?  // ссылка на внутреннюю Transaction
+  userId          String?  // пользователь
+  type            String   // DEPOSIT|WITHDRAW|CROSS_BORDER|SBP
+  amount          Float    // сумма
+  fee             Float    @default(0) // комиссия
+  feePayer        String   @default("USER") // USER|EXCHANGE
+  currency        String   @default("RUB")
+  status          String   @default("PENDING") // PENDING|COMPLETED|FAILED|REVERSED|SUSPENDED_BY_BANK
+  bankReference   String?  // ID транзакции в банке
+  isThreshold     Boolean  @default(false) // >600K ₽ (115-ФЗ)
+  processedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model BankReconciliation {
+  id                  String   @id @default(cuid())
+  bankId              String
+  bank                Bank     @relation(fields: [bankId], references: [id])
+  period              String   // "2026-06"
+  statementFile       String?  // путь к файлу выписки
+  totalTransactions   Int      @default(0)
+  matchedCount        Int      @default(0)
+  unmatchedInternal   Int      @default(0)
+  unmatchedBank       Int      @default(0)
+  status              String   @default("PENDING") // PENDING|IN_PROGRESS|MATCHED|DISCREPANCY
+  discrepancyAmount   Float    @default(0)
+  resolvedBy          String?
+  resolvedAt          DateTime?
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model BankWebhookLog {
+  id          String   @id @default(cuid())
+  bankId      String
+  bank        Bank     @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  eventType   String   // PAYMENT_STATUS_CHANGED|REFUND|REVERSAL|SUSPENDED
+  payload     String   // JSON body
+  processedAt DateTime?
+  status      String   @default("RECEIVED") // RECEIVED|PROCESSED|FAILED
+  createdAt   DateTime @default(now())
+}
+
+model BankComplianceExport {
+  id          String   @id @default(cuid())
+  bankId      String
+  bank        Bank     @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  period      String   // "2026-06"
+  format      String   // XML|CSV|JSON
+  status      String   @default("PENDING") // PENDING|GENERATED|SENT
+  fileUrl     String?
+  requestedBy String?  // bank request reference
+  createdAt   DateTime @default(now())
+}
+
+model CorridorConfig {
+  id              String   @id @default(cuid())
+  corridorId      String   @unique // "RU-CN"
+  senderBankId    String?  // банк-отправитель (РФ)
+  receiverBankId  String?  // банк-получатель (зарубежный)
+  liquidityBridge String?  // партнёр конвертации
+  feePercent      Float    @default(1.0)
+  feeMin          Float    @default(0)
+  feeMax          Float?
+  etaMin          Int      @default(15) // минуты
+  etaMax          Int      @default(40)
+  minAmount       Float    @default(10000)
+  maxAmount       Float    @default(10000000)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
