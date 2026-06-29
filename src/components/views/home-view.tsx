@@ -339,32 +339,33 @@ function MarketGrid() {
                   <Card
                     key={coin.id}
                     className={cn(
-                      'p-2 cursor-pointer transition-all hover:border-primary/40 hover:-translate-y-0.5 group flex flex-row items-center gap-2 py-2',
+                      'p-2.5 cursor-pointer transition-all hover:border-primary/40 hover:-translate-y-0.5 group flex flex-col gap-1.5',
                       status === 'up' && 'ring-1 ring-success/40',
                       status === 'down' && 'ring-1 ring-destructive/40'
                     )}
                     onClick={() => goTrade(coin.symbol)}
                   >
-                    {/* Left column: icon + name+% + price */}
-                    <div className="flex flex-col items-center justify-center shrink-0 w-[52px] gap-0.5">
-                      <CoinIcon symbol={coin.symbol} size={28} />
-                      <span className="font-semibold text-[11px] leading-none">{coin.symbol}</span>
+                    {/* Header row: icon + name + change badge */}
+                    <div className="flex items-center gap-2">
+                      <CoinIcon symbol={coin.symbol} size={24} />
+                      <span className="font-semibold text-sm leading-none">{coin.symbol}</span>
                       <span
                         className={cn(
-                          'flex items-center gap-0.5 text-[9px] font-medium px-1 py-0.5 rounded',
+                          'flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded ml-auto',
                           up ? 'text-success bg-success/10' : 'text-destructive bg-destructive/10'
                         )}
                       >
-                        {up ? <TrendingUp className="w-2 h-2" /> : <TrendingDown className="w-2 h-2" />}
+                        {up ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
                         {formatPercent(coin.change24h)}
                       </span>
-                      <div className="text-[10px] font-mono font-bold tabular-nums text-center leading-tight">
-                        {formatPrice(price, currency)}
-                      </div>
                     </div>
-                    {/* Right: sparkline filling remaining space */}
-                    <div className="flex-1 min-w-0 h-[64px] flex items-stretch overflow-hidden">
-                      <Sparkline data={generateSpark(coin.change24h)} width={200} height={60} fill />
+                    {/* Price — large, full width above chart */}
+                    <div className="text-lg font-mono font-bold tabular-nums leading-tight">
+                      {formatPrice(price, currency)}
+                    </div>
+                    {/* Real 24h sparkline — shorter height, full width */}
+                    <div className="h-[36px] w-full flex items-stretch overflow-hidden">
+                      <Sparkline data={coin.sparkline || generateSpark(coin.change24h)} width={200} height={36} fill />
                     </div>
                   </Card>
                 )

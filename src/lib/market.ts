@@ -82,6 +82,9 @@ export async function fetchTickers(): Promise<CoinTicker[]> {
     if (!res.ok) throw new Error('binance not ok')
     const data: any[] = await res.json()
 
+    // Параллельно получаем sparkline-данные (24ч закрытия) через klines API
+    const sparklines = await fetchSparklines()
+
     return COINS.map((coin) => {
       const d = data.find((x) => x.symbol === coin.binance)
       const priceUsd = d ? parseFloat(d.lastPrice) : FALLBACK_PRICES[coin.symbol].usd
@@ -98,6 +101,7 @@ export async function fetchTickers(): Promise<CoinTicker[]> {
         high24h: d ? parseFloat(d.highPrice) : undefined,
         low24h: d ? parseFloat(d.lowPrice) : undefined,
         volume24h: d ? parseFloat(d.quoteVolume) : undefined,
+        sparkline: sparklines[coin.symbol] || generateFallbackSpark(change24h),
       }
     })
   } catch {
@@ -111,9 +115,52 @@ export async function fetchTickers(): Promise<CoinTicker[]> {
         priceUsd: fb.usd,
         priceRub: fb.usd * usdRub,
         change24h: fb.change,
+        sparkline: generateFallbackSpark(fb.change),
       }
     })
   }
+}
+
+// Получение реальных цен закрытия за 24 часа через Binance klines API
+// Возвращает Map: symbol → number[] (24 точки закрытия в USD)
+let sparklineCache: { data: Record<string, number[]>; ts: number } = { data: {}, ts: 0 }
+
+async function fetchSparklines(): Promise<Record<string, number[]>> {
+  // Кэш 2 минуты
+  if (Date.now() - sparklineCache.ts < 120_000 && Object.keys(sparklineCache.data).length > 0) {
+    return sparklineCache.data
+  }
+  try {
+    const results: Record<string, number[]> = {}
+    // Запрос klines для всех монет параллельно (24 свечи по 1 часу)
+    const promises = COINS.map(async (coin) => {
+      try {
+        const url = `https://api.binance.com/api/v3/klines?symbol=${coin.binance}&interval=1h&limit=24`
+        const res = await fetch(url, { signal: AbortSignal.timeout(6000) })
+        if (!res.ok) throw new Error('klines not ok')
+        const klines: any[] = await res.json()
+        // klines формат: [openTime, open, high, low, close, volume, ...]
+        const closes = klines.map((k) => parseFloat(k[4])) // close price
+        results[coin.symbol] = closes
+      } catch {
+        results[coin.symbol] = generateFallbackSpark(FALLBACK_PRICES[coin.symbol].change)
+      }
+    })
+    await Promise.all(promises)
+    sparklineCache = { data: results, ts: Date.now() }
+    return results
+  } catch {
+    return {}
+  }
+}
+
+// Fallback: генерирует правдоподобный sparkline на основе change24h
+function generateFallbackSpark(change24h: number): number[] {
+  const trend = change24h >= 0 ? 1 : -1
+  return Array.from({ length: 24 }, (_, i) => {
+    const base = 50 + i * trend * 0.4
+    return base + (Math.random() - 0.5) * 3
+  })
 }
 
 // Локальная микросимуляция цены для анимации подсветки
