@@ -357,6 +357,8 @@ async function main() {
   }
   console.log(`  ✓ 5 webhook логов`)
 
+  await seedBankUsers()
+
   console.log('\n✅ Финансовый seed завершён!')
   console.log('   💼 FINANCE аккаунт: finance@ruscrypto.ru (роль FINANCE)')
   console.log(`   🏦 Банков: ${BANKS.length} (ВТБ, Альфа, Сбер, ГПБ, Тинькофф)`)
@@ -365,3 +367,59 @@ async function main() {
 main()
   .catch((e) => { console.error(e); process.exit(1) })
   .finally(async () => { await db.$disconnect() })
+
+// ─── Bank representative users (роль BANK) ────────────────────────────────────
+async function seedBankUsers() {
+  const vtb = await db.bank.findFirst({ where: { name: 'ВТБ' } })
+  const alfa = await db.bank.findFirst({ where: { name: 'Альфа-Банк' } })
+  const sber = await db.bank.findFirst({ where: { name: 'Сбербанк' } })
+
+  if (vtb) {
+    await db.user.upsert({
+      where: { email: 'bank@vtb.ru' },
+      update: { name: 'Сергей ВТБ', role: 'BANK', bankId: vtb.id, kycLevel: 2, kycStatus: 'ACTIVE' },
+      create: {
+        email: 'bank@vtb.ru',
+        name: 'Сергей ВТБ',
+        role: 'BANK',
+        bankId: vtb.id,
+        kycLevel: 2,
+        kycStatus: 'ACTIVE',
+        referralCode: 'RU-VTB01',
+      },
+    })
+  }
+  if (alfa) {
+    await db.user.upsert({
+      where: { email: 'bank@alfa.ru' },
+      update: { name: 'Мария Альфа', role: 'BANK', bankId: alfa.id, kycLevel: 2, kycStatus: 'ACTIVE' },
+      create: {
+        email: 'bank@alfa.ru',
+        name: 'Мария Альфа',
+        role: 'BANK',
+        bankId: alfa.id,
+        kycLevel: 2,
+        kycStatus: 'ACTIVE',
+        referralCode: 'RU-ALFA1',
+      },
+    })
+  }
+  if (sber) {
+    await db.user.upsert({
+      where: { email: 'bank@sber.ru' },
+      update: { name: 'Дмитрий Сбер', role: 'BANK', bankId: sber.id, kycLevel: 2, kycStatus: 'ACTIVE' },
+      create: {
+        email: 'bank@sber.ru',
+        name: 'Дмитрий Сбер',
+        role: 'BANK',
+        bankId: sber.id,
+        kycLevel: 2,
+        kycStatus: 'ACTIVE',
+        referralCode: 'RU-SBER1',
+      },
+    })
+  }
+  console.log(`  ✓ 3 bank representative users (bank@vtb.ru, bank@alfa.ru, bank@sber.ru)`)
+}
+
+// Вызов в конце main

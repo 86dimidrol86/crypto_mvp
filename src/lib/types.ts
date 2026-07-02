@@ -15,6 +15,7 @@ export type ViewId =
   | 'compliance'
   | 'admin'
   | 'finance'
+  | 'bank-portal'
   | 'profile'
   | 'auth'
   | 'help'

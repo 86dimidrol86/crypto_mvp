@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-// GET /api/auth?email=... — текущий пользователь (по умолчанию демо-user)
+// GET /api/auth?email=... — текущий пользователь
 export async function GET(req: NextRequest) {
   const email = req.nextUrl.searchParams.get('email') || 'user@ruscrypto.ru'
   const user = await db.user.findUnique({
     where: { email },
-    include: { balances: true },
+    include: { balances: true, bank: true },
   })
   if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json({
@@ -20,6 +20,8 @@ export async function GET(req: NextRequest) {
     role: user.role,
     referralCode: user.referralCode,
     balances: user.balances,
+    bankId: user.bankId,
+    bankName: user.bank?.name || null,
   })
 }
 
@@ -38,7 +40,7 @@ export async function POST(req: NextRequest) {
       kycStatus: 'ACTIVE',
       role: 'USER',
     },
-    include: { balances: true },
+    include: { balances: true, bank: true },
   })
   return NextResponse.json({
     id: user.id,
@@ -51,5 +53,7 @@ export async function POST(req: NextRequest) {
     role: user.role,
     referralCode: user.referralCode,
     balances: user.balances,
+    bankId: user.bankId,
+    bankName: user.bank?.name || null,
   })
 }
