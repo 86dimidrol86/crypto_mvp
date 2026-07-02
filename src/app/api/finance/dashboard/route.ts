@@ -39,9 +39,10 @@ export async function GET(req: NextRequest) {
       include: { limits: true, accounts: true },
     })
 
-    // KPI — транзакции за выбранный период
+    // KPI — транзакции за выбранный период (с верхней границей = сейчас,
+    // чтобы будущие транзакции из seed не попадали)
     const txPeriod = await db.bankTransaction.findMany({
-      where: { createdAt: { gte: periodStart }, status: 'COMPLETED' },
+      where: { createdAt: { gte: periodStart, lte: now }, status: 'COMPLETED' },
     })
     const totalVolume = txPeriod.reduce((s, t) => s + t.amount, 0)
     const totalFees = txPeriod.reduce((s, t) => s + t.fee, 0)
@@ -83,7 +84,7 @@ export async function GET(req: NextRequest) {
     // Time series за период
     const seriesStart = new Date(now.getTime() - seriesDays * 24 * 60 * 60 * 1000)
     const txSeries = await db.bankTransaction.findMany({
-      where: { createdAt: { gte: seriesStart }, status: 'COMPLETED' },
+      where: { createdAt: { gte: seriesStart, lte: now }, status: 'COMPLETED' },
       select: { amount: true, fee: true, createdAt: true, bankId: true },
     })
 
@@ -124,7 +125,7 @@ export async function GET(req: NextRequest) {
 
     // Threshold operations (>600K, 115-ФЗ) за период
     const thresholdOps = await db.bankTransaction.count({
-      where: { isThreshold: true, createdAt: { gte: periodStart } },
+      where: { isThreshold: true, createdAt: { gte: periodStart, lte: now } },
     })
 
     return NextResponse.json({

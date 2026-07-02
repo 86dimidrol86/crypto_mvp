@@ -223,7 +223,8 @@ async function main() {
   await db.bankTransaction.deleteMany({})
   console.log(`  ✓ Старые транзакции очищены`)
 
-  // Генерация: июнь (30 дней) + июль (31 день) = 61 день × ~10 tx = ~610 транзакций
+  // Генерация: июнь (30 дней) + июль (31 день) = 61 день
+  // ~300 транзакций в день равномерно (250-350) = ~18000 за 2 месяца
   const startDate = new Date('2026-06-01T00:00:00')
   const endDate = new Date('2026-07-31T23:59:59')
   const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000)
@@ -231,8 +232,8 @@ async function main() {
 
   for (let day = 0; day <= totalDays; day++) {
     const dayDate = new Date(startDate.getTime() + day * 86400000)
-    // 8-15 транзакций в день (рандомно)
-    const txPerDay = 8 + Math.floor(Math.random() * 8)
+    // 250-350 транзакций в день (равномерно ~300)
+    const txPerDay = 250 + Math.floor(Math.random() * 101)
     for (let j = 0; j < txPerDay; j++) {
       const bank = allBanks[Math.floor(Math.random() * allBanks.length)]
       const type = txTypes[Math.floor(Math.random() * txTypes.length)]
@@ -264,7 +265,7 @@ async function main() {
       txCount++
     }
   }
-  console.log(`  ✓ ${txCount} банковских транзакций за июнь-июль`)
+  console.log(`  ✓ ${txCount} банковских транзакций за июнь-июль (~300/день)`)
 
   // Corridors
   for (const c of CORRIDORS) {
