@@ -120,14 +120,19 @@ function SidebarContent({ onNavigate, collapsed }: { onNavigate?: () => void; co
   const setView = useAppStore((s) => s.setView)
   const alerts = useAppStore((s) => s.alerts)
   const userRole = useAppStore((s) => s.userRole)
+  const enabledModules = useAppStore((s) => s.enabledModules)
   const openAlerts = alerts.filter((a) => a.status === 'OPEN').length
   const { t } = useI18n()
 
   const isAdmin = userRole === 'ADMIN' || userRole === 'COMPLIANCE'
   const isFinance = userRole === 'ADMIN' || userRole === 'FINANCE'
-  // Filter admin/finance nav items for users without appropriate role
+  // Filter admin/finance nav items + disabled modules (p2p, crossBorder)
   const visibleNav = NAV.filter(
-    (n) => (n.id !== 'admin' || isAdmin) && (n.id !== 'finance' || isFinance)
+    (n) =>
+      (n.id !== 'admin' || isAdmin) &&
+      (n.id !== 'finance' || isFinance) &&
+      (n.id !== 'p2p' || enabledModules.p2p) &&
+      (n.id !== 'payments' || enabledModules.crossBorder)
   )
   const groups = Array.from(new Set(visibleNav.map((n) => n.group)))
 

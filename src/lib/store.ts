@@ -74,6 +74,10 @@ interface AppState {
   locale: Locale
   setLocale: (l: Locale) => void
 
+  // module toggles (админ может отключать модули)
+  enabledModules: { p2p: boolean; crossBorder: boolean }
+  setModuleEnabled: (module: 'p2p' | 'crossBorder', enabled: boolean) => void
+
   // auth (демо)
   isAuthed: boolean
   userEmail: string | null
@@ -423,6 +427,12 @@ export const useAppStore = create<AppState>()(
 
       locale: 'ru',
       setLocale: (l) => set({ locale: l }),
+
+      enabledModules: { p2p: true, crossBorder: true },
+      setModuleEnabled: (module, enabled) =>
+        set((s) => ({
+          enabledModules: { ...s.enabledModules, [module]: enabled },
+        })),
 
       isAuthed: false,
       userEmail: null,
@@ -836,6 +846,7 @@ export const useAppStore = create<AppState>()(
         currency: s.currency,
         sidebarCollapsed: s.sidebarCollapsed,
         locale: s.locale,
+        enabledModules: s.enabledModules,
         marginPositions: s.marginPositions,
         marginAccount: s.marginAccount,
         priceAlerts: s.priceAlerts,

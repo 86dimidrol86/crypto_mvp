@@ -41,6 +41,7 @@ import { toast } from 'sonner'
 import { useApi, apiPost, apiPatch } from '@/lib/use-api'
 import { useI18n } from '@/lib/use-i18n'
 import { useMounted } from '@/lib/use-mounted'
+import { useAppStore } from '@/lib/store'
 import { formatPrice, formatNumber, timeAgo, formatDateTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -2889,6 +2890,7 @@ function WebhooksTab({ refreshKey }: { refreshKey: number }) {
 // ─── Main View ───────────────────────────────────────────────────────────────
 export function FinanceView() {
   const { t } = useI18n()
+  const enabledModules = useAppStore((s) => s.enabledModules)
   const [refreshKey, setRefreshKey] = useState(0)
   const [tab, setTab] = useState('dashboard')
 
@@ -2969,10 +2971,12 @@ export function FinanceView() {
                 <Scale className="w-3.5 h-3.5" />
                 {t('finance.tab.reconciliation')}
               </TabsTrigger>
-              <TabsTrigger value="corridors" className="gap-1.5 text-xs">
-                <Globe2 className="w-3.5 h-3.5" />
-                {t('finance.tab.corridors')}
-              </TabsTrigger>
+              {enabledModules.crossBorder && (
+                <TabsTrigger value="corridors" className="gap-1.5 text-xs">
+                  <Globe2 className="w-3.5 h-3.5" />
+                  {t('finance.tab.corridors')}
+                </TabsTrigger>
+              )}
               <TabsTrigger value="reports" className="gap-1.5 text-xs">
                 <FileText className="w-3.5 h-3.5" />
                 {t('finance.tab.reports')}
@@ -3006,13 +3010,15 @@ export function FinanceView() {
               banks={banks}
             />
           </TabsContent>
-          <TabsContent value="corridors" className="mt-4">
-            <CorridorsTab
-              refreshKey={refreshKey}
-              onRefresh={handleRefresh}
-              banks={banks}
-            />
-          </TabsContent>
+          {enabledModules.crossBorder && (
+            <TabsContent value="corridors" className="mt-4">
+              <CorridorsTab
+                refreshKey={refreshKey}
+                onRefresh={handleRefresh}
+                banks={banks}
+              />
+            </TabsContent>
+          )}
           <TabsContent value="reports" className="mt-4">
             <ReportsTab />
           </TabsContent>

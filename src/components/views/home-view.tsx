@@ -51,6 +51,7 @@ function AnimatedNumber({
 function Hero() {
   const setView = useAppStore((s) => s.setView)
   const isAuthed = useAppStore((s) => s.isAuthed)
+  const enabledModules = useAppStore((s) => s.enabledModules)
   const { t } = useI18n()
   const [tickers, setTickers] = useState<CoinTicker[]>([])
   const [usdRub, setUsdRub] = useState<number>(0)
@@ -119,14 +120,16 @@ function Hero() {
                 {isAuthed ? t('home.heroCtaAuthed') : t('home.heroCtaGuest')}
                 <ArrowRight className="w-4 h-4" />
               </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={() => setView('payments')}
-                className="h-11 px-6 text-base"
-              >
-                {t('home.heroCtaP2P')}
-              </Button>
+              {enabledModules.crossBorder && (
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => setView('payments')}
+                  className="h-11 px-6 text-base"
+                >
+                  {t('home.heroCtaP2P')}
+                </Button>
+              )}
             </div>
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5">
