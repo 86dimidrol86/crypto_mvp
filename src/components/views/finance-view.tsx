@@ -459,10 +459,19 @@ function computeFeePreview(fee: BankFee, amount = 100000): number {
 // ─── Tab 1: Дашборд ──────────────────────────────────────────────────────────
 function DashboardTab({ refreshKey }: { refreshKey: number }) {
   const mounted = useMounted()
+  const [period, setPeriod] = useState<'1h' | '24h' | '7d' | '30d'>('24h')
+  const periodQuery = `&period=${period}`
   const url = refreshKey
-    ? `/api/finance/dashboard?r=${refreshKey}`
-    : '/api/finance/dashboard'
+    ? `/api/finance/dashboard?r=${refreshKey}${periodQuery}`
+    : `/api/finance/dashboard?period=${period}`
   const { data, loading } = useApi<DashboardData>(url, { refresh: 30000 })
+
+  const periods: { id: '1h' | '24h' | '7d' | '30d'; label: string }[] = [
+    { id: '1h', label: '1ч' },
+    { id: '24h', label: '24ч' },
+    { id: '7d', label: '7д' },
+    { id: '30d', label: '30д' },
+  ]
 
   if (loading && !data) {
     return (
@@ -498,18 +507,41 @@ function DashboardTab({ refreshKey }: { refreshKey: number }) {
     name: b.name,
     volume: Math.round(b.volume24h / 1_000_000),
   }))
-  const lineData = series.slice(-30).map((s) => ({
-    date: s.date.slice(5),
+  const lineData = series.map((s) => ({
+    date: s.date,
     volume: Math.round(s.volume / 1_000_000),
     fees: Math.round(s.fees / 1000),
   }))
 
   return (
     <div className="space-y-4">
+      {/* Period filter */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex gap-1 bg-muted/60 p-1 rounded-xl">
+          {periods.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setPeriod(p.id)}
+              className={cn(
+                'px-4 py-1.5 rounded-lg text-sm font-semibold transition',
+                period === p.id
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="text-xs text-muted-foreground">
+          Период: {period === '1h' ? 'последний час' : period === '24h' ? 'последние 24 часа' : period === '7d' ? 'последние 7 дней' : 'последние 30 дней'}
+        </div>
+      </div>
+
       {/* KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard
-          title="Оборот 24ч"
+          title="Оборот"
           value={formatPrice(kpi.totalVolume24h, 'rub')}
           sub={`за ${kpi.txCount24h} транз.`}
           icon={CircleDollarSign}
@@ -517,7 +549,7 @@ function DashboardTab({ refreshKey }: { refreshKey: number }) {
           index={0}
         />
         <StatCard
-          title="Комиссии 24ч"
+          title="Комиссии"
           value={formatPrice(kpi.totalFees24h, 'rub')}
           sub="доход биржи"
           icon={Receipt}
@@ -1932,7 +1964,7 @@ function AccountsTab({ refreshKey, onRefresh }: { refreshKey: number; onRefresh:
   )
 }
 
-// ─── Tab 6: Свёрка ───────────────────────────────────────────────────────────
+// ─── Tab 6: Сверка ───────────────────────────────────────────────────────────
 function ReconciliationTab({
   refreshKey,
   onRefresh,
@@ -1959,7 +1991,7 @@ function ReconciliationTab({
     setCreating(true)
     try {
       await apiPost('/api/finance/reconciliation', createForm)
-      toast.success('Свёрка создана', {
+      toast.success('Сверка создана', {
         description: `${createForm.period} • банк ${
           banks.find((b) => b.id === createForm.bankId)?.name ?? '—'
         }`,
@@ -1980,7 +2012,7 @@ function ReconciliationTab({
         status: 'MATCHED',
         notes: 'Расхождения разрешены вручную',
       })
-      toast.success('Свёрка отмечена как сверённая')
+      toast.success('Сверка отмечена как сверённая')
       setSelected(null)
       onRefresh()
     } catch (e) {
@@ -2012,7 +2044,7 @@ function ReconciliationTab({
           className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 h-8"
         >
           <Plus className="w-3.5 h-3.5" />
-          Новая свёрка
+          Новая сверка
         </Button>
       </div>
 
@@ -2072,7 +2104,7 @@ function ReconciliationTab({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Scale className="w-4 h-4 text-primary" />
-              Новая свёрка
+              Новая сверка
             </DialogTitle>
             <DialogDescription>Выберите банк и период сверки</DialogDescription>
           </DialogHeader>
@@ -2124,7 +2156,7 @@ function ReconciliationTab({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Scale className="w-4 h-4 text-primary" />
-              Свёрка: {selected?.bank.name}
+              Сверка: {selected?.bank.name}
             </DialogTitle>
             <DialogDescription>
               Период {selected?.period}

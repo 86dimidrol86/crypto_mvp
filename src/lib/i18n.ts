@@ -35,7 +35,7 @@ const ru: Dict = {
   'finance.tab.fees': 'Комиссии',
   'finance.tab.limits': 'Лимиты',
   'finance.tab.accounts': 'Счета',
-  'finance.tab.reconciliation': 'Свёрка',
+  'finance.tab.reconciliation': 'Сверка',
   'finance.tab.corridors': 'Коридоры',
   'finance.tab.reports': 'Отчёты',
   'finance.tab.webhooks': 'Вебхуки',

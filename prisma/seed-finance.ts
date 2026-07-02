@@ -213,37 +213,58 @@ async function main() {
   }
   console.log(`  ✓ ${BANKS.length} банков с комиссиями, лимитами, счетами`)
 
-  // BankTransaction (100 за 30 дней)
+  // BankTransaction — 600+ транзакций за июнь-июль (2 месяца, ~10 в день)
+  // Июнь: с 1 июня по 30 июня, Июль: с 1 июля по 31 июля
   const allBanks = await db.bank.findMany()
   const txTypes = ['DEPOSIT', 'WITHDRAW', 'CROSS_BORDER', 'SBP']
   const users = await db.user.findMany({ take: 10 })
-  for (let i = 0; i < 100; i++) {
-    const bank = allBanks[Math.floor(Math.random() * allBanks.length)]
-    const type = txTypes[Math.floor(Math.random() * txTypes.length)]
-    const amount = Math.floor(1000 + Math.random() * 4999000)
-    const isThreshold = amount > 600000
-    const r = Math.random()
-    const status = r > 0.92 ? 'SUSPENDED_BY_BANK' : r > 0.88 ? 'PENDING' : r > 0.85 ? 'FAILED' : 'COMPLETED'
-    const daysAgo = Math.floor(Math.random() * 30)
-    const createdAt = new Date(Date.now() - daysAgo * 86400000 - Math.random() * 86400000)
-    await db.bankTransaction.create({
-      data: {
-        bankId: bank.id,
-        userId: users[Math.floor(Math.random() * users.length)]?.id || null,
-        type,
-        amount,
-        fee: amount * 0.01,
-        feePayer: 'USER',
-        currency: 'RUB',
-        status,
-        bankReference: `BK${Date.now()}${i}`,
-        isThreshold,
-        processedAt: status === 'COMPLETED' ? createdAt : null,
-        createdAt,
-      },
-    })
+
+  // Очистка старых транзакций (чтобы не дублировать при повторном seed)
+  await db.bankTransaction.deleteMany({})
+  console.log(`  ✓ Старые транзакции очищены`)
+
+  // Генерация: июнь (30 дней) + июль (31 день) = 61 день × ~10 tx = ~610 транзакций
+  const startDate = new Date('2026-06-01T00:00:00')
+  const endDate = new Date('2026-07-31T23:59:59')
+  const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000)
+  let txCount = 0
+
+  for (let day = 0; day <= totalDays; day++) {
+    const dayDate = new Date(startDate.getTime() + day * 86400000)
+    // 8-15 транзакций в день (рандомно)
+    const txPerDay = 8 + Math.floor(Math.random() * 8)
+    for (let j = 0; j < txPerDay; j++) {
+      const bank = allBanks[Math.floor(Math.random() * allBanks.length)]
+      const type = txTypes[Math.floor(Math.random() * txTypes.length)]
+      const amount = Math.floor(1000 + Math.random() * 4999000)
+      const isThreshold = amount > 600000
+      const r = Math.random()
+      const status = r > 0.92 ? 'SUSPENDED_BY_BANK' : r > 0.88 ? 'PENDING' : r > 0.85 ? 'FAILED' : 'COMPLETED'
+      // Случайное время в течение дня
+      const hour = Math.floor(Math.random() * 24)
+      const minute = Math.floor(Math.random() * 60)
+      const createdAt = new Date(dayDate)
+      createdAt.setHours(hour, minute, Math.floor(Math.random() * 60))
+      await db.bankTransaction.create({
+        data: {
+          bankId: bank.id,
+          userId: users[Math.floor(Math.random() * users.length)]?.id || null,
+          type,
+          amount,
+          fee: amount * (0.005 + Math.random() * 0.01), // 0.5%-1.5% комиссия
+          feePayer: Math.random() > 0.3 ? 'USER' : 'EXCHANGE',
+          currency: 'RUB',
+          status,
+          bankReference: `BK${day}${j}${Date.now()}`,
+          isThreshold,
+          processedAt: status === 'COMPLETED' ? createdAt : null,
+          createdAt,
+        },
+      })
+      txCount++
+    }
   }
-  console.log(`  ✓ 100 банковских транзакций`)
+  console.log(`  ✓ ${txCount} банковских транзакций за июнь-июль`)
 
   // Corridors
   for (const c of CORRIDORS) {
