@@ -2281,3 +2281,46 @@ Stage Summary:
   - Compliance: VLM предлагает увеличить иерархию в StatCards (цифра > подзаголовок), добавить пагинацию для "Ленты алертов".
   - Общие: унифицировать отступы между всеми вьюхами.
 - Git: коммит запланирован после этой записи worklog.
+
+---
+Task ID: CRON-REVIEW-8 (webDevReview #8)
+Agent: Orchestrator (cron-triggered)
+Task: Оценить статус проекта, QA через agent-browser, продолжить улучшения стилизации + новые функции.
+
+Work Log:
+1. Прочитал worklog.md (2283 строки) — контекст: MVP v2.0 стабилен. 7 раундов улучшений: Home (Quick Trade), Wallet (distribution+KPI), Portfolio (Quick Actions+legend), Markets (icons+sparkline+range bar), Help+Home FAQ, Margin (empty states+AccountSummary), Compliance (StatCard tones+risk bar).
+2. QA-проверка:
+   - `bun run lint` → exit 0 (0 errors, 0 warnings) ✓
+   - dev.log: чистый, GET / 200, без runtime errors ✓
+   - agent-browser (1440×900): залогинился как USER demo.
+3. VLM-анализ 4 вьюх: News 8/10 (отступы, теги), P2P 7/10 (ширина колонок, выравнивание), Payments 9/10 (мелкие цифры), Profile 8/10 (высота блоков). Багов нет.
+4. Фокус работы выбран: **улучшить P2P view** (VLM рекомендация: стандартизировать колонки, выровнять кнопки).
+
+5. Реализация (p2p-view.tsx OfferRow):
+   - **Row hover**: `hover:bg-muted/30` → `hover:bg-muted/40 hover:border-primary/20 transition-all group` (добавлен border-primary/20 при hover + transition-all вместо transition).
+   - **User cell**: Avatar size 32 → 36, добавлен `min-w-0 flex-1` для truncate, имя с `group-hover:text-primary transition-colors`, completed deals с `CheckCircle2` иконкой (w-2.5 h-2.5 text-success/70) перед числом.
+   - **Payment method cell**: добавлен `min-w-0`, Badge с `bg-muted/40`, limits с `truncate` для предотвращения обрезки.
+   - **Amount cell**: label с `uppercase tracking-wide`, value с `font-semibold` (было просто font-mono).
+   - **Price + action cell**: Button с `px-3` → `px-4`, добавлен `font-semibold shadow-sm transition-all hover:scale-105` для micro-interaction.
+   - **Empty state**: `p-8` → `p-10 flex flex-col items-center`, иконка Users в круглой плашке w-14 h-14 rounded-2xl bg-primary/10 (было просто mx-auto text-muted-foreground/40), текст font-medium text-foreground/80, hint с max-w-xs.
+   - **Импорты**: добавил CheckCircle2 в lucide-react import.
+
+6. Тестирование через agent-browser:
+   - P2P v2 → VLM: **8/10** (было 7/10). Подтверждено: OfferRow с аватаром + именем + CheckCircle2 + rating stars, hover эффекты (bg-muted/40, border-primary/20, group-hover:text-primary), кнопки с shadow-sm + hover:scale-105. VLM отметил "Четкая структура: аватар + имя + completed deals с иконкой CheckCircle2 + рейтинг".
+7. `bun run lint` → exit 0 ✓
+8. dev.log: чистый, /api/p2p 200 в 19ms, без ошибок ✓
+
+Stage Summary:
+- **Статус проекта**: MVP v2.0 стабилен. 18 views, 5 ролей, 33 API, 21 Prisma model, lint clean, dev.log clean.
+- **Что сделано в этом раунде (CRON-REVIEW-8)**:
+  1. **P2P OfferRow polish**: hover effects (bg-muted/40 + border-primary/20 + transition-all + group), Avatar 32→36, имя с group-hover:text-primary, completed deals с CheckCircle2 иконкой, payment method с truncate, amount с font-semibold + uppercase label, Button с shadow-sm + hover:scale-105.
+  2. **P2P empty state**: иконка Users в круглой плашке (w-14 h-14 rounded-2xl bg-primary/10), текст font-medium text-foreground/80, hint с max-w-xs.
+  3. VLM-оценка p2p выросла с **7/10 → 8/10**.
+- **Нерешённые вопросы / рекомендации на следующий раунд**:
+  - News: уменьшить отступы между карточками (VLM рекомендация из этого раунда).
+  - Payments: увеличить шрифт ключевых цифр (курс, комиссия), empty state для "Мои платежи".
+  - Profile: уменьшить отступы в "Последние сделки", увеличить шрифт в "Мои активы", унифицировать высоту блоков.
+  - Trade: Quick Trade preset на home — limit/market toggle (OrderForm уже имеет toggle).
+  - Markets: hover tooltip на sparkline.
+  - Общие: унифицировать отступы между всеми вьюхами.
+- Git: коммит запланирован после этой записи worklog.

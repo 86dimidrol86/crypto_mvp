@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Clock,
   TrendingUp,
+  CheckCircle2,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { useI18n } from '@/lib/use-i18n'
@@ -154,33 +155,36 @@ function OfferRow({
     : 'bg-success text-success-foreground hover:bg-success/90'
 
   return (
-    <div className="grid grid-cols-12 gap-3 px-3 py-3 items-center border-b border-border/60 last:border-0 hover:bg-muted/30 transition">
+    <div className="grid grid-cols-12 gap-3 px-3 py-3 items-center border-b border-border/60 last:border-0 hover:bg-muted/40 hover:border-primary/20 transition-all group">
       {/* User */}
-      <div className="col-span-12 sm:col-span-4 flex items-center gap-2.5">
-        <Avatar name={offer.user} size={32} />
-        <div className="min-w-0">
-          <div className="text-sm font-medium truncate">{offer.user}</div>
+      <div className="col-span-12 sm:col-span-4 flex items-center gap-2.5 min-w-0">
+        <Avatar name={offer.user} size={36} />
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium truncate group-hover:text-primary transition-colors">{offer.user}</div>
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-            <span>{offer.completed} {t('p2p.offer.deals')}</span>
+            <span className="flex items-center gap-0.5">
+              <CheckCircle2 className="w-2.5 h-2.5 text-success/70" />
+              {offer.completed} {t('p2p.offer.deals')}
+            </span>
             {offer.rating && <RatingStars rating={offer.rating} />}
           </div>
         </div>
       </div>
 
       {/* Payment method */}
-      <div className="col-span-6 sm:col-span-3">
-        <Badge variant="outline" className="text-[10px] gap-1 font-normal">
+      <div className="col-span-6 sm:col-span-3 min-w-0">
+        <Badge variant="outline" className="text-[10px] gap-1 font-normal bg-muted/40">
           {offer.method}
         </Badge>
-        <div className="text-[10px] text-muted-foreground mt-1">
+        <div className="text-[10px] text-muted-foreground mt-1 truncate">
           {offer.fiat} • {t('p2p.offer.limits')} 100–{formatNumber(offer.amount * offer.price, 0)} ₽
         </div>
       </div>
 
       {/* Amount */}
       <div className="col-span-6 sm:col-span-2 text-right">
-        <div className="text-[10px] text-muted-foreground">{t('p2p.offer.available')}</div>
-        <div className="text-sm font-mono tabular-nums">
+        <div className="text-[10px] text-muted-foreground uppercase tracking-wide">{t('p2p.offer.available')}</div>
+        <div className="text-sm font-mono tabular-nums font-semibold">
           {formatNumber(offer.amount, 0)} {offer.asset}
         </div>
       </div>
@@ -196,7 +200,7 @@ function OfferRow({
         <Button
           size="sm"
           onClick={() => onAccept(offer)}
-          className={cn('h-8 px-3 text-xs gap-1', actionCls)}
+          className={cn('h-8 px-4 text-xs gap-1 font-semibold shadow-sm transition-all hover:scale-105', actionCls)}
         >
           {actionLabel}
         </Button>
@@ -339,10 +343,12 @@ function OffersSection({
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="p-8 text-center">
-          <Users className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
-          <p className="text-sm text-muted-foreground">{t('p2p.listings.empty')}</p>
-          <p className="text-[11px] text-muted-foreground/70 mt-1">
+        <div className="p-10 text-center flex flex-col items-center">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-3">
+            <Users className="w-7 h-7 text-primary/70" />
+          </div>
+          <p className="text-sm font-medium text-foreground/80">{t('p2p.listings.empty')}</p>
+          <p className="text-[11px] text-muted-foreground mt-1 max-w-xs">
             {t('p2p.listings.emptyHint')}
           </p>
         </div>
