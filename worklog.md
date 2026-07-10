@@ -1866,3 +1866,47 @@ Stage Summary:
 - No existing content removed — only additions + targeted updates.
 - Cross-references between docs (06-BANK-PORTAL.md ↔ 05-FINANCE-ROLE-DESIGN.md section 12.4 ↔ 02-DOCUMENTATION.md section 4.18).
 - Lint clean, commit pushed, worklog appended.
+
+---
+Task ID: PRES-FIX-3
+Agent: Orchestrator
+Task: Исправить верстку титульного и последнего слайдов в HTML-презентации + заменить иконки на Lucide SVG как в оригинале.
+
+Work Log:
+1. Прочитал worklog.md (1868 строк) — установил контекст: презентация недавно переделана под 1920×1080, пользователь сообщил о проблемах верстки.
+2. Просмотрел 2 загруженных изображения (pasted_image_1783653061218.png — титульный слайд; pasted_image_1783653193515.png — CTA слайд) через VLM. Подтверждено: бейдж "MVP v2.0 • Июль 2026" уехал влево на титуле; на CTA-слайде иконка банка слева вверху, остальной контент центрирован — визуальный дисбаланс.
+3. Прочитал download/presentation.html (246 строк) — обнаружил КОРНЕВУЮ ПРИЧИНУ: в сгенерированном HTML классы `slide-title` (для 1-го слайда) и `slide-cta` (для 5-го слайда) ОТСУТСТВУЮТ. Регулярка `s.html.replace(/<div class="slide[^"]*">/,'')` в scripts/generate-presentation.mjs срезала не только оборачивающий div, но и доп. классы с ним. Без `align-items: center` бейдж/иконка прижимались влево.
+4. Прочитал src/components/views/presentation-view.tsx (499 строк) — определил какие Lucide-иконки используются в заголовках оригинала:
+   - Слайд 2 "Трафик денег и комиссии" → TrendingUp
+   - Слайд 3 "Заработок банка" → Building2
+   - Слайд 4 "Регуляторная база" → Scale
+   - Слайд 5 CTA "Выгодное партнёрство" → Building2 (большая 56px)
+5. Внес 7 правок в scripts/generate-presentation.mjs через MultiEdit:
+   - Добавил ICONS-объект с 3 Lucide SVG (trendingUp, building2, scale) с правильными viewBox/Stroke
+   - Заменил 📈 → ${ICONS.trendingUp} в заголовке слайда 2
+   - Заменил 🏦 → ${ICONS.building2} в заголовке слайда 3
+   - Заменил ⚖️ → ${ICONS.scale} в заголовке слайда 4
+   - Заменил 🏦 → ${ICONS.building2} в .cta-icon слайда 5
+   - Обновил CSS: .header-icon — добавил color: var(--primary), flex-shrink: 0; .header-icon svg { width: 24px; height: 24px; }
+   - Обновил CSS: .cta-icon — заменил font-size: 64px на color: var(--primary) + display: flex + justify-content: center; .cta-icon svg { width: 64px; height: 64px; }
+   - ИСПРАВИЛ регулятор генерации обёртки: вместо слепого срезания regex'ом, теперь извлекает доп.классы через `s.html.match(/<div class="slide([^"]*)">/)` и применяет их к выходному div: `<div class="slide ${extra} ${i===0?'active':''}" data-index="${i}">`. Классы slide-title и slide-cta теперь корректно сохраняются.
+6. Перегенерировал HTML: `node scripts/generate-presentation.mjs` → 5 слайдов OK.
+7. Проверил через grep: 
+   - `<div class="slide slide-title active" data-index="0">` ✓
+   - `<div class="slide slide-cta " data-index="4">` ✓
+   - Все 4 иконки теперь SVG (TrendingUp, Building2, Scale, Building2) ✓
+8. QA через agent-browser (viewport 1920×1080):
+   - Слайд 1: screenshot → VLM подтверждает "Все элементы строго центрированы по горизонтали. Лого, заголовок, подзаголовок, юридический текст и бейдж — без смещений" ✓
+   - Слайд 5 (CTA): screenshot → VLM подтверждает "Все элементы строго центрированы: иконка банка, заголовок, описание, 4 карточки статистики, бейджи партнёров, футер — симметрично относительно центральной оси" ✓
+   - Слайды 2,3,4: screenshots → VLM подтверждает "Иконки: золотой векторный SVG-график (TrendingUp) / SVG-здание (Building2) / SVG-весы (Scale) — в квадратной плашке" ✓
+9. dev.log чистый, без ошибок и предупреждений.
+
+Stage Summary:
+- 3 ПРОБЛЕМЫ РЕШЕНЫ:
+  (1) Титульный слайд — бейдж "MVP v2.0 • Июль 2026" теперь строго центрирован (восстановлен класс slide-title с align-items: center).
+  (2) CTA-слайд — весь контент (иконка, заголовок, описание, 4 карточки, бейджи, футер) теперь строго центрирован (восстановлен класс slide-cta).
+  (3) Иконки в заголовках слайдов 2/3/4 + большая иконка CTA — заменены с эмодзи (📈🏦⚖️) на Lucide SVG (TrendingUp/Building2/Scale/Building2) в соответствии с оригинальной React-версией presentation-view.tsx.
+- Изменено: 1 файл (scripts/generate-presentation.mjs), перегенерировано 2 HTML-файла (download/presentation.html, download/presentation-pdf.html).
+- Корневая причина бага с центрированием: regex-срезание оборачивающего `<div class="slide slide-title">` удаляло доп.классы. Исправлено через явное извлечение extra-классов и применение их к выходному div.
+- PDF-версия (presentation-pdf.html) НЕ имела этой проблемы (там оборачивающий div используется напрямую), но иконки тоже обновились до SVG для консистентности.
+- VLM-верификация всех 5 слайдов через agent-browser (viewport 1920×1080) — все центрирования и иконки корректны.

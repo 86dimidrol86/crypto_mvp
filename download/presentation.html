@@ -20,7 +20,8 @@ p { line-height: 1.5; }
 .logo-big { width: 96px; height: 96px; border-radius: 28px; background: linear-gradient(135deg, #FCD535, #F0B90B); display: flex; align-items: center; justify-content: center; font-size: 48px; font-weight: 900; color: #000; margin: 0 auto 24px; box-shadow: 0 20px 60px #F0B90B30; }
 .slide-title { text-align: center; align-items: center; justify-content: center; }
 .slide-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
-.header-icon { width: 48px; height: 48px; border-radius: 14px; background: #F0B90B20; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+.header-icon { width: 48px; height: 48px; border-radius: 14px; background: #F0B90B20; display: flex; align-items: center; justify-content: center; color: var(--primary); flex-shrink: 0; }
+.header-icon svg { width: 24px; height: 24px; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 24px; }
 .flow-card { padding: 20px 24px; }
 .flow-section { margin-bottom: 8px; }
@@ -106,7 +107,8 @@ p { line-height: 1.5; }
 .legal-note { padding: 16px; border-radius: 12px; background: #F0B90B08; border: 1px solid #F0B90B20; font-size: 17px; color: var(--muted); display: flex; align-items: center; gap: 12px; }
 .legal-note b { color: var(--primary); }
 .slide-cta { text-align: center; align-items: center; justify-content: center; }
-.cta-icon { font-size: 64px; margin-bottom: 20px; }
+.cta-icon { color: var(--primary); margin-bottom: 20px; display: flex; justify-content: center; }
+.cta-icon svg { width: 64px; height: 64px; }
 .cta-desc { font-size: 22px; color: var(--muted); max-width: 900px; margin: 0 auto 28px; text-align: center; }
 .cta-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; max-width: 1100px; }
 .cta-stat { padding: 20px; text-align: center; }
@@ -140,7 +142,7 @@ body { display: flex; flex-direction: column; align-items: center; min-height: 1
 @media print { .nav-bar, .top-bar { display: none; } .slide { display: flex !important; } }
 </style></head><body>
 <div class="top-bar"><span>₿ РусКрипто — Презентация</span><div class="progress-bar"><div class="progress-fill" id="progress"></div></div><span id="counter">1 / 5</span></div>
-<div class="slide active" data-index="0">
+<div class="slide slide-title active" data-index="0">
       
         <div class="logo-big">₿</div>
         <h1>РусКрипто</h1>
@@ -148,9 +150,9 @@ body { display: flex; flex-direction: column; align-items: center; min-height: 1
         <p class="laws">ФЗ № 259-ФЗ «О ЦФА» • ФЗ № 1194918-8 «О цифровой валюте» • ФЗ № 115 «О ПОД/ФТ» • Платформа цифрового рубля ЦБ РФ</p>
         <div class="badge">● MVP v2.0 • Июль 2026</div>
       </div>
-<div class="slide " data-index="1">
+<div class="slide  " data-index="1">
       
-        <div class="slide-header"><div class="header-icon">📈</div><h2>Трафик денег и комиссии</h2></div>
+        <div class="slide-header"><div class="header-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div><h2>Трафик денег и комиссии</h2></div>
         <div class="card flow-card">
           <div class="flow-section">
             <div class="flow-label flow-in">▼ ВВОД СРЕДСТВ (₽ → Биржа)</div>
@@ -190,9 +192,9 @@ body { display: flex; flex-direction: column; align-items: center; min-height: 1
         </div>
         <p class="flow-summary">▼ Ввод: Пользователь → Банк (спецсчёт) → ЦБ РФ (₽→ЦР) → Биржа → Торговля → Криптовалюта &nbsp;|&nbsp; ▲ Вывод: Крипта → Биржа → ЦБ РФ (ЦР→₽) → Банк → Пользователь</p>
       </div>
-<div class="slide " data-index="2">
+<div class="slide  " data-index="2">
       
-        <div class="slide-header"><div class="header-icon">🏦</div><h2>Заработок банка</h2></div>
+        <div class="slide-header"><div class="header-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg></div><h2>Заработок банка</h2></div>
         <div class="revenue-grid">
           <div class="card revenue-card">
             <div class="revenue-header revenue-in">⬇️ Ввод средств (₽ → Биржа)</div>
@@ -211,9 +213,9 @@ body { display: flex; flex-direction: column; align-items: center; min-height: 1
         </div>
         <div class="card trading-bar"><span>⚡ Каждая торговая сделка на бирже:</span> <span>Биржа: <b>0.1-0.5%</b></span> <span>Банк (эквайринг): <b>0.05-0.3%</b></span></div>
       </div>
-<div class="slide " data-index="3">
+<div class="slide  " data-index="3">
       
-        <div class="slide-header"><div class="header-icon">⚖️</div><h2>Регуляторная база</h2></div>
+        <div class="slide-header"><div class="header-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg></div><h2>Регуляторная база</h2></div>
         <div class="legal-grid">
           <div class="card legal-card"><span class="legal-badge">ФЗ № 259-ФЗ</span><b>О цифровых финансовых активах</b><p>Правовая основа для ЦФА и цифрового рубля. Операторы ЦФА-платформ лицензируются ЦБ РФ.</p><ul><li>✅ Цифровой рубль — законное средство</li><li>✅ Платформа ЦБ РФ для конвертации</li><li>✅ Оператор ЦФА — лицензия ЦБ</li></ul></div>
           <div class="card legal-card"><span class="legal-badge">ФЗ № 1194918-8</span><b>О цифровой валюте</b><p>Легализация криптобирж с 01.07.2026. 5 типов лицензий. Уставный капитал от 100 млн ₽.</p><ul><li>✅ Лицензия оператора обмена</li><li>✅ Адрес-идентификаторы</li><li>✅ Квалификация инвесторов</li><li>✅ Капитал ≥ 100 млн ₽</li></ul></div>
@@ -222,9 +224,9 @@ body { display: flex; flex-direction: column; align-items: center; min-height: 1
         </div>
         <div class="card legal-note">✨ Банк выступает <b>оператором кошельков цифрового рубля</b> и <b>партнёром биржи</b> — зарабатывает на каждом переводе ₽ ↔ цифровой ₽ и комиссии за эквайринг</div>
       </div>
-<div class="slide " data-index="4">
+<div class="slide slide-cta " data-index="4">
       
-        <div class="cta-icon">🏦</div>
+        <div class="cta-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg></div>
         <h2>Выгодное партнёрство</h2>
         <p class="cta-desc">Банк-партнёр зарабатывает на каждом рубле, проходящем через биржу: ввод, вывод, конвертация в цифровой рубль, торговые сделки.</p>
         <div class="cta-stats">
