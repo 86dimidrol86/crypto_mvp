@@ -471,7 +471,7 @@ export function PresentationView({ onClose }: { onClose: () => void }) {
             animate="center"
             exit="exit"
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="min-h-full max-w-[1200px] mx-auto px-6 lg:px-10 py-8"
+            className="min-h-full max-w-[1920px] mx-auto px-8 lg:px-16 py-8"
           >
             {slide.render()}
           </motion.div>
