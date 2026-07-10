@@ -2232,3 +2232,52 @@ Stage Summary:
   - Profile: уменьшить отступы в "Последние сделки", увеличить шрифт в "Мои активы".
   - Общие: унифицировать отступы между всеми вьюхами.
 - Git: коммит запланирован после этой записи worklog.
+
+---
+Task ID: CRON-REVIEW-7 (webDevReview #7)
+Agent: Orchestrator (cron-triggered)
+Task: Оценить статус проекта, QA через agent-browser, продолжить улучшения стилизации + новые функции.
+
+Work Log:
+1. Прочитал worklog.md (2234 строки) — контекст: MVP v2.0 стабилен. 6 раундов улучшений: Home (Quick Trade), Wallet (distribution+KPI), Portfolio (Quick Actions+legend), Markets (icons+sparkline+range bar), Help+Home FAQ, Margin (empty states+AccountSummary).
+2. QA-проверка:
+   - `bun run lint` → exit 0 (0 errors, 0 warnings) ✓
+   - dev.log: чистый, GET / 200, без runtime errors ✓
+   - agent-browser (1440×900): залогинился как USER demo, затем COMPLIANCE demo.
+3. VLM-анализ 3 вьюх: Trade 8/10 (пустые зоны справа стакана), KYC 9/10 (минимальные пустоты), Compliance 7/10 (пустые зоны, мелкий шрифт, выравнивание). Багов нет.
+4. Фокус работы выбран: **улучшить Compliance view** (VLM рекомендация из этого раунда). Trade limit/market toggle уже существует в OrderForm.
+
+5. Реализация (compliance-view.tsx):
+   - **StatCard enhancement**: toneMap переделан из строк в объекты {text, bg, border}:
+     * default: text-primary, bg-primary/10, hover:border-primary/30
+     * danger: text-destructive, bg-destructive/10, hover:border-destructive/30
+     * warning: text-warning, bg-warning/10, hover:border-warning/30
+     * success: text-success, bg-success/10, hover:border-success/30
+     * Card: добавлен `transition-colors group` + cn(cfg.border) для hover border
+     * Icon square: w-8 h-8 → w-9 h-9, bg-muted/40 → cfg.bg (цветной фон), добавлен `group-hover:scale-110 transition-transform`
+   - **AlertListItem risk score**: добавлен мини progress bar под процентом:
+     * `<div className="w-12 h-1 bg-muted/50 rounded-full mt-1 overflow-hidden">`
+     * inner: `<div className={cn('h-full rounded-full transition-all', sev.stripe)} style={{width: `${riskScore*100}%`}} />`
+     * sev.stripe — это уже существующий bg класс (bg-destructive / bg-orange-500 / bg-warning / bg-sky-500), идеально подходит для progress bar
+     * Ширина 12 (w-12) консистентна с risk score блоком
+
+6. Тестирование через agent-browser:
+   - Compliance v2 → VLM: **8/10** (было 7/10). Подтверждено: 4 StatCards с цветными плашками иконок (primary/destructive/warning/success), alert list items с risk score + progress bar, hover эффекты на cards. VLM отметил "Progress bar интуитивно показывает уровень риска" и "ярко выделенные критические алерты (красный border)".
+7. `bun run lint` → exit 0 ✓
+8. dev.log: чистый, /api/compliance 200 в 8-52ms, без ошибок ✓
+
+Stage Summary:
+- **Статус проекта**: MVP v2.0 стабилен. 18 views, 5 ролей, 33 API, 21 Prisma model, lint clean, dev.log clean.
+- **Что сделано в этом раунде (CRON-REVIEW-7)**:
+  1. **Compliance StatCard**: 4 карточки с цветными плашками иконок (primary/destructive/warning/success), hover border colors, group-hover:scale-110 на иконках, увеличенный размер иконки (w-9 h-9).
+  2. **Compliance AlertListItem risk score**: мини progress bar (w-12 h-1) под процентом risk score, цвет соответствует severity (destructive/orange/warning/sky), transition-all для анимации.
+  3. VLM-оценка compliance выросла с **7/10 → 8/10**.
+- **Нерешённые вопросы / рекомендации на следующий раунд**:
+  - Trade: Quick Trade preset на home — добавить limit/market toggle (VLM рекомендация). OrderForm уже имеет toggle, но Quick Trade widget на home передаёт только amount.
+  - P2P: адаптивные колонки "Рекламодатель" и "Способ оплаты" с обрезкой текста.
+  - Payments: увеличить шрифт ключевых цифр (курс, комиссия), empty state для "Мои платежи".
+  - News: уменьшить отступы между карточками.
+  - Profile: уменьшить отступы в "Последние сделки", увеличить шрифт в "Мои активы".
+  - Compliance: VLM предлагает увеличить иерархию в StatCards (цифра > подзаголовок), добавить пагинацию для "Ленты алертов".
+  - Общие: унифицировать отступы между всеми вьюхами.
+- Git: коммит запланирован после этой записи worklog.

@@ -115,13 +115,14 @@ function StatCard({
   tone?: 'default' | 'danger' | 'warning' | 'success'
 }) {
   const toneMap = {
-    default: 'text-primary',
-    danger: 'text-destructive',
-    warning: 'text-warning',
-    success: 'text-success',
+    default: { text: 'text-primary', bg: 'bg-primary/10', border: 'hover:border-primary/30' },
+    danger: { text: 'text-destructive', bg: 'bg-destructive/10', border: 'hover:border-destructive/30' },
+    warning: { text: 'text-warning', bg: 'bg-warning/10', border: 'hover:border-warning/30' },
+    success: { text: 'text-success', bg: 'bg-success/10', border: 'hover:border-success/30' },
   }
+  const cfg = toneMap[tone]
   return (
-    <Card className="bg-card/60 backdrop-blur">
+    <Card className={cn('bg-card/60 backdrop-blur transition-colors group', cfg.border)}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between mb-2">
           <span className="text-xs text-muted-foreground uppercase tracking-wider">
@@ -129,8 +130,9 @@ function StatCard({
           </span>
           <div
             className={cn(
-              'w-8 h-8 rounded-xl flex items-center justify-center bg-muted/40',
-              toneMap[tone]
+              'w-9 h-9 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform',
+              cfg.bg,
+              cfg.text
             )}
           >
             <Icon className="w-4 h-4" />
@@ -196,6 +198,12 @@ function AlertListItem({
               <span className="text-xs">%</span>
             </div>
             <div className="text-[9px] text-muted-foreground mt-0.5">risk</div>
+            <div className="w-12 h-1 bg-muted/50 rounded-full mt-1 overflow-hidden">
+              <div
+                className={cn('h-full rounded-full transition-all', sev.stripe)}
+                style={{ width: `${Math.round(alert.riskScore * 100)}%` }}
+              />
+            </div>
           </div>
         </div>
         <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-border/60">
