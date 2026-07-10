@@ -133,12 +133,12 @@ function ArticleCard({
       exit={{ opacity: 0, y: -6 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
     >
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden hover:border-primary/30 transition-colors group">
         <Accordion type="single" collapsible>
           <AccordionItem value={article.id} className="border-b-0">
             <AccordionTrigger className="px-4 py-3.5 hover:no-underline items-start">
               <div className="flex items-start gap-3 flex-1">
-                <div className="w-8 h-8 shrink-0 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                <div className="w-9 h-9 shrink-0 rounded-lg bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 group-hover:bg-primary/15 transition-all">
                   <Icon className="w-4 h-4" />
                 </div>
                 <div className="flex-1 min-w-0 text-left">
@@ -150,7 +150,7 @@ function ArticleCard({
                       {sectionLabel}
                     </Badge>
                   </div>
-                  <h3 className="text-sm font-bold tracking-tight leading-snug">
+                  <h3 className="text-sm font-bold tracking-tight leading-snug group-hover:text-primary transition-colors">
                     {article.title[locale]}
                   </h3>
                   <p className="text-[12px] text-muted-foreground line-clamp-2 mt-1 leading-relaxed">
@@ -166,7 +166,7 @@ function ArticleCard({
                   <BookOpen className="w-3.5 h-3.5" />
                   {locale === 'ru' ? 'Определение' : 'Definition'}
                 </div>
-                <p className="text-[13px] text-foreground/90 leading-relaxed">
+                <p className="text-[14px] text-foreground/90 leading-relaxed">
                   {article.definition[locale]}
                 </p>
               </div>
@@ -177,9 +177,9 @@ function ArticleCard({
                   <ListChecks className="w-3.5 h-3.5" />
                   {locale === 'ru' ? 'Как пользоваться' : 'How to use'}
                 </div>
-                <ol className="space-y-1.5">
+                <ol className="space-y-2">
                   {article.howTo[locale].map((step, i) => (
-                    <li key={i} className="flex items-start gap-2 text-[13px] text-foreground/90 leading-relaxed">
+                    <li key={i} className="flex items-start gap-2.5 text-[13.5px] text-foreground/90 leading-relaxed">
                       <span className="shrink-0 w-5 h-5 rounded-md bg-primary/15 text-primary text-[10px] font-bold font-mono flex items-center justify-center mt-0.5">
                         {i + 1}
                       </span>
@@ -196,13 +196,13 @@ function ArticleCard({
                     <MessageCircleQuestion className="w-3.5 h-3.5" />
                     {locale === 'ru' ? 'Частые вопросы' : 'FAQ'}
                   </div>
-                  <div className="space-y-2.5">
+                  <div className="space-y-3">
                     {article.faq.map((f, i) => (
-                      <div key={i} className="border-l-2 border-primary/30 pl-2.5">
-                        <p className="text-[12.5px] font-semibold text-foreground leading-snug">
+                      <div key={i} className="border-l-2 border-primary/30 pl-3 hover:border-primary/60 transition-colors">
+                        <p className="text-[13px] font-semibold text-foreground leading-snug">
                           {f.q[locale]}
                         </p>
-                        <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">
+                        <p className="text-[12.5px] text-muted-foreground mt-1 leading-relaxed">
                           {f.a[locale]}
                         </p>
                       </div>

@@ -712,6 +712,111 @@ function AssetSecurity() {
   )
 }
 
+// ─── FAQ section (quick answers to common questions) ─────────────────────────
+const FAQ_ITEMS = [
+  {
+    qKey: 'home.faq.q1',
+    aKey: 'home.faq.a1',
+    icon: ShieldCheck,
+  },
+  {
+    qKey: 'home.faq.q2',
+    aKey: 'home.faq.a2',
+    icon: Zap,
+  },
+  {
+    qKey: 'home.faq.q3',
+    aKey: 'home.faq.a3',
+    icon: Globe2,
+  },
+  {
+    qKey: 'home.faq.q4',
+    aKey: 'home.faq.a4',
+    icon: Landmark,
+  },
+  {
+    qKey: 'home.faq.q5',
+    aKey: 'home.faq.a5',
+    icon: Scale,
+  },
+  {
+    qKey: 'home.faq.q6',
+    aKey: 'home.faq.a6',
+    icon: CheckCircle2,
+  },
+]
+
+function FaqSection() {
+  const { t } = useI18n()
+  const setView = useAppStore((s) => s.setView)
+  const [openIdx, setOpenIdx] = useState<number | null>(0)
+
+  return (
+    <section className="border-b border-border py-8 bg-sidebar/20">
+      <div className="max-w-[1400px] mx-auto px-3 lg:px-5">
+        <div className="text-center mb-6">
+          <Badge variant="outline" className="mb-2 border-primary/30 text-primary gap-1.5">
+            <Sparkles className="w-3 h-3" />
+            {t('home.faq.badge')}
+          </Badge>
+          <h2 className="text-xl lg:text-2xl font-bold">{t('home.faq.title')}</h2>
+          <p className="text-muted-foreground mt-1.5 max-w-2xl mx-auto text-sm">
+            {t('home.faq.subtitle')}
+          </p>
+        </div>
+        <div className="grid md:grid-cols-2 gap-3 max-w-4xl mx-auto">
+          {FAQ_ITEMS.map((item, i) => {
+            const isOpen = openIdx === i
+            return (
+              <Card
+                key={item.qKey}
+                className={cn(
+                  'p-4 cursor-pointer transition-all duration-200 hover:border-primary/40 group',
+                  isOpen && 'border-primary/40 shadow-md shadow-primary/5'
+                )}
+                onClick={() => setOpenIdx(isOpen ? null : i)}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition">
+                    <item.icon className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="font-semibold text-sm leading-snug">{t(item.qKey)}</h3>
+                      <ChevronDown
+                        className={cn(
+                          'w-4 h-4 shrink-0 text-muted-foreground transition-transform',
+                          isOpen && 'rotate-180 text-primary'
+                        )}
+                      />
+                    </div>
+                    {isOpen && (
+                      <p className="text-[13px] text-muted-foreground leading-relaxed mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                        {t(item.aKey)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+        <div className="text-center mt-5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setView('help')}
+            className="gap-1.5 hover:border-primary/40 hover:text-primary"
+          >
+            {t('home.faq.allArticles')}
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 // ─── Partners & Regulators trust band ────────────────────────────────────────
 const PARTNERS = [
   { nameKey: 'home.partners.bank-russia', subtitleKey: 'home.partners.bank-russia-sub' },
@@ -986,6 +1091,7 @@ export function HomeView() {
       <MoversSection />
       <Features />
       <AssetSecurity />
+      <FaqSection />
       <PartnersBand />
       <CtaBand />
     </div>

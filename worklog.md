@@ -2123,3 +2123,65 @@ Stage Summary:
   - Profile: уменьшить отступы, увеличить шрифт в "Мои активы".
   - Общие: унифицировать отступы между всеми вьюхами.
 - Git: коммит запланирован после этой записи worklog.
+
+---
+Task ID: CRON-REVIEW-5 (webDevReview #5)
+Agent: Orchestrator (cron-triggered)
+Task: Оценить статус проекта, QA через agent-browser, продолжить улучшения стилизации + новые функции.
+
+Work Log:
+1. Прочитал worklog.md (2125 строк) — контекст: MVP v2.0 стабилен. Предыдущие раунды: CRON-REVIEW-1 (Home Quick Trade, 7→8/10), CRON-REVIEW-2 (Wallet distribution+KPI, 7→8/10), CRON-REVIEW-3 (Portfolio Quick Actions+legend, 8/10), CRON-REVIEW-4 (Markets icons+sparkline+range bar, 8→8.5/10).
+2. QA-проверка:
+   - `bun run lint` → exit 0 (0 errors, 0 warnings) ✓
+   - dev.log: чистый, GET / 200, /api/profile/* 200, без runtime errors ✓
+   - agent-browser (1440×900): залогинился как USER demo.
+3. VLM-анализ 3 вьюх: News 8/10 (отступы), Help 7/10 (отступы, шрифт сжат), Profile 9/10 (пустые зоны в сделках). Багов нет.
+4. Фокус работы выбран: **улучшить Help Center + добавить FAQ секцию на Home** (рекомендация VLM из CRON-REVIEW-2/3).
+
+5. Реализация Help Center (help-view.tsx ArticleCard):
+   - **Card**: добавлен `hover:border-primary/30 transition-colors group` (было просто overflow-hidden).
+   - **Icon square**: w-8 h-8 → w-9 h-9, добавлен `group-hover:scale-110 group-hover:bg-primary/15 transition-all` для интерактива.
+   - **Title**: добавлен `group-hover:text-primary transition-colors` для подсветки при hover.
+   - **Definition text**: text-[13px] → text-[14px] (VLM рекомендовал 15px, 14px оптимально для контента).
+   - **How to list**: gap-2 → space-y-2, text-[13px] → text-[13.5px], gap-2 → gap-2.5 между иконкой и текстом.
+   - **FAQ items**: space-y-2.5 → space-y-3, pl-2.5 → pl-3, добавлен `hover:border-primary/60 transition-colors` на каждом вопросе, text-[12.5px] → text-[13px] для вопроса, text-[12px] → text-[12.5px] для ответа, mt-0.5 → mt-1.
+
+6. Реализация Home FAQ section (home-view.tsx):
+   - **Новый компонент FaqSection**: 6 карточек в grid md:grid-cols-2 max-w-4xl mx-auto.
+   - **FAQ_ITEMS**: 6 вопросов с иконками (ShieldCheck/Zap/Globe2/Landmark/Scale/CheckCircle2):
+     * q1: Законна ли торговля криптовалютой в РФ? → ФЗ-1194918-8, лицензия ЦБ
+     * q2: Как быстро исполняются ордера? → 12ms latency, 100K TPS
+     * q3: Доступны ли кросс-бордер платежи? → 6 коридоров
+     * q4: Что такое цифровой рубль? → третья форма валюты, 01.09.2026
+     * q5: Как работает AML-контроль? → ML+SHAP, >600K ₽, SAR
+     * q6: Нужна ли верификация через Госуслуги? → KYC обязательный, 5 мин, 3 уровня
+   - **Интерактивность**: openIdx state (по умолчанию 0 — первый раскрыт), клик по карточке toggle, ChevronDown rotate-180 когда открыт, animate-in fade-in slide-in-from-top-1 для ответа.
+   - **Стилизация**: каждая карточка p-4 cursor-pointer transition-all duration-200 hover:border-primary/40 group, открытая — border-primary/40 shadow-md shadow-primary/5. Иконка 8×8 bg-primary/10 text-primary group-hover:scale-110.
+   - **Header**: Badge "ЧАСТЫЕ ВОПРОСЫ" с Sparkles иконкой, h2 заголовок, subtitle.
+   - **CTA**: кнопка "Все статьи справки" → setView('help') с ArrowRight.
+   - **Position**: между AssetSecurity и PartnersBand в HomeView.
+
+7. **i18n**: +16 ключей RU+EN:
+   - home.faq.{badge,title,subtitle,allArticles}
+   - home.faq.{q1-q6,a1-a6} — полные тексты вопросов и ответов про законность/скорость/кросс-бордер/цифровой рубль/AML/KYC
+
+8. Тестирование через agent-browser:
+   - Home FAQ → VLM: **8/10**. Подтверждено: 6 карточек с вопросами, иконки слева, первая карточка раскрыта с ответом, hover эффекты. Кнопка "Все статьи справки" ниже на странице.
+   - Help v2 → VLM: header с иконкой и поиском виден, карточки статей с иконками по 2 в ряд, читаемость хорошая. Hover эффекты (group-hover:scale-110, border-primary/30) работают при наведении.
+9. `bun run lint` → exit 0 ✓
+10. dev.log: чистый, /api/profile/{referral,login-history,sessions} 200, без ошибок ✓
+
+Stage Summary:
+- **Статус проекта**: MVP v2.0 стабилен. 18 views, 5 ролей, 33 API, 21 Prisma model, lint clean, dev.log clean.
+- **Что сделано в этом раунде (CRON-REVIEW-5)**:
+  1. **Help Center ArticleCard polish**: hover effects (border-primary/30, group-hover:scale-110 на иконке, group-hover:text-primary на title), увеличенные шрифты (definition 13→14px, how-to 13→13.5px, FAQ 12.5→13px), лучшие отступы (space-y-3, pl-3, gap-2.5).
+  2. **Home FAQ section**: новый компонент FaqSection с 6 вопросами/ответами, интерактивный accordion (openIdx state), иконки, CTA на help view. Полные тексты про законность/скорость/кросс-бордер/цифровой рубль/AML/KYC.
+  3. i18n: +16 ключей RU+EN.
+  4. VLM-оценка home FAQ: 8/10.
+- **Нерешённые вопросы / рекомендации на следующий раунд**:
+  - Trade: добавить limit/market toggle для Quick Trade preset (рекомендация из CRON-REVIEW-1, всё ещё не реализовано).
+  - News: уменьшить отступы между карточками (VLM рекомендация).
+  - Profile: уменьшить отступы в "Последние сделки", увеличить шрифт в "Мои активы".
+  - Markets: hover tooltip на sparkline для точных значений.
+  - Общие: унифицировать отступы между всеми вьюхами.
+- Git: коммит запланирован после этой записи worklog.
