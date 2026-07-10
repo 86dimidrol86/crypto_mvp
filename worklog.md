@@ -2015,3 +2015,58 @@ Stage Summary:
   - Trade: добавить Quick Trade preset для limit vs market (рекомендация из CRON-REVIEW-1).
   - Общие: унифицировать отступы между вьюхами, добавить "FAQ" в Asset Security на home.
 - Git: коммит запланирован после этой записи worklog.
+
+---
+Task ID: CRON-REVIEW-3 (webDevReview #3)
+Agent: Orchestrator (cron-triggered)
+Task: Оценить статус проекта, QA через agent-browser, продолжить улучшения стилизации + новые функции.
+
+Work Log:
+1. Прочитал worklog.md (2017 строк) — контекст: MVP v2.0 стабилен, CRON-REVIEW-1 добавил Quick Trade на home (7→8/10), CRON-REVIEW-2 улучшил Wallet (distribution bar + 3 KPI cards + 24h change + actions, 7→8/10).
+2. QA-проверка:
+   - `bun run lint` → exit 0 (0 errors, 0 warnings) ✓
+   - dev.log: чистый, GET / 200, /api/wallet 200, /api/portfolio/history 200, без ошибок ✓
+   - agent-browser (1440×900): залогинился как USER demo.
+3. VLM-анализ 2 вьюх: Portfolio 8/10 (легенда/цифры не выровнены, избыточный отступ), Markets 7/10 (заголовки не выровнены, мелкие графики). Багов нет.
+4. Фокус работы выбран: **улучшить Portfolio view** — allocation legend polish + donut central PnL + holdings table 24h value change + Quick Actions row.
+
+5. Реализация (portfolio-view.tsx):
+   - **Allocation legend enhancement**: каждая строка теперь py-1.5 px-2 -mx-2 rounded-lg hover:bg-muted/40 transition-colors group. Color square 3×3 (было 2.5) с group-hover:scale-110. Layout: min-w-0 + truncate для имени, gap-3 для value+%. % теперь цветной (style={{color: d.color}}) и font-semibold w-12 text-right. Value перед %, font-mono text-xs muted. Порядок: имя → value → % (было имя → % → value).
+   - **Donut central text**: увеличил text-lg → text-xl, добавил mt-0.5, добавил PnL индикатор внизу (TrendingUp/Down + formatPercent(pnl24hPct), цветной success/destructive).
+   - **Holdings table enhancement**:
+     * TableRow: hover:bg-muted/30 transition-colors group
+     * Asset cell: CoinIcon 26px (было 24) + symbol + subtitle (Рубль/Tether/Bitcoin/Ethereum) text-[10px] muted
+     * Value cell: основная цена (formatPrice) + под ней valueChange24h = valueRub * change24h/100 (цветной success/destructive, text-[10px] font-mono, с +/-)
+     * Change badge: inline-flex items-center gap-0.5 + TrendingUp/Down иконка (3×3) + formatPercent
+     * Allocation bar: w-16 (было w-12) + group-hover:brightness-110 + font-medium (было muted)
+   - **Quick Actions row**:新增 row после 3 метрик в Total value card, отделён border-t border-border/60 mt-4 pt-4:
+     * Торговать — bg-primary text-primary-foreground, ArrowRightLeft, onClick setView('trade')
+     * Пополнить — outline border-success/30 bg-success/10 text-success, ArrowDownToLine, setView('wallet')
+     * Вывести — outline border-destructive/30 bg-destructive/10 text-destructive, ArrowUpFromLine, setView('wallet')
+     * Экспорт CSV — outline ml-auto, Download, onClick handleDownloadTax (экспорт 3-НДФЛ)
+   - **Импорты**: добавил ArrowRightLeft, ArrowDownToLine, ArrowUpFromLine в lucide-react.
+   - **i18n**: +8 ключей RU+EN: portfolio.quick.{trade,deposit,withdraw,export}.
+
+6. **БАГ НАЙДЕН И ИСПРАВЛЕН**: при первом рендере client-side error "handleExportCSV is not defined" — функция называлась handleDownloadTax (строка 238), а я в кнопке указал handleExportCSV. VLM-анализ скриншота показал "Application error: a client-side exception has occurred". Исправил onClick={handleDownloadTax}. После reload — страница рендерится корректно.
+7. Тестирование через agent-browser:
+   - Portfolio v3 → snapshot: "heading Портфель", "button Торговать", "button Экспорт CSV", "heading Распределение активов", "heading Активы", "heading Доходность портфеля", "heading Налоговый отчёт 3-НДФЛ" — все элементы на месте ✓
+   - VLM: **8/10** (но с замечаниями по данным — PnL weighted vs sum, USDT цена — это VLM неточности, не баги кода).
+8. `bun run lint` → exit 0 ✓
+9. dev.log после исправления: чистый, /api/portfolio/history 200 в 193-546ms, без runtime errors ✓
+
+Stage Summary:
+- **Статус проекта**: MVP v2.0 стабилен. 18 views, 5 ролей, 33 API, 21 Prisma model, lint clean, dev.log clean.
+- **Что сделано в этом раунде (CRON-REVIEW-3)**:
+  1. **Portfolio allocation legend**: hover effects (bg-muted/40 + scale-110 на color square), цветные %, лучший layout.
+  2. **Portfolio donut central**: увеличенный total + PnL% индикатор с иконкой.
+  3. **Portfolio holdings table**: 24h value change под основной ценой, change badge с иконкой, allocation bar шире + hover brightness, subtitle для каждого актива.
+  4. **Portfolio Quick Actions**: 4 кнопки (Торговать/Пополнить/Вывести/Экспорт CSV) в Total value card.
+  5. **Bug fix**: handleExportCSV → handleDownloadTax (client-side crash исправлен).
+  6. i18n: +8 ключей RU+EN.
+  7. VLM-оценка portfolio: 8/10 (стабильно).
+- **Нерешённые вопросы / рекомендации на следующий раунд**:
+  - Markets: выровнять заголовки колонок, увеличить высоту mini-графиков на 20-30%.
+  - Trade: добавить limit/market toggle для Quick Trade preset (рекомендация из CRON-REVIEW-1).
+  - Home: добавить FAQ секцию в Asset Security (рекомендация VLM).
+  - Общие: tooltip на allocation donut segments (Recharts Tooltip уже есть, но можно улучшить контент).
+- Git: коммит запланирован после этой записи worklog.

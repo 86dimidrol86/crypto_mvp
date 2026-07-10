@@ -14,6 +14,9 @@ import {
   Layers,
   Coins,
   CircleDollarSign,
+  ArrowRightLeft,
+  ArrowDownToLine,
+  ArrowUpFromLine,
 } from 'lucide-react'
 import {
   PieChart,
@@ -324,6 +327,44 @@ export function PortfolioView() {
               </div>
             </div>
           </div>
+          {/* Quick actions row */}
+          <div className="relative mt-4 pt-4 border-t border-border/60 flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={() => setView('trade')}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 h-9 gap-1.5"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5" />
+              {t('portfolio.quick.trade')}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setView('wallet')}
+              className="h-9 gap-1.5 border-success/30 bg-success/10 text-success hover:bg-success/20 hover:text-success"
+            >
+              <ArrowDownToLine className="w-3.5 h-3.5" />
+              {t('portfolio.quick.deposit')}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setView('wallet')}
+              className="h-9 gap-1.5 border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
+            >
+              <ArrowUpFromLine className="w-3.5 h-3.5" />
+              {t('portfolio.quick.withdraw')}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleDownloadTax}
+              className="h-9 gap-1.5 ml-auto"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {t('portfolio.quick.export')}
+            </Button>
+          </div>
         </Card>
 
         {/* Risk metrics row */}
@@ -401,19 +442,36 @@ export function PortfolioView() {
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{t('portfolio.allocation.total')}</div>
-                <div className="text-lg font-bold tabular-nums">{formatPrice(totalRub, 'rub')}</div>
+                <div className="text-xl font-bold tabular-nums mt-0.5">{formatPrice(totalRub, 'rub')}</div>
+                <div className={cn(
+                  'text-[10px] font-mono tabular-nums mt-0.5 flex items-center gap-0.5',
+                  pnl24hPct >= 0 ? 'text-success' : 'text-destructive'
+                )}>
+                  {pnl24hPct >= 0 ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+                  {formatPercent(pnl24hPct)}
+                </div>
               </div>
             </div>
-            <div className="mt-4 space-y-2">
+            <div className="mt-4 space-y-1.5">
               {donutData.map((d) => (
-                <div key={d.name} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-2.5 h-2.5 rounded-sm" style={{ background: d.color }} />
-                    <span className="font-medium">{d.name}</span>
+                <div
+                  key={d.name}
+                  className="flex items-center justify-between text-sm py-1.5 px-2 -mx-2 rounded-lg hover:bg-muted/40 transition-colors group cursor-default"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className="w-3 h-3 rounded-sm shrink-0 group-hover:scale-110 transition-transform"
+                      style={{ background: d.color }}
+                    />
+                    <span className="font-medium truncate">{d.name}</span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-muted-foreground tabular-nums">{d.allocation.toFixed(1)}%</span>
-                    <span className="font-mono text-xs tabular-nums">{formatPrice(d.value, 'rub')}</span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                      {formatPrice(d.value, 'rub')}
+                    </span>
+                    <span className="font-semibold tabular-nums w-12 text-right" style={{ color: d.color }}>
+                      {d.allocation.toFixed(1)}%
+                    </span>
                   </div>
                 </div>
               ))}
@@ -441,42 +499,55 @@ export function PortfolioView() {
                 <TableBody>
                   {holdings.map((h) => {
                     const up = h.change24h >= 0
+                    const valueChange24h = h.valueRub * (h.change24h / 100)
                     return (
-                      <TableRow key={h.asset} className="border-border">
+                      <TableRow key={h.asset} className="border-border hover:bg-muted/30 transition-colors group">
                         <TableCell className="pl-4">
-                          <div className="flex items-center gap-2">
-                            <CoinIcon symbol={h.asset} size={24} />
-                            <span className="font-semibold">{h.asset}</span>
+                          <div className="flex items-center gap-2.5">
+                            <CoinIcon symbol={h.asset} size={26} />
+                            <div>
+                              <div className="font-semibold">{h.asset}</div>
+                              <div className="text-[10px] text-muted-foreground">
+                                {h.asset === 'RUB' ? 'Рубль' : h.asset === 'USDT' ? 'Tether' : h.asset === 'BTC' ? 'Bitcoin' : 'Ethereum'}
+                              </div>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm tabular-nums">
                           {formatAmount(h.amount, h.asset)}
                         </TableCell>
-                        <TableCell className="text-right font-mono text-sm tabular-nums">
-                          {formatPrice(h.valueRub, 'rub')}
+                        <TableCell className="text-right">
+                          <div className="font-mono text-sm tabular-nums">{formatPrice(h.valueRub, 'rub')}</div>
+                          <div className={cn(
+                            'text-[10px] font-mono tabular-nums',
+                            up ? 'text-success' : 'text-destructive'
+                          )}>
+                            {up ? '+' : ''}{formatPrice(valueChange24h, 'rub')}
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">
                           <span
                             className={cn(
-                              'text-xs font-medium px-2 py-0.5 rounded-md',
+                              'inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-md',
                               up ? 'text-success bg-success/10' : 'text-destructive bg-destructive/10'
                             )}
                           >
+                            {up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                             {formatPercent(h.change24h)}
                           </span>
                         </TableCell>
                         <TableCell className="pr-4 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
                               <div
-                                className="h-full rounded-full"
+                                className="h-full rounded-full transition-all group-hover:brightness-110"
                                 style={{
                                   width: `${Math.min(h.allocation, 100)}%`,
                                   background: ALLOC_COLORS[h.asset] || DEFAULT_COLOR,
                                 }}
                               />
                             </div>
-                            <span className="text-xs text-muted-foreground w-10 tabular-nums">
+                            <span className="text-xs font-medium w-12 tabular-nums">
                               {h.allocation.toFixed(1)}%
                             </span>
                           </div>
