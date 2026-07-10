@@ -49,83 +49,181 @@ const SLIDES = [
           <h2 className="text-2xl lg:text-3xl font-bold">Трафик денег и комиссии</h2>
         </motion.div>
 
-        {/* SVG flow diagram */}
+        {/* Detailed flow diagram */}
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}>
-          <Card className="p-6 overflow-x-auto">
-            <div className="min-w-[700px]">
-              {/* Row 1: User → Bank → Exchange */}
-              <div className="flex items-center justify-between gap-2 mb-2">
+          <Card className="p-4 lg:p-6 overflow-x-auto">
+            <div className="min-w-[900px] space-y-4">
+
+              {/* ─── INPUT FLOW (top) ─── */}
+              <div className="text-center text-xs font-bold text-success uppercase tracking-wider mb-1">▼ ВВОД СРЕДСТВ (₽ → Биржа)</div>
+
+              <div className="flex items-center justify-between gap-1">
                 {/* User */}
-                <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="flex flex-col items-center text-center w-28">
-                  <div className="w-14 h-14 rounded-2xl bg-sky-500/15 flex items-center justify-center mb-1.5"><Users className="w-7 h-7 text-sky-400" /></div>
-                  <div className="text-xs font-semibold">Пользователь</div>
-                  <div className="text-[10px] text-muted-foreground">Личный счёт</div>
+                <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="flex flex-col items-center text-center w-24 shrink-0">
+                  <div className="w-12 h-12 rounded-2xl bg-sky-500/15 flex items-center justify-center mb-1"><Users className="w-6 h-6 text-sky-400" /></div>
+                  <div className="text-[11px] font-semibold">Пользователь</div>
+                  <div className="text-[9px] text-muted-foreground">Личный счёт ₽</div>
                 </motion.div>
 
-                {/* Arrow 1: User → Bank */}
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="flex flex-col items-center flex-1">
-                  <div className="text-[10px] text-primary font-semibold mb-0.5">1. Перевод ₽</div>
-                  <div className="flex items-center w-full">
-                    <div className="flex-1 h-0.5 bg-primary/30" />
-                    <ArrowRight className="w-5 h-5 text-primary shrink-0" />
-                  </div>
-                  <div className="text-[9px] text-muted-foreground mt-0.5">банк: 0.5-2%</div>
+                {/* Arrow: User → Bank */}
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }} className="flex flex-col items-center flex-1">
+                  <div className="text-[9px] text-success font-semibold">1. Перевод ₽</div>
+                  <div className="flex items-center w-full"><div className="flex-1 h-0.5 bg-success/30" /><ArrowRight className="w-4 h-4 text-success shrink-0" /></div>
+                  <div className="text-[8px] text-amber-400 font-medium">банк: 0.5-2%</div>
                 </motion.div>
 
                 {/* Bank */}
-                <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="flex flex-col items-center text-center w-28">
-                  <div className="w-14 h-14 rounded-2xl bg-amber-500/15 flex items-center justify-center mb-1.5"><Building2 className="w-7 h-7 text-amber-400" /></div>
-                  <div className="text-xs font-semibold">Банк</div>
-                  <div className="text-[10px] text-muted-foreground">Спецсчёт биржи</div>
+                <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="flex flex-col items-center text-center w-24 shrink-0">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/15 flex items-center justify-center mb-1"><Building2 className="w-6 h-6 text-amber-400" /></div>
+                  <div className="text-[11px] font-semibold">Банк</div>
+                  <div className="text-[9px] text-muted-foreground">Спецсчёт биржи</div>
                 </motion.div>
 
-                {/* Arrow 2: Bank → Exchange */}
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="flex flex-col items-center flex-1">
-                  <div className="text-[10px] text-primary font-semibold mb-0.5">2. Конвертация ₽→ЦР</div>
-                  <div className="flex items-center w-full">
-                    <div className="flex-1 h-0.5 bg-primary/30" />
-                    <ArrowRight className="w-5 h-5 text-primary shrink-0" />
-                  </div>
-                  <div className="text-[9px] text-muted-foreground mt-0.5">ЦБ РФ: цифровой ₽</div>
+                {/* Arrow: Bank → Exchange */}
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }} className="flex flex-col items-center flex-1">
+                  <div className="text-[9px] text-primary font-semibold">2. ₽ → Цифровой ₽</div>
+                  <div className="flex items-center w-full"><div className="flex-1 h-0.5 bg-primary/30" /><ArrowRight className="w-4 h-4 text-primary shrink-0" /></div>
+                  <div className="text-[8px] text-muted-foreground">ФЗ-259 • ЦБ РФ</div>
                 </motion.div>
 
                 {/* Exchange */}
-                <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 }} className="flex flex-col items-center text-center w-28">
-                  <div className="w-14 h-14 rounded-2xl bg-primary/15 flex items-center justify-center mb-1.5"><Landmark className="w-7 h-7 text-primary" /></div>
-                  <div className="text-xs font-semibold">Биржа</div>
-                  <div className="text-[10px] text-muted-foreground">Спот-торги</div>
+                <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }} className="flex flex-col items-center text-center w-24 shrink-0">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/15 flex items-center justify-center mb-1"><Landmark className="w-6 h-6 text-primary" /></div>
+                  <div className="text-[11px] font-semibold">Биржа</div>
+                  <div className="text-[9px] text-muted-foreground">Баланс игрока</div>
+                </motion.div>
+
+                {/* Arrow: Exchange → Crypto */}
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }} className="flex flex-col items-center flex-1">
+                  <div className="text-[9px] text-primary font-semibold">3. Торговля</div>
+                  <div className="flex items-center w-full"><div className="flex-1 h-0.5 bg-primary/30" /><ArrowRight className="w-4 h-4 text-primary shrink-0" /></div>
+                  <div className="text-[8px] text-primary">биржа: 0.1-0.5%</div>
+                </motion.div>
+
+                {/* Crypto */}
+                <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6 }} className="flex flex-col items-center text-center w-24 shrink-0">
+                  <div className="w-12 h-12 rounded-2xl bg-violet-500/15 flex items-center justify-center mb-1"><Wallet className="w-6 h-6 text-violet-400" /></div>
+                  <div className="text-[11px] font-semibold">Криптовалюта</div>
+                  <div className="text-[9px] text-muted-foreground">BTC, ETH, USDT</div>
                 </motion.div>
               </div>
 
-              {/* AML bar */}
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }} className="mt-4 p-3 rounded-xl bg-destructive/5 border border-destructive/20 flex items-center justify-center gap-3">
-                <Scale className="w-4 h-4 text-destructive" />
-                <span className="text-xs text-muted-foreground">
-                  <b>AML-контроль (115-ФЗ)</b> на каждом этапе: банк → биржа → ЦБ РФ → Росфинмониторинг
-                </span>
+              {/* ─── OUTPUT FLOW (bottom, reverse) ─── */}
+              <div className="text-center text-xs font-bold text-destructive uppercase tracking-wider mb-1">▲ ВЫВОД СРЕДСТВ (Крипта → ₽)</div>
+
+              <div className="flex items-center justify-between gap-1">
+                {/* Crypto */}
+                <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 }} className="flex flex-col items-center text-center w-24 shrink-0">
+                  <div className="w-12 h-12 rounded-2xl bg-violet-500/15 flex items-center justify-center mb-1"><Wallet className="w-6 h-6 text-violet-400" /></div>
+                  <div className="text-[11px] font-semibold">Продажа</div>
+                  <div className="text-[9px] text-muted-foreground">Крипта → ₽</div>
+                </motion.div>
+
+                {/* Arrow: Crypto → Exchange */}
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.75 }} className="flex flex-col items-center flex-1">
+                  <div className="text-[9px] text-destructive font-semibold">4. Списание</div>
+                  <div className="flex items-center w-full"><div className="flex-1 h-0.5 bg-destructive/30" /><ArrowRight className="w-4 h-4 text-destructive shrink-0" /></div>
+                  <div className="text-[8px] text-primary">биржа: 0.5%</div>
+                </motion.div>
+
+                {/* Exchange */}
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }} className="flex flex-col items-center text-center w-24 shrink-0">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/15 flex items-center justify-center mb-1"><Landmark className="w-6 h-6 text-primary" /></div>
+                  <div className="text-[11px] font-semibold">Биржа</div>
+                  <div className="text-[9px] text-muted-foreground">Конвертация</div>
+                </motion.div>
+
+                {/* Arrow: Exchange → Bank */}
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.85 }} className="flex flex-col items-center flex-1">
+                  <div className="text-[9px] text-destructive font-semibold">5. Цифровой ₽ → ₽</div>
+                  <div className="flex items-center w-full"><div className="flex-1 h-0.5 bg-destructive/30" /><ArrowRight className="w-4 h-4 text-destructive shrink-0" /></div>
+                  <div className="text-[8px] text-amber-400">банк: 0.1-0.5%</div>
+                </motion.div>
+
+                {/* Bank */}
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }} className="flex flex-col items-center text-center w-24 shrink-0">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/15 flex items-center justify-center mb-1"><Building2 className="w-6 h-6 text-amber-400" /></div>
+                  <div className="text-[11px] font-semibold">Банк</div>
+                  <div className="text-[9px] text-muted-foreground">Спецсчёт → ₽</div>
+                </motion.div>
+
+                {/* Arrow: Bank → User */}
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.95 }} className="flex flex-col items-center flex-1">
+                  <div className="text-[9px] text-destructive font-semibold">6. Перевод ₽</div>
+                  <div className="flex items-center w-full"><div className="flex-1 h-0.5 bg-destructive/30" /><ArrowRight className="w-4 h-4 text-destructive shrink-0" /></div>
+                  <div className="text-[8px] text-amber-400">банк: 0.5-2%</div>
+                </motion.div>
+
+                {/* User */}
+                <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.0 }} className="flex flex-col items-center text-center w-24 shrink-0">
+                  <div className="w-12 h-12 rounded-2xl bg-sky-500/15 flex items-center justify-center mb-1"><Users className="w-6 h-6 text-sky-400" /></div>
+                  <div className="text-[11px] font-semibold">Пользователь</div>
+                  <div className="text-[9px] text-muted-foreground">Личный счёт ₽</div>
+                </motion.div>
+              </div>
+
+              {/* ─── ROLES (middle band) ─── */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.1 }} className="border-t border-border pt-3">
+                <div className="text-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Участники и их роли</div>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { icon: '⚙️', role: 'Админ биржи', color: 'border-primary/20 bg-primary/5', actions: ['Управление банками', 'Комиссии и лимиты', 'Отключение модулей', 'Мониторинг системы'] },
+                    { icon: '⚖️', role: 'Комплаенс', color: 'border-destructive/20 bg-destructive/5', actions: ['AML-алерты', 'SAR-отчёты', 'Карантин счетов', 'Пороговые >600K ₽'] },
+                    { icon: '💼', role: 'Финансист биржи', color: 'border-amber-500/20 bg-amber-500/5', actions: ['Обороты по банкам', 'Сверка выписок', 'Коридоры', 'Отчёты для ЦБ'] },
+                    { icon: '🏦', role: 'Сотрудник банка', color: 'border-sky-500/20 bg-sky-500/5', actions: ['Транзакции банка', 'Настройки (просмотр)', 'Сверка со своей стороны', 'Отчёты по банку'] },
+                  ].map((r, i) => (
+                    <motion.div key={r.role} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.2 + i * 0.1 }} className={cn('rounded-xl border p-3', r.color)}>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="text-base">{r.icon}</span>
+                        <span className="text-[11px] font-bold">{r.role}</span>
+                      </div>
+                      <ul className="space-y-1">
+                        {r.actions.map((a, j) => (
+                          <li key={j} className="text-[9px] text-muted-foreground flex gap-1"><span className="text-primary shrink-0">▸</span> {a}</li>
+                        ))}
+                      </ul>
+                    </motion.div>
+                  ))}
+                </div>
               </motion.div>
 
-              {/* Row 2: Revenue split */}
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.1 }} className="mt-4 grid grid-cols-3 gap-3">
-                <div className="text-center p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
-                  <div className="text-2xl font-bold text-amber-400">0.5-2%</div>
-                  <div className="text-[10px] text-muted-foreground">Банк<br/>за перевод ₽</div>
+              {/* ─── AML bar ─── */}
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.6 }} className="p-2.5 rounded-xl bg-destructive/5 border border-destructive/20 flex items-center justify-center gap-2">
+                <Scale className="w-4 h-4 text-destructive" />
+                <span className="text-[11px] text-muted-foreground"><b>AML-контроль (115-ФЗ)</b> на каждом этапе: банк → биржа → ЦБ РФ → Росфинмониторинг</span>
+              </motion.div>
+
+              {/* ─── Bank portal output ─── */}
+              <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.7 }} className="flex items-center gap-3 p-3 rounded-xl bg-sky-500/5 border border-sky-500/20">
+                <div className="w-8 h-8 rounded-lg bg-sky-500/15 flex items-center justify-center shrink-0"><Building2 className="w-4 h-4 text-sky-400" /></div>
+                <div className="flex-1">
+                  <div className="text-xs font-semibold text-sky-400">Выходные данные для банка (Портал банка)</div>
+                  <div className="text-[10px] text-muted-foreground">Биржа → банк: сводка всех транзакций • суммы • комиссии • статусы • сверка • пороговые операции • отчёты для ЦБ РФ</div>
                 </div>
-                <div className="text-center p-3 rounded-xl bg-primary/5 border border-primary/20">
-                  <div className="text-2xl font-bold text-primary">0.1-0.5%</div>
-                  <div className="text-[10px] text-muted-foreground">Биржа<br/>за торговлю</div>
+                <ArrowRight className="w-4 h-4 text-sky-400 shrink-0" />
+              </motion.div>
+
+              {/* ─── Revenue split ─── */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.8 }} className="grid grid-cols-3 gap-2">
+                <div className="text-center p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/20">
+                  <div className="text-xl font-bold text-amber-400">0.5-2%</div>
+                  <div className="text-[9px] text-muted-foreground">Банк<br/>за перевод ₽</div>
                 </div>
-                <div className="text-center p-3 rounded-xl bg-success/5 border border-success/20">
-                  <div className="text-2xl font-bold text-success">0.5-1.5%</div>
-                  <div className="text-[10px] text-muted-foreground">Биржа+Банк<br/>за вывод</div>
+                <div className="text-center p-2.5 rounded-xl bg-primary/5 border border-primary/20">
+                  <div className="text-xl font-bold text-primary">0.1-0.5%</div>
+                  <div className="text-[9px] text-muted-foreground">Биржа<br/>за торговлю</div>
+                </div>
+                <div className="text-center p-2.5 rounded-xl bg-success/5 border border-success/20">
+                  <div className="text-xl font-bold text-success">0.5-2%</div>
+                  <div className="text-[9px] text-muted-foreground">Банк<br/>за вывод ₽</div>
                 </div>
               </motion.div>
             </div>
           </Card>
         </motion.div>
 
-        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.3 }} className="text-xs text-muted-foreground text-center mt-3">
-          Пользователь переводит рубли на спецсчёт биржи в банке → банк конвертирует ₽ в цифровой рубль (ЦБ РФ) → зачисление на биржу → торговля → вывод через банк обратно в ₽
+        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.0 }} className="text-[11px] text-muted-foreground text-center mt-3">
+          ▼ Ввод: Пользователь → Банк (спецсчёт) → ЦБ РФ (₽→ЦР) → Биржа → Торговля → Криптовалюта &nbsp;|&nbsp; ▲ Вывод: Крипта → Биржа → ЦБ РФ (ЦР→₽) → Банк → Пользователь
         </motion.p>
       </div>
     ),
