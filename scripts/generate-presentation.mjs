@@ -1,0 +1,239 @@
+#!/usr/bin/env node
+// Генератор HTML презентации РусКрипто (5 слайдов)
+import { writeFileSync, mkdirSync } from 'fs'
+const OUTPUT_DIR = 'download'
+
+const slidesData = [
+  { id: 'title', html: `
+      <div class="slide slide-title">
+        <div class="logo-big">₿</div>
+        <h1>РусКрипто</h1>
+        <p class="subtitle">Легальная криптобиржа Российской Федерации</p>
+        <p class="laws">ФЗ № 259-ФЗ «О ЦФА» • ФЗ № 1194918-8 «О цифровой валюте» • ФЗ № 115 «О ПОД/ФТ» • Платформа цифрового рубля ЦБ РФ</p>
+        <div class="badge">● MVP v2.0 • Июль 2026</div>
+      </div>` },
+  { id: 'scheme', html: `
+      <div class="slide">
+        <h2>📊 Трафик денег и комиссии</h2>
+        <div class="flow-section">
+          <div class="flow-label flow-in">▼ ВВОД СРЕДСТВ (₽ → Биржа)</div>
+          <div class="flow-row">
+            <div class="node node-user"><div class="node-icon">👤</div>Пользователь<br><small>Личный счёт ₽</small></div>
+            <div class="arrow arrow-success"><span class="arrow-label">1. Перевод ₽</span><span class="arrow-fee">банк: 0.5-2%</span></div>
+            <div class="node node-bank"><div class="node-icon">🏦</div>Банк<br><small>Спецсчёт биржи</small></div>
+            <div class="arrow arrow-primary"><span class="arrow-label">2. ₽ → Цифровой ₽</span><span class="arrow-fee">ФЗ-259 • ЦБ РФ</span></div>
+            <div class="node node-exchange"><div class="node-icon">🏛️</div>Биржа<br><small>Баланс игрока</small></div>
+            <div class="arrow arrow-primary"><span class="arrow-label">3. Торговля</span><span class="arrow-fee">биржа: 0.1-0.5%</span></div>
+            <div class="node node-crypto"><div class="node-icon">💎</div>Криптовалюта<br><small>BTC, ETH, USDT</small></div>
+          </div>
+          <div class="flow-label flow-out">▲ ВЫВОД СРЕДСТВ (Крипта → ₽)</div>
+          <div class="flow-row">
+            <div class="node node-crypto"><div class="node-icon">💎</div>Продажа<br><small>Крипта → ₽</small></div>
+            <div class="arrow arrow-danger"><span class="arrow-label">4. Списание</span><span class="arrow-fee">биржа: 0.5%</span></div>
+            <div class="node node-exchange"><div class="node-icon">🏛️</div>Биржа<br><small>Конвертация</small></div>
+            <div class="arrow arrow-danger"><span class="arrow-label">5. Цифровой ₽ → ₽</span><span class="arrow-fee">банк: 0.1-0.5%</span></div>
+            <div class="node node-bank"><div class="node-icon">🏦</div>Банк<br><small>Спецсчёт → ₽</small></div>
+            <div class="arrow arrow-danger"><span class="arrow-label">6. Перевод ₽</span><span class="arrow-fee">банк: 0.5-2%</span></div>
+            <div class="node node-user"><div class="node-icon">👤</div>Пользователь<br><small>Личный счёт ₽</small></div>
+          </div>
+        </div>
+        <div class="roles-grid">
+          <div class="role-card role-admin"><div class="role-icon">⚙️</div><b>Админ биржи</b><ul><li>Управление банками</li><li>Комиссии и лимиты</li><li>Отключение модулей</li><li>Мониторинг системы</li></ul></div>
+          <div class="role-card role-compliance"><div class="role-icon">⚖️</div><b>Комплаенс</b><ul><li>AML-алерты</li><li>SAR-отчёты</li><li>Карантин счетов</li><li>Пороговые >600K ₽</li></ul></div>
+          <div class="role-card role-finance"><div class="role-icon">💼</div><b>Финансист биржи</b><ul><li>Обороты по банкам</li><li>Сверка выписок</li><li>Коридоры</li><li>Отчёты для ЦБ</li></ul></div>
+          <div class="role-card role-bank"><div class="role-icon">🏦</div><b>Сотрудник банка</b><ul><li>Транзакции банка</li><li>Настройки (просмотр)</li><li>Сверка</li><li>Отчёты по банку</li></ul></div>
+        </div>
+        <div class="aml-bar">⚖️ <b>AML-контроль (115-ФЗ)</b> на каждом этапе: банк → биржа → ЦБ РФ → Росфинмониторинг</div>
+        <div class="bank-output">🏦 <b>Выходные данные для банка (Портал банка):</b> Биржа → банк: сводка всех транзакций • суммы • комиссии • статусы • сверка • пороговые операции • отчёты для ЦБ РФ →</div>
+        <div class="fees-grid">
+          <div class="fee-card fee-bank">0.5-2%<small>Банк за перевод ₽</small></div>
+          <div class="fee-card fee-exchange">0.1-0.5%<small>Биржа за торговлю</small></div>
+          <div class="fee-card fee-output">0.5-2%<small>Банк за вывод ₽</small></div>
+        </div>
+      </div>` },
+  { id: 'revenue', html: `
+      <div class="slide">
+        <h2>🏦 Заработок банка</h2>
+        <div class="revenue-grid">
+          <div class="revenue-card">
+            <div class="revenue-header revenue-in">⬇️ Ввод средств (₽ → Биржа)</div>
+            <div class="revenue-step"><span class="step-num">1</span><div class="step-info"><b>Перевод ₽ на спецсчёт</b><br><small>Пользователь → спецсчёт биржи в банке</small></div><div class="step-fee">0.5-2%<small>Банк</small></div></div>
+            <div class="revenue-step"><span class="step-num">2</span><div class="step-info"><b>Конвертация ₽ → Цифровой ₽</b><br><small>Банк → платформа цифрового рубля ЦБ РФ (ФЗ-259)</small></div><div class="step-fee">0.1-0.5%<small>Банк + ЦБ</small></div></div>
+            <div class="revenue-step"><span class="step-num">3</span><div class="step-info"><b>Зачисление на биржу</b><br><small>Цифровой ₽ → баланс пользователя на бирже</small></div><div class="step-fee">—<small>Биржа</small></div></div>
+            <div class="revenue-total">Итого банк зарабатывает на вводе: <b>0.6-2.4%</b></div>
+          </div>
+          <div class="revenue-card">
+            <div class="revenue-header revenue-out">⬆️ Вывод средств (Биржа → ₽)</div>
+            <div class="revenue-step"><span class="step-num">1</span><div class="step-info"><b>Списание с биржи</b><br><small>Баланс пользователя → конвертация в ₽</small></div><div class="step-fee">0.5%<small>Биржа</small></div></div>
+            <div class="revenue-step"><span class="step-num">2</span><div class="step-info"><b>Конвертация Цифровой ₽ → ₽</b><br><small>ЦБ РФ → банк (ФЗ-259, ФЗ-1194918-8)</small></div><div class="step-fee">0.1-0.5%<small>Банк + ЦБ</small></div></div>
+            <div class="revenue-step"><span class="step-num">3</span><div class="step-info"><b>Перевод ₽ пользователю</b><br><small>Спецсчёт → личный счёт пользователя</small></div><div class="step-fee">0.5-2%<small>Банк</small></div></div>
+            <div class="revenue-total">Итого банк зарабатывает на выводе: <b>0.6-2.4%</b></div>
+          </div>
+        </div>
+        <div class="trading-bar">⚡ Каждая торговая сделка: <b>Биржа 0.1-0.5%</b> | <b>Банк (эквайринг) 0.05-0.3%</b></div>
+      </div>` },
+  { id: 'legal', html: `
+      <div class="slide">
+        <h2>⚖️ Регуляторная база</h2>
+        <div class="legal-grid">
+          <div class="legal-card"><span class="legal-badge">ФЗ № 259-ФЗ</span><b>О цифровых финансовых активах</b><p>Правовая основа для ЦФА и цифрового рубля. Операторы ЦФА-платформ лицензируются ЦБ РФ.</p><ul><li>✅ Цифровой рубль — законное средство</li><li>✅ Платформа ЦБ РФ для конвертации</li><li>✅ Оператор ЦФА — лицензия ЦБ</li></ul></div>
+          <div class="legal-card"><span class="legal-badge">ФЗ № 1194918-8</span><b>О цифровой валюте</b><p>Легализация криптобирж с 01.07.2026. 5 типов лицензий. Уставный капитал от 100 млн ₽.</p><ul><li>✅ Лицензия оператора обмена</li><li>✅ Адрес-идентификаторы</li><li>✅ Квалификация инвесторов</li><li>✅ Капитал ≥ 100 млн ₽</li></ul></div>
+          <div class="legal-card"><span class="legal-badge">ФЗ № 115-ФЗ</span><b>ПОД/ФТ (AML)</b><p>Противодействие отмыванию. Идентификация, мониторинг, отчётность.</p><ul><li>✅ AML-консоль: 5 типов алертов</li><li>✅ SHAP-объяснимость ML</li><li>✅ SAR в Росфинмониторинг</li><li>✅ Порог >600K ₽ — авто-контроль</li></ul></div>
+          <div class="legal-card"><span class="legal-badge">ЦБ РФ</span><b>Платформа цифрового рубля</b><p>С 01.09.2026 — массовое внедрение. Банки-операторы конвертируют ₽ ↔ ЦР.</p><ul><li>✅ Спецсчёт биржи в банке</li><li>✅ Конвертация ₽ → цифровой ₽</li><li>✅ ЦБ РФ — оператор платформы</li><li>✅ Банк — оператор кошельков</li></ul></div>
+        </div>
+        <div class="legal-note">✨ Банк выступает <b>оператором кошельков цифрового рубля</b> и <b>партнёром биржи</b> — зарабатывает на каждом переводе ₽ ↔ цифровой ₽ и комиссии за эквайринг</div>
+      </div>` },
+  { id: 'cta', html: `
+      <div class="slide slide-cta">
+        <div class="cta-icon">🏦</div>
+        <h2>Выгодное партнёрство</h2>
+        <p class="cta-desc">Банк-партнёр зарабатывает на каждом рубле, проходящем через биржу: ввод, вывод, конвертация в цифровой рубль, торговые сделки.</p>
+        <div class="cta-stats">
+          <div class="cta-stat"><b>1.2-4.8%</b><small>с каждого ввода/вывода</small></div>
+          <div class="cta-stat"><b>$20B+</b><small>объём крипторынка РФ/год</small></div>
+          <div class="cta-stat"><b>0.05-0.3%</b><small>эквайринг сделок</small></div>
+          <div class="cta-stat"><b>01.09.2026</b><small>цифровой рубль — старт</small></div>
+        </div>
+        <div class="cta-badges"><span class="partner-badge">ВТБ (ГОСТ TLS)</span><span class="partner-badge">Альфа-Банк (REST)</span><span class="partner-badge">Сбербанк</span></div>
+        <p class="cta-footer">РусКрипто © 2026 • ФЗ-259 • ФЗ-1194918-8 • ФЗ-115 • ЦБ РФ: цифровой рубль</p>
+      </div>` },
+]
+
+const css = `
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0B1426; color: #ededed; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+.slide { width: 1280px; height: 720px; padding: 36px 48px; display: flex; flex-direction: column; justify-content: center; position: relative; overflow: hidden; }
+h1 { font-size: 52px; font-weight: 800; margin-bottom: 6px; }
+h2 { font-size: 28px; font-weight: 700; margin-bottom: 16px; }
+.subtitle { font-size: 20px; color: #F0B90B; margin-bottom: 4px; }
+.laws { font-size: 12px; color: #888; max-width: 700px; margin: 0 auto 16px; text-align: center; }
+.badge { display: inline-block; padding: 5px 14px; border: 1px solid #F0B90B40; border-radius: 16px; color: #F0B90B; font-size: 13px; }
+.logo-big { width: 72px; height: 72px; border-radius: 20px; background: linear-gradient(135deg, #FCD535, #F0B90B); display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 900; color: #000; margin: 0 auto 16px; }
+.slide-title { text-align: center; align-items: center; }
+.flow-section { margin-bottom: 8px; }
+.flow-label { text-align: center; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 6px 0 3px; }
+.flow-in { color: #22c55e; }
+.flow-out { color: #ef4444; }
+.flow-row { display: flex; align-items: center; justify-content: space-between; gap: 2px; margin-bottom: 3px; }
+.node { width: 90px; text-align: center; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+.node small { font-size: 9px; color: #888; font-weight: 400; }
+.node-icon { font-size: 20px; margin-bottom: 1px; }
+.arrow { flex: 1; text-align: center; font-size: 9px; padding: 1px 0; }
+.arrow-label { display: block; font-weight: 700; }
+.arrow-fee { display: block; font-size: 8px; color: #F0B90B; }
+.arrow::after { content: '→'; font-size: 14px; display: block; }
+.arrow-success::after { color: #22c55e; }
+.arrow-success .arrow-label { color: #22c55e; }
+.arrow-primary::after { color: #F0B90B; }
+.arrow-primary .arrow-label { color: #F0B90B; }
+.arrow-danger::after { color: #ef4444; }
+.arrow-danger .arrow-label { color: #ef4444; }
+.roles-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0; }
+.role-card { border-radius: 10px; padding: 8px; border: 1px solid; font-size: 10px; }
+.role-card b { font-size: 11px; display: block; margin-bottom: 3px; }
+.role-card ul { list-style: none; }
+.role-card li { font-size: 9px; color: #888; margin: 1px 0; }
+.role-card li::before { content: '▸ '; color: #F0B90B; }
+.role-admin { border-color: #F0B90B30; background: #F0B90B08; }
+.role-compliance { border-color: #ef444430; background: #ef444408; }
+.role-finance { border-color: #F0B90B30; background: #F0B90B08; }
+.role-bank { border-color: #38bdf830; background: #38bdf808; }
+.role-icon { font-size: 14px; }
+.aml-bar { background: #ef444408; border: 1px solid #ef444420; border-radius: 8px; padding: 6px; text-align: center; font-size: 10px; color: #888; margin: 6px 0; }
+.bank-output { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; background: #38bdf808; border: 1px solid #38bdf820; font-size: 10px; color: #888; margin: 6px 0; }
+.bank-output b { color: #38bdf8; }
+.fees-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 6px; }
+.fee-card { text-align: center; padding: 8px; border-radius: 8px; font-size: 20px; font-weight: 700; }
+.fee-card small { display: block; font-size: 9px; color: #888; font-weight: 400; margin-top: 2px; }
+.fee-bank { background: #F0B90B08; border: 1px solid #F0B90B20; color: #F0B90B; }
+.fee-exchange { background: #F0B90B08; border: 1px solid #F0B90B20; color: #F0B90B; }
+.fee-output { background: #22c55e08; border: 1px solid #22c55e20; color: #22c55e; }
+.revenue-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
+.revenue-card { border: 1px solid #333; border-radius: 10px; padding: 14px; background: #111827; }
+.revenue-header { font-weight: 700; font-size: 13px; margin-bottom: 8px; padding: 5px 8px; border-radius: 6px; }
+.revenue-in { background: #22c55e15; color: #22c55e; }
+.revenue-out { background: #ef444415; color: #ef4444; }
+.revenue-step { display: flex; align-items: flex-start; gap: 6px; padding: 6px; border-radius: 6px; background: #1a2332; margin-bottom: 4px; }
+.step-num { width: 22px; height: 22px; border-radius: 50%; background: #F0B90B20; color: #F0B90B; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.step-info { flex: 1; font-size: 12px; }
+.step-info small { font-size: 10px; color: #888; }
+.step-fee { text-align: right; font-size: 13px; font-weight: 700; color: #F0B90B; }
+.step-fee small { display: block; font-size: 9px; color: #888; font-weight: 400; }
+.revenue-total { text-align: center; padding: 6px; border-radius: 6px; background: #F0B90B10; border: 1px solid #F0B90B20; font-size: 12px; color: #888; margin-top: 6px; }
+.revenue-total b { color: #F0B90B; font-size: 16px; }
+.trading-bar { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 8px; border-radius: 8px; background: #F0B90B08; border: 1px solid #F0B90B20; font-size: 13px; }
+.legal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.legal-card { border: 1px solid #333; border-radius: 10px; padding: 12px; background: #111827; }
+.legal-badge { display: inline-block; padding: 2px 8px; border: 1px solid #F0B90B40; border-radius: 10px; color: #F0B90B; font-size: 10px; margin-bottom: 4px; }
+.legal-card b { font-size: 13px; display: block; margin-bottom: 3px; }
+.legal-card p { font-size: 10px; color: #888; margin-bottom: 6px; }
+.legal-card ul { list-style: none; }
+.legal-card li { font-size: 10px; color: #ccc; margin: 2px 0; }
+.legal-note { padding: 8px; border-radius: 8px; background: #F0B90B08; border: 1px solid #F0B90B20; font-size: 12px; color: #888; }
+.legal-note b { color: #F0B90B; }
+.slide-cta { text-align: center; align-items: center; }
+.cta-icon { font-size: 44px; margin-bottom: 12px; }
+.cta-desc { font-size: 15px; color: #888; max-width: 650px; margin: 0 auto 16px; }
+.cta-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; max-width: 750px; }
+.cta-stat { border: 1px solid #333; border-radius: 10px; padding: 12px; }
+.cta-stat b { font-size: 20px; color: #F0B90B; display: block; }
+.cta-stat small { font-size: 10px; color: #888; }
+.cta-badges { display: flex; gap: 8px; justify-content: center; margin-bottom: 12px; }
+.partner-badge { padding: 4px 12px; border: 1px solid #F0B90B40; border-radius: 14px; color: #F0B90B; font-size: 12px; }
+.cta-footer { font-size: 11px; color: #555; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes scaleIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+.slide.active { animation: fadeIn 0.6s ease-out; }
+.slide.active .node { animation: scaleIn 0.4s ease-out backwards; }
+.slide.active .role-card { animation: fadeIn 0.4s ease-out backwards; }
+.slide.active .revenue-card { animation: fadeIn 0.5s ease-out backwards; }
+.slide.active .legal-card { animation: fadeIn 0.4s ease-out backwards; }
+`
+
+// Interactive HTML
+const html = `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>РусКрипто — Презентация</title>
+<style>
+${css}
+body { display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+.slide { display: none; }
+.slide.active { display: flex; }
+.nav-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 44px; background: #111827cc; backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-top: 1px solid #333; z-index: 100; }
+.nav-btn { background: none; border: 1px solid #444; color: #ccc; padding: 5px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.nav-btn:hover { background: #F0B90B15; border-color: #F0B90B; color: #F0B90B; }
+.nav-btn:disabled { opacity: 0.3; cursor: default; }
+.nav-dots { display: flex; gap: 5px; }
+.nav-dot { width: 7px; height: 7px; border-radius: 50%; background: #444; cursor: pointer; border: none; padding: 0; }
+.nav-dot.active { background: #F0B90B; width: 22px; border-radius: 4px; }
+.top-bar { position: fixed; top: 0; left: 0; right: 0; height: 32px; background: #111827cc; backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid #333; z-index: 100; font-size: 12px; }
+.progress-bar { flex: 1; max-width: 180px; height: 3px; background: #333; border-radius: 2px; margin: 0 12px; overflow: hidden; }
+.progress-fill { height: 100%; background: #F0B90B; border-radius: 2px; transition: width 0.3s; }
+@media print { .nav-bar, .top-bar { display: none; } .slide { display: flex !important; page-break-after: always; } }
+</style></head><body>
+<div class="top-bar"><span>₿ РусКрипто — Презентация</span><div class="progress-bar"><div class="progress-fill" id="progress"></div></div><span id="counter">1 / ${slidesData.length}</span></div>
+${slidesData.map((s,i) => `<div class="slide ${i===0?'active':''}" data-index="${i}">${s.html.replace(/<div class="slide[^"]*">/,'').replace(/<\/div>$/,'')}</div>`).join('\n')}
+<div class="nav-bar">
+<button class="nav-btn" id="prev" onclick="nav(-1)">← Назад</button>
+<div class="nav-dots">${slidesData.map((_,i)=>`<button class="nav-dot ${i===0?'active':''}" onclick="goTo(${i})"></button>`).join('')}</div>
+<button class="nav-btn" id="next" onclick="nav(1)">Далее →</button>
+</div>
+<script>
+let c=0;const s=document.querySelectorAll('.slide'),d=document.querySelectorAll('.nav-dot'),t=s.length;
+function show(n){s.forEach((e,i)=>e.classList.toggle('active',i===n));d.forEach((e,i)=>e.classList.toggle('active',i===n));document.getElementById('counter').textContent=(n+1)+' / '+t;document.getElementById('progress').style.width=((n+1)/t*100)+'%';document.getElementById('prev').disabled=n===0;document.getElementById('next').disabled=n===t-1;c=n}
+function nav(d){show(Math.max(0,Math.min(t-1,c+d)))}
+function goTo(n){show(n)}
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' ')nav(1);if(e.key==='ArrowLeft')nav(-1)});
+show(0);
+</script></body></html>`
+
+// PDF HTML (all slides visible, print-optimized)
+const pdfHtml = `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8"><title>РусКрипто — PDF</title>
+<style>${css}.slide{display:flex;page-break-after:always}@media print{body{background:#fff}}</style>
+</head><body>${slidesData.map(s=>s.html).join('\n')}</body></html>`
+
+mkdirSync(OUTPUT_DIR, { recursive: true })
+writeFileSync(`${OUTPUT_DIR}/presentation.html`, html, 'utf-8')
+writeFileSync(`${OUTPUT_DIR}/presentation-pdf.html`, pdfHtml, 'utf-8')
+console.log(`✅ Generated:\n   📄 ${OUTPUT_DIR}/presentation.html — интерактивная (←/→)\n   📄 ${OUTPUT_DIR}/presentation-pdf.html — для PDF (Ctrl+P → Сохранить как PDF)\n   📊 ${slidesData.length} слайдов`)
