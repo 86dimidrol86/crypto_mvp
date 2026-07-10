@@ -14,6 +14,8 @@ import {
   Plus,
   ArrowUp,
   ArrowDown,
+  BarChart3,
+  Activity,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '@/lib/store'
@@ -681,29 +683,44 @@ export function MarketsView() {
 
         {/* Aggregate stats banner */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-          <Card className="p-3.5">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              {t('markets.stat.volumeAll')}
+          <Card className="p-3.5 hover:border-primary/30 transition-colors group">
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                {t('markets.stat.volumeAll')}
+              </div>
+              <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center group-hover:scale-110 transition">
+                <BarChart3 className="w-3.5 h-3.5 text-primary" />
+              </div>
             </div>
-            <div className="text-xl font-bold mt-1 font-mono tabular-nums">
+            <div className="text-xl font-bold mt-1.5 font-mono tabular-nums">
               {totalVolume > 0 ? <Volume24h rub={totalVolume} /> : '—'}
             </div>
           </Card>
-          <Card className="p-3.5">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              {t('markets.stat.ratio')}
+          <Card className="p-3.5 hover:border-primary/30 transition-colors group">
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                {t('markets.stat.ratio')}
+              </div>
+              <div className="w-7 h-7 rounded-lg bg-muted/40 flex items-center justify-center group-hover:scale-110 transition">
+                <Activity className="w-3.5 h-3.5 text-muted-foreground" />
+              </div>
             </div>
-            <div className="text-xl font-bold mt-1 flex items-center gap-2">
+            <div className="text-xl font-bold mt-1.5 flex items-center gap-2">
               <span className="text-success">{gainers}</span>
               <span className="text-muted-foreground text-sm">/</span>
               <span className="text-destructive">{losers}</span>
             </div>
           </Card>
-          <Card className="p-3.5">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              {t('markets.stat.topGainer')}
+          <Card className="p-3.5 hover:border-success/30 transition-colors group">
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                {t('markets.stat.topGainer')}
+              </div>
+              <div className="w-7 h-7 rounded-lg bg-success/10 flex items-center justify-center group-hover:scale-110 transition">
+                <TrendingUp className="w-3.5 h-3.5 text-success" />
+              </div>
             </div>
-            <div className="text-xl font-bold mt-1 flex items-center gap-2 text-success">
+            <div className="text-xl font-bold mt-1.5 flex items-center gap-2 text-success">
               {topGainer ? (
                 <>
                   <span>{topGainer.symbol}</span>
@@ -714,11 +731,16 @@ export function MarketsView() {
               )}
             </div>
           </Card>
-          <Card className="p-3.5">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              {t('markets.stat.topLoser')}
+          <Card className="p-3.5 hover:border-destructive/30 transition-colors group">
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                {t('markets.stat.topLoser')}
+              </div>
+              <div className="w-7 h-7 rounded-lg bg-destructive/10 flex items-center justify-center group-hover:scale-110 transition">
+                <TrendingDown className="w-3.5 h-3.5 text-destructive" />
+              </div>
             </div>
-            <div className="text-xl font-bold mt-1 flex items-center gap-2 text-destructive">
+            <div className="text-xl font-bold mt-1.5 flex items-center gap-2 text-destructive">
               {topLoser ? (
                 <>
                   <span>{topLoser.symbol}</span>
@@ -844,16 +866,32 @@ export function MarketsView() {
                       </span>
                     </div>
                     {/* High */}
-                    <div className="text-right text-xs font-mono tabular-nums text-muted-foreground">
-                      {r.high24h ? formatPrice(r.high24h, 'rub') : '—'}
+                    <div className="text-right">
+                      <div className="text-xs font-mono tabular-nums text-muted-foreground">
+                        {r.high24h ? formatPrice(r.high24h, 'rub') : '—'}
+                      </div>
                     </div>
-                    {/* Low */}
-                    <div className="text-right text-xs font-mono tabular-nums text-muted-foreground">
-                      {r.low24h ? formatPrice(r.low24h, 'rub') : '—'}
+                    {/* Low + 24h range bar */}
+                    <div className="text-right">
+                      <div className="text-xs font-mono tabular-nums text-muted-foreground">
+                        {r.low24h ? formatPrice(r.low24h, 'rub') : '—'}
+                      </div>
+                      {r.high24h && r.low24h && r.high24h > r.low24h && (
+                        <div className="relative w-full h-1 bg-muted/50 rounded-full mt-1 overflow-hidden" title={`Low ${formatPrice(r.low24h, 'rub')} → High ${formatPrice(r.high24h, 'rub')}`}>
+                          <div
+                            className="absolute top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full"
+                            style={{
+                              left: `${Math.min(100, Math.max(0, ((r.priceRub - r.low24h) / (r.high24h - r.low24h)) * 100))}%`,
+                              background: up ? 'var(--success)' : 'var(--destructive)',
+                              boxShadow: `0 0 4px ${up ? 'var(--success)' : 'var(--destructive)'}`,
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                     {/* Volume + sparkline */}
                     <div className="flex items-center justify-end gap-2">
-                      <Sparkline data={r.spark} width={70} height={22} />
+                      <Sparkline data={r.spark} width={70} height={28} />
                       <div className="text-right text-xs font-mono tabular-nums">
                         <Volume24h rub={r.volume24hRub} />
                       </div>

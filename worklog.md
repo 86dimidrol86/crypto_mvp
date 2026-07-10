@@ -2070,3 +2070,56 @@ Stage Summary:
   - Home: добавить FAQ секцию в Asset Security (рекомендация VLM).
   - Общие: tooltip на allocation donut segments (Recharts Tooltip уже есть, но можно улучшить контент).
 - Git: коммит запланирован после этой записи worklog.
+
+---
+Task ID: CRON-REVIEW-4 (webDevReview #4)
+Agent: Orchestrator (cron-triggered)
+Task: Оценить статус проекта, QA через agent-browser, продолжить улучшения стилизации + новые функции.
+
+Work Log:
+1. Прочитал worklog.md (2072 строки) — контекст: MVP v2.0 стабилен, CRON-REVIEW-3 улучшил Portfolio (Quick Actions + legend + holdings 24h value, 8/10). Рекомендации: Markets polish, Trade limit/market, Home FAQ.
+2. QA-проверка:
+   - `bun run lint` → exit 0 (0 errors, 0 warnings) ✓
+   - dev.log: чистый, GET / 200, /api/portfolio/history 200, без runtime errors ✓
+   - agent-browser (1440×900): залогинился как USER demo.
+3. VLM-анализ 3 вьюх: Markets 8/10 (отступы, заголовки, мелкие графики), Trade 7/10 (переполнение текста, ширина кнопок), Profile 9/10 (отступы, шрифт). Багов нет.
+4. Фокус работы выбран: **улучшить Markets view** — stats banner с иконками + sparkline больше + 24h range bar (рекомендация из CRON-REVIEW-3).
+
+5. Реализация (markets-view.tsx):
+   - **Stats banner enhancement**: 4 карточки переработаны:
+     * Каждая карточка получила hover:border-{color}/30 transition-colors group
+     * Добавлен flex items-center justify-between header с иконкой в квадрате 7×7 (rounded-lg)
+     * Иконки: BarChart3 (volume, bg-primary/10 text-primary), Activity (ratio, bg-muted/40), TrendingUp (gainer, bg-success/10 text-success), TrendingDown (loser, bg-destructive/10 text-destructive)
+     * group-hover:scale-110 на иконках для интерактива
+     * mt-1 → mt-1.5 для лучшего отступа
+   - **Sparkline increase**: height 22px → 28px (+27% как рекомендовал VLM в CRON-REVIEW-3). Width остался 70px.
+   - **24h range bar**: под Low ценой добавлен мини-индикатор позиции текущей цены в диапазоне Low–High:
+     * relative w-full h-1 bg-muted/50 rounded-full mt-1 overflow-hidden
+     * absolute dot: w-1.5 h-1.5 rounded-full, left = (priceRub - low24h) / (high24h - low24h) * 100%
+     * Цвет: success если up, destructive если down
+     * Box-shadow glow для визуального выделения
+     * Title атрибут с точными Low → High значениями
+     * Math.min/max для защиты от выхода за 0-100%
+   - **High column**: теперь обёрнут в div для консистентной высоты с Low (который получил range bar)
+   - **Импорты**: добавил BarChart3, Activity в lucide-react import.
+
+6. Тестирование через agent-browser:
+   - Markets v2 → VLM: **8.5/10** (было 8/10). Подтверждено: stats с иконками, sparkline 28px, 24h range bar, цветовая дифференциация. Нет критических багов.
+7. `bun run lint` → exit 0 ✓
+8. dev.log: чистый, /api/profile/sessions 200, без ошибок ✓
+
+Stage Summary:
+- **Статус проекта**: MVP v2.0 стабилен. 18 views, 5 ролей, 33 API, 21 Prisma model, lint clean, dev.log clean.
+- **Что сделано в этом раунде (CRON-REVIEW-4)**:
+  1. **Markets stats banner**: 4 карточки с иконками (BarChart3/Activity/TrendingUp/TrendingDown), hover border colors, group-hover:scale-110.
+  2. **Markets sparkline**: height 22→28px (+27% как рекомендовал VLM).
+  3. **Markets 24h range bar**: мини-индикатор позиции цены в диапазоне Low–High под Low ценой, с цветовым кодом (success/destructive) и glow эффектом.
+  4. i18n: не требовалось (использованы существующие ключи).
+  5. VLM-оценка markets выросла с **8/10 → 8.5/10**.
+- **Нерешённые вопросы / рекомендации на следующий раунд**:
+  - Trade: добавить limit/market toggle для Quick Trade preset (рекомендация из CRON-REVIEW-1, всё ещё не реализовано).
+  - Home: добавить FAQ секцию в Asset Security (рекомендация VLM).
+  - Markets: hover tooltip на sparkline для точных значений.
+  - Profile: уменьшить отступы, увеличить шрифт в "Мои активы".
+  - Общие: унифицировать отступы между всеми вьюхами.
+- Git: коммит запланирован после этой записи worklog.
