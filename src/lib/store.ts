@@ -99,6 +99,9 @@ interface AppState {
   // trading
   selectedPair: string
   setSelectedPair: (p: string) => void
+  /** Preset RUB amount from Quick Trade widget on home — OrderForm reads & clears it on pair change. */
+  quickTradePresetRub: number | null
+  setQuickTradePresetRub: (v: number | null) => void
   orders: Trade[] // история сделок (используется как trade history)
   placeOrder: (o: PlaceOrderInput) => Trade
   openOrders: Trade[]
@@ -462,6 +465,8 @@ export const useAppStore = create<AppState>()(
       balances: INITIAL_BALANCES,
       selectedPair: 'BTC/RUB',
       setSelectedPair: (p) => set({ selectedPair: p }),
+      quickTradePresetRub: null,
+      setQuickTradePresetRub: (v) => set({ quickTradePresetRub: v }),
 
       orders: [],
       openOrders: [],

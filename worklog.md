@@ -1910,3 +1910,57 @@ Stage Summary:
 - Корневая причина бага с центрированием: regex-срезание оборачивающего `<div class="slide slide-title">` удаляло доп.классы. Исправлено через явное извлечение extra-классов и применение их к выходному div.
 - PDF-версия (presentation-pdf.html) НЕ имела этой проблемы (там оборачивающий div используется напрямую), но иконки тоже обновились до SVG для консистентности.
 - VLM-верификация всех 5 слайдов через agent-browser (viewport 1920×1080) — все центрирования и иконки корректны.
+
+---
+Task ID: CRON-REVIEW-1 (webDevReview #1)
+Agent: Orchestrator (cron-triggered)
+Task: Оценить статус проекта, QA через agent-browser, добавить улучшения стилизации + новые функции.
+
+Work Log:
+1. Прочитал worklog.md (1912 строк) — установил контекст: MVP v2.0 РусКрипто (18 views, 5 ролей, 33 API, 21 Prisma model), последняя задача — PRES-FIX-3 (исправление верстки презентации).
+2. QA-проверка состояния:
+   - `bun run lint` → exit 0 (0 errors, 0 warnings) ✓
+   - dev.log: чистый, GET / 200, /api/admin/stats 200, без ошибок ✓
+   - agent-browser (1440×900): open http://localhost:3000 → 200 OK, home рендерится ✓
+3. VLM-анализ home (screenshot → glm-4.6v): оценка **7/10**. Замечания: плотное расположение блоков, недостаточный контраст курсовых значений, "зажатость" MarketGrid, разная ширина кнопок, тёмные графики.
+4. VLM-анализ 5 ключевых вьюх (trade, portfolio, analytics, wallet, kyc, help) — все "OK", багов верстки нет.
+5. Проверил существование price alerts — уже реализованы в markets-view.tsx (PriceAlertDialog, MyAlertsSection, background checker).
+6. Фокус работы выбран: **новая функция Quick Trade виджет + polish Home**.
+7. Реализация Quick Trade виджета:
+   - **store.ts**: добавил поля `quickTradePresetRub: number | null` + `setQuickTradePresetRub` в AppStore interface и implementation (строки 100-104, 468-469).
+   - **trade-view.tsx OrderForm**: добавил отдельный useEffect (строки 946-956) для prefill qty из preset — ждёт пока price > 0 (websocket ещё не дал данные при первом mount). Дизайн: отдельный effect, т.к. pair может уже быть целевым (BTC/RUB default) и useEffect на [pair] не сработает. Внутри effect: qty = presetRub/price, setInputQty, setSide('buy'), toast.info("Пресет применён: 25 000 ₽ → 0.005133 BTC"), setQuickTradePresetRub(null).
+   - **i18n.ts**: добавил 9 новых ключей RU + EN: home.quick.{title,subtitle,amountLabel,receiveLabel,fee,demo,btn,toast,loginRequired} + trade.toast.presetApplied.
+   - **home-view.tsx**: новая функция QuickTradeWidget (строки 787-968):
+     * Слева: marketing copy (badge "Купить крипту за 1 клик", заголовок, описание, 3 trust badges: 0.2% fee / Демо-режим / LIVE • BINANCE).
+     * Справа: Card с gradient (from-card via-card to-primary/5) + decorative blur circle:
+       - Селектор монеты: 4 pill-кнопки (BTC/ETH/BNB/SOL) с CoinIcon + активная подсветка (border-primary + shadow)
+       - Input суммы в ₽: text input с inputMode decimal, автоформат через toLocaleString('ru-RU'), ₽ суффикс справа
+       - 4 preset-кнопки: 5K / 25K / 100K / 500K (активная подсвечена)
+       - Receive calc card: "Получите" + live preview (amount/priceRub) с CoinIcon + символом + fee (0.2% от amount)
+       - Buy button: bg-primary text-primary-foreground h-11, ZapIcon + "Купить {coin}" + ArrowRight, shadow-lg shadow-primary/20
+     * handleBuy: если !isAuthed → toast.info + setView('auth'); иначе → setSelectedPair, setQuickTradePresetRub, toast.success, setView('trade').
+   - **HomeView**: добавил <QuickTradeWidget /> между Hero и MarketGrid.
+8. Polish Home:
+   - **Hero**: добавил `animate-pulse` на верхний правый glow + второй decorative violet/5 blur внизу слева для глубины.
+   - **MarketGrid cards**: hover эффекты усилены — `hover:-translate-y-1` (было -0.5), `hover:shadow-lg hover:shadow-primary/10`, `transition-all duration-200`, добавлен absolute gradient overlay (group-hover:from-primary/5), `relative` на внутренних элементах, sparkline opacity 90→100%.
+   - **Features cards**: `hover:-translate-y-0.5 hover:shadow-md`, gradient overlay (group-hover opacity 0→100%), `relative` на тексте, `shadow-sm` на иконке.
+9. Тестирование через agent-browser:
+   - Home v2 → VLM: **8/10** (было 7/10). Подтверждено: виджет виден, карточки с hover эффектами, hero с depth glow.
+   - Quick Trade клик "Купить BTC" (незалогиненный) → переход на auth ✓ (toast + redirect работает).
+   - Залогинился как USER demo → home → клик "Купить BTC" → переход на trade → pair BTC/RUB выбран → **в поле "Объем" подставлено 0.005139 BTC** (25000₽ / 4.87M₽) ✓. Prefill работает корректно после вынесения в отдельный useEffect с ожиданием price > 0.
+10. `bun run lint` → exit 0 ✓ (исправил warning: убрал неиспользуемый eslint-disable, добавил полные deps в useEffect).
+11. dev.log: чистый, без ошибок после всех изменений.
+
+Stage Summary:
+- **Статус проекта**: MVP v2.0 стабилен. 18 views, 5 ролей, 33 API, 21 Prisma model, lint clean, dev.log clean, все основные вьюхи рендерятся без багов (VLM "OK" по trade/portfolio/analytics/wallet/kyc/help).
+- **Что сделано в этом раунде**:
+  1. Новая функция **Quick Trade виджет** на главной — выбор монеты (BTC/ETH/BNB/SOL), ввод суммы ₽, пресеты 5K/25K/100K/500K, live preview получения + fee, кнопка "Купить {coin}" с prefill в OrderForm на trade-view. Полная интеграция store + i18n + toast.
+  2. **Polish Home**: Hero с dual-glow (animated pulse + violet depth), MarketGrid cards с lift+shadow+gradient overlay, Features cards с hover translate+shadow.
+  3. VLM-оценка home выросла с **7/10 → 8/10**.
+- **Нерешённые вопросы / рекомендации на следующий раунд**:
+  - Quick Trade: добавить поле "Цена" для продвинутых пользователей (limit vs market).
+  - Market Grid: интерактивные графики (зум, выбор периода 1h/24h/7d).
+  - Top Movers: фильтр по периоду (24h/7d/30d).
+  - Features: более детализированные иконки (закон/замок/глобус с текстовыми символами).
+  - VLM предлагает добавить "FAQ" или "Как это работает" в Asset Security.
+- Git: коммит запланирован после этой записи worklog.

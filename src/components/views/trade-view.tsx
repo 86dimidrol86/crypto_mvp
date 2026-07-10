@@ -902,6 +902,8 @@ function OrderForm({
 }) {
   const balances = useAppStore((s) => s.balances)
   const placeOrder = useAppStore((s) => s.placeOrder)
+  const quickTradePresetRub = useAppStore((s) => s.quickTradePresetRub)
+  const setQuickTradePresetRub = useAppStore((s) => s.setQuickTradePresetRub)
   const { t } = useI18n()
   const [side, setSide] = useState<OrderSide>('buy')
   const [orderType, setOrderType] = useState<OrderType>('limit')
@@ -940,6 +942,18 @@ function OrderForm({
     }, 0)
     return () => clearTimeout(resetTimer)
   }, [pair, orderType])
+
+  // Quick Trade preset from home — waits until price is available, then prefills qty.
+  // Separate effect because pair may already be the target pair (no change event).
+  useEffect(() => {
+    if (!quickTradePresetRub || quickTradePresetRub <= 0) return
+    if (price <= 0) return // wait for live price
+    const qty = quickTradePresetRub / price
+    setInputQty(qty.toFixed(8).replace(/0+$/, '').replace(/\.$/, ''))
+    setSide('buy')
+    toast.info(`${t('trade.toast.presetApplied')} ${quickTradePresetRub.toLocaleString('ru-RU')} ₽ → ${qty.toFixed(6)} ${base}`)
+    setQuickTradePresetRub(null)
+  }, [quickTradePresetRub, price, base, t, setQuickTradePresetRub])
 
   const applyPercent = (p: number) => {
     setPct(p)

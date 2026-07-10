@@ -15,8 +15,11 @@ import {
   Landmark,
   ChevronUp,
   ChevronDown,
+  Zap as ZapIcon,
+  Sparkles,
 } from 'lucide-react'
 import { motion, useSpring, useTransform } from 'framer-motion'
+import { toast } from 'sonner'
 import { useAppStore } from '@/lib/store'
 import { useI18n } from '@/lib/use-i18n'
 import { fetchTickers, jitterPrice, getUsdRubRate } from '@/lib/market'
@@ -91,7 +94,11 @@ function Hero() {
     <section className="relative overflow-hidden border-b border-border">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent" />
       <div
-        className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-primary/10 blur-3xl"
+        className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-primary/10 blur-3xl animate-pulse"
+        aria-hidden
+      />
+      <div
+        className="absolute -bottom-32 -left-32 w-[28rem] h-[28rem] rounded-full bg-violet-500/5 blur-3xl"
         aria-hidden
       />
       <div className="relative max-w-[1400px] mx-auto px-3 lg:px-5 py-8 lg:py-12">
@@ -342,14 +349,16 @@ function MarketGrid() {
                   <Card
                     key={coin.id}
                     className={cn(
-                      'p-2.5 cursor-pointer transition-all hover:border-primary/40 hover:-translate-y-0.5 group flex flex-col gap-1.5',
+                      'p-2.5 cursor-pointer transition-all duration-200 hover:border-primary/50 hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/10 group flex flex-col gap-1.5 relative overflow-hidden',
                       status === 'up' && 'ring-1 ring-success/40',
                       status === 'down' && 'ring-1 ring-destructive/40'
                     )}
                     onClick={() => goTrade(coin.symbol)}
                   >
+                    {/* Subtle gradient overlay on hover */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-primary/0 group-hover:from-primary/5 group-hover:to-transparent transition-all pointer-events-none" />
                     {/* Header row: icon + name + change badge */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 relative">
                       <CoinIcon symbol={coin.symbol} size={24} />
                       <span className="font-semibold text-sm leading-none">{coin.symbol}</span>
                       <span
@@ -363,11 +372,11 @@ function MarketGrid() {
                       </span>
                     </div>
                     {/* Price — large, full width above chart */}
-                    <div className="text-lg font-mono font-bold tabular-nums leading-tight">
+                    <div className="text-lg font-mono font-bold tabular-nums leading-tight relative">
                       {formatPrice(price, currency)}
                     </div>
                     {/* Real 24h sparkline — shorter height, full width */}
-                    <div className="h-[36px] w-full flex items-stretch overflow-hidden">
+                    <div className="h-[36px] w-full flex items-stretch overflow-hidden relative opacity-90 group-hover:opacity-100 transition">
                       <Sparkline data={coin.sparkline || generateSpark(coin.change24h)} width={200} height={36} fill />
                     </div>
                   </Card>
@@ -451,17 +460,21 @@ function Features() {
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {FEATURES.map((f) => (
-            <Card key={f.titleKey} className="p-4 hover:border-primary/30 transition group">
+            <Card
+              key={f.titleKey}
+              className="p-4 hover:border-primary/40 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md group relative overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
               <div
                 className={cn(
-                  'w-10 h-10 rounded-xl bg-muted/60 flex items-center justify-center mb-3 group-hover:scale-110 transition',
+                  'w-10 h-10 rounded-xl bg-muted/60 flex items-center justify-center mb-3 group-hover:scale-110 transition shadow-sm',
                   f.color
                 )}
               >
                 <f.icon className="w-5 h-5" />
               </div>
-              <h3 className="font-semibold text-base mb-1.5">{t(f.titleKey)}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{t(f.descKey)}</p>
+              <h3 className="font-semibold text-base mb-1.5 relative">{t(f.titleKey)}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed relative">{t(f.descKey)}</p>
             </Card>
           ))}
         </div>
@@ -781,10 +794,194 @@ function CtaBand() {
   )
 }
 
+// ─── Quick Trade Widget — быстрая покупка крипты с главной страницы ──────────
+const QUICK_COINS = ['BTC', 'ETH', 'BNB', 'SOL'] as const
+const QUICK_PRESETS = [5000, 25000, 100000, 500000] as const
+
+function QuickTradeWidget() {
+  const setView = useAppStore((s) => s.setView)
+  const setSelectedPair = useAppStore((s) => s.setSelectedPair)
+  const setQuickTradePresetRub = useAppStore((s) => s.setQuickTradePresetRub)
+  const isAuthed = useAppStore((s) => s.isAuthed)
+  const { t } = useI18n()
+  const [coin, setCoin] = useState<string>('BTC')
+  const [amountRub, setAmountRub] = useState<string>('25000')
+  const [tickers, setTickers] = useState<CoinTicker[]>([])
+
+  useEffect(() => {
+    let mounted = true
+    const load = async () => {
+      const tt = await fetchTickers()
+      if (mounted) setTickers(tt)
+    }
+    load()
+    const i = setInterval(load, 12000)
+    return () => {
+      mounted = false
+      clearInterval(i)
+    }
+  }, [])
+
+  const ticker = tickers.find((c) => c.symbol === coin)
+  const priceRub = ticker?.priceRub ?? 0
+  const amountNum = parseFloat(amountRub.replace(/\s/g, '')) || 0
+  const receiveAmount = priceRub > 0 ? amountNum / priceRub : 0
+  const fee = amountNum * 0.002
+
+  const handleBuy = () => {
+    if (!isAuthed) {
+      toast.info(t('home.quick.loginRequired'))
+      setView('auth')
+      return
+    }
+    if (amountNum <= 0 || priceRub <= 0) {
+      toast.error('Введите корректную сумму')
+      return
+    }
+    setSelectedPair(`${coin}/RUB`)
+    setQuickTradePresetRub(amountNum)
+    toast.success(`${t('home.quick.toast')}: ${amountNum.toLocaleString('ru-RU')} ₽ → ${coin}`)
+    setView('trade')
+  }
+
+  return (
+    <section className="border-b border-border py-6">
+      <div className="max-w-[1400px] mx-auto px-3 lg:px-5">
+        <div className="grid lg:grid-cols-[1fr_440px] gap-4 items-stretch">
+          {/* Left: marketing copy */}
+          <div className="flex flex-col justify-center">
+            <Badge variant="outline" className="mb-2 border-primary/30 text-primary gap-1.5 w-fit">
+              <ZapIcon className="w-3 h-3" />
+              {t('home.quick.subtitle')}
+            </Badge>
+            <h2 className="text-xl lg:text-2xl font-bold leading-tight">
+              {t('home.quick.title')}{' '}
+              <span className="text-primary">за 1 клик</span>
+            </h2>
+            <p className="text-sm text-muted-foreground mt-2 max-w-md">
+              Выберите монету и сумму в ₽ — мы откроем форму ордера с предзаполненным количеством. Сделка пройдёт по рыночной цене.
+            </p>
+            <div className="flex flex-wrap items-center gap-3 mt-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+                {t('home.quick.fee')}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-primary" />
+                {t('home.quick.demo')}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+                LIVE • BINANCE
+              </span>
+            </div>
+          </div>
+
+          {/* Right: widget card */}
+          <Card className="relative overflow-hidden p-4 lg:p-5 bg-gradient-to-br from-card via-card to-primary/5 border-primary/20">
+            <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-primary/10 blur-3xl" aria-hidden />
+            <div className="relative">
+              {/* Coin selector */}
+              <div className="grid grid-cols-4 gap-1.5 mb-3">
+                {QUICK_COINS.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => setCoin(c)}
+                    className={cn(
+                      'flex flex-col items-center gap-1 py-2 rounded-xl border transition-all',
+                      coin === c
+                        ? 'border-primary bg-primary/10 shadow-[0_0_0_1px_var(--primary)]'
+                        : 'border-border bg-muted/30 hover:border-primary/40 hover:bg-primary/5'
+                    )}
+                  >
+                    <CoinIcon symbol={c} size={20} />
+                    <span className={cn('text-[11px] font-semibold', coin === c && 'text-primary')}>{c}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Amount input */}
+              <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                {t('home.quick.amountLabel')}
+              </label>
+              <div className="relative mt-1 mb-2">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={amountRub ? parseFloat(amountRub).toLocaleString('ru-RU') : ''}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^\d.]/g, '')
+                    setAmountRub(raw)
+                  }}
+                  placeholder="25 000"
+                  className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2.5 pr-10 text-lg font-mono font-bold tabular-nums focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-primary font-bold">₽</span>
+              </div>
+
+              {/* Preset buttons */}
+              <div className="grid grid-cols-4 gap-1.5 mb-3">
+                {QUICK_PRESETS.map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setAmountRub(String(p))}
+                    className={cn(
+                      'py-1 rounded-lg text-[11px] font-semibold border transition',
+                      amountRub === String(p)
+                        ? 'border-primary bg-primary/15 text-primary'
+                        : 'border-border text-muted-foreground hover:border-primary/40 hover:text-primary'
+                    )}
+                  >
+                    {p >= 1000 ? `${p / 1000}K` : p}
+                  </button>
+                ))}
+              </div>
+
+              {/* Receive calc */}
+              <div className="bg-muted/30 rounded-xl p-3 mb-3 border border-border/60">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                    {t('home.quick.receiveLabel')}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    1 {coin} ≈ {formatPrice(priceRub, 'rub')}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <div className="flex items-center gap-2">
+                    <CoinIcon symbol={coin} size={22} />
+                    <span className="text-base font-bold font-mono tabular-nums">
+                      {receiveAmount > 0 ? receiveAmount.toFixed(receiveAmount < 1 ? 6 : receiveAmount < 100 ? 4 : 2) : '—'}
+                    </span>
+                    <span className="text-sm font-semibold text-muted-foreground">{coin}</span>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    fee: {fee.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽
+                  </span>
+                </div>
+              </div>
+
+              <Button
+                onClick={handleBuy}
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-11 text-base font-semibold gap-2 shadow-lg shadow-primary/20"
+              >
+                <ZapIcon className="w-4 h-4" />
+                {t('home.quick.btn')} {coin}
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export function HomeView() {
   return (
     <div>
       <Hero />
+      <QuickTradeWidget />
       <MarketGrid />
       <MoversSection />
       <Features />
