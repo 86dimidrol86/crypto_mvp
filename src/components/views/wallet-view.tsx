@@ -16,6 +16,9 @@ import {
   ArrowLeftRight,
   Loader2,
   Network,
+  TrendingUp,
+  TrendingDown,
+  Lock,
 } from 'lucide-react'
 import { useAppStore } from '@/lib/store'
 import { useI18n } from '@/lib/use-i18n'
@@ -149,26 +152,77 @@ function TotalBalanceCard({ balances }: { balances: Balance[] }) {
   const totalRub = balances.reduce((sum, b) => sum + b.amount * priceRub(b.asset), 0)
   const totalUsd = totalRub / (usdRub || 1)
 
+  // Asset distribution for mini stacked bar
+  const distribution = balances
+    .map((b) => ({
+      asset: b.asset,
+      rub: b.amount * priceRub(b.asset),
+    }))
+    .filter((d) => d.rub > 0)
+    .sort((a, b) => b.rub - a.rub)
+  const distTotal = distribution.reduce((s, d) => s + d.rub, 0) || 1
+
+  const ASSET_COLORS: Record<string, string> = {
+    BTC: '#F0B90B',
+    ETH: '#a78bfa',
+    USDT: '#22c55e',
+    RUB: '#38bdf8',
+  }
+
   return (
     <Card className="relative overflow-hidden p-4 lg:p-5 bg-gradient-to-br from-primary/10 via-card to-card border-primary/20">
-      <div className="absolute -bottom-16 -right-16 w-56 h-56 rounded-full bg-primary/10 blur-3xl" />
-      <div className="relative flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
-        <div>
+      <div className="absolute -bottom-16 -right-16 w-56 h-56 rounded-full bg-primary/10 blur-3xl animate-pulse" />
+      <div className="relative flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider mb-1.5">
             <WalletIcon className="w-3.5 h-3.5 text-primary" />
             {t('wallet.totalValue')}
           </div>
-          <div className="text-3xl font-mono font-bold tabular-nums">
+          <div className="text-3xl lg:text-4xl font-mono font-bold tabular-nums">
             {formatPrice(totalRub, 'rub')}
           </div>
           <div className="text-xs text-muted-foreground mt-1 font-mono tabular-nums">
             ≈ {formatPrice(totalUsd, 'usd')}
           </div>
+
+          {/* Distribution mini stacked bar */}
+          {distribution.length > 0 && (
+            <div className="mt-3">
+              <div className="flex h-2 rounded-full overflow-hidden bg-muted/40 max-w-md gap-0.5">
+                {distribution.map((d) => (
+                  <div
+                    key={d.asset}
+                    className="h-full transition-all hover:brightness-110"
+                    style={{
+                      width: `${(d.rub / distTotal) * 100}%`,
+                      background: ASSET_COLORS[d.asset] || '#888',
+                    }}
+                    title={`${d.asset}: ${formatPrice(d.rub, 'rub')} (${((d.rub / distTotal) * 100).toFixed(1)}%)`}
+                  />
+                ))}
+              </div>
+              {/* Legend */}
+              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+                {distribution.slice(0, 6).map((d) => (
+                  <div key={d.asset} className="flex items-center gap-1.5 text-[11px]">
+                    <span
+                      className="w-2 h-2 rounded-sm"
+                      style={{ background: ASSET_COLORS[d.asset] || '#888' }}
+                    />
+                    <span className="font-semibold text-foreground/90">{d.asset}</span>
+                    <span className="text-muted-foreground font-mono tabular-nums">
+                      {((d.rub / distTotal) * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <Button
             variant="outline"
-            className="gap-2 border-success/30 bg-success/10 text-success hover:bg-success/20 hover:text-success"
+            className="gap-2 border-success/30 bg-success/10 text-success hover:bg-success/20 hover:text-success h-10 px-4"
             onClick={() => document.getElementById('wallet-tab-deposit')?.click()}
           >
             <ArrowDownToLine className="w-4 h-4" />
@@ -176,7 +230,7 @@ function TotalBalanceCard({ balances }: { balances: Balance[] }) {
           </Button>
           <Button
             variant="outline"
-            className="gap-2 border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
+            className="gap-2 border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive h-10 px-4"
             onClick={() => document.getElementById('wallet-tab-withdraw')?.click()}
           >
             <ArrowUpFromLine className="w-4 h-4" />
@@ -185,6 +239,109 @@ function TotalBalanceCard({ balances }: { balances: Balance[] }) {
         </div>
       </div>
     </Card>
+  )
+}
+
+// ─── Wallet stats row: 3 mini KPI cards (assets count, 24h PnL estimate, locked) ─
+function WalletStatsRow({ balances }: { balances: Balance[] }) {
+  const { t } = useI18n()
+  const [tickers, setTickers] = useState<CoinTicker[]>([])
+  const [usdRub, setUsdRub] = useState<number>(92.5)
+
+  useEffect(() => {
+    let mounted = true
+    const load = async () => {
+      const [t, r] = await Promise.all([fetchTickers(), getUsdRubRate()])
+      if (!mounted) return
+      setTickers(t)
+      setUsdRub(r)
+    }
+    load()
+    const i = setInterval(load, 30000)
+    return () => {
+      mounted = false
+      clearInterval(i)
+    }
+  }, [])
+
+  const priceRub = (asset: string): number => {
+    if (asset === 'RUB') return 1
+    if (asset === 'USDT') return usdRub
+    const tk = tickers.find((t) => t.symbol === asset)
+    return tk ? tk.priceRub : 0
+  }
+
+  const totalRub = balances.reduce((sum, b) => sum + b.amount * priceRub(b.asset), 0)
+  const activeAssets = balances.filter((b) => b.amount > 0).length
+  const lockedTotal = balances.reduce((sum, b) => sum + (b.locked || 0) * priceRub(b.asset), 0)
+
+  // 24h PnL estimate: sum of (amount * change24h * price) for crypto assets
+  const pnl24h = balances.reduce((sum, b) => {
+    if (b.asset === 'RUB' || b.asset === 'USDT') return sum
+    const tk = tickers.find((t) => t.symbol === b.asset)
+    if (!tk) return sum
+    return sum + b.amount * tk.priceRub * (tk.change24h / 100)
+  }, 0)
+  const pnlPct = totalRub > 0 ? (pnl24h / totalRub) * 100 : 0
+  const pnlPositive = pnl24h >= 0
+
+  const stats = [
+    {
+      label: t('wallet.stats.assets'),
+      value: String(activeAssets),
+      sub: t('wallet.stats.assetsSub'),
+      icon: WalletIcon,
+      color: 'text-primary',
+      bg: 'bg-primary/10',
+    },
+    {
+      label: t('wallet.stats.pnl24h'),
+      value: `${pnlPositive ? '+' : ''}${formatPrice(Math.abs(pnl24h), 'rub')}`,
+      sub: `${pnlPositive ? '+' : ''}${pnlPct.toFixed(2)}%`,
+      icon: pnlPositive ? TrendingUp : TrendingDown,
+      color: pnlPositive ? 'text-success' : 'text-destructive',
+      bg: pnlPositive ? 'bg-success/10' : 'bg-destructive/10',
+    },
+    {
+      label: t('wallet.stats.locked'),
+      value: lockedTotal > 0 ? formatPrice(lockedTotal, 'rub') : '0 ₽',
+      sub: t('wallet.stats.lockedSub'),
+      icon: Lock,
+      color: 'text-muted-foreground',
+      bg: 'bg-muted/40',
+    },
+  ]
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {stats.map((s) => (
+        <Card
+          key={s.label}
+          className="p-3 lg:p-4 flex items-center gap-3 hover:border-primary/30 transition-colors"
+        >
+          <div
+            className={cn(
+              'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
+              s.bg,
+              s.color
+            )}
+          >
+            <s.icon className="w-5 h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] text-muted-foreground uppercase tracking-wide truncate">
+              {s.label}
+            </div>
+            <div className="text-base lg:text-lg font-bold font-mono tabular-nums truncate">
+              {s.value}
+            </div>
+            <div className={cn('text-[11px] font-mono tabular-nums', s.color)}>
+              {s.sub}
+            </div>
+          </div>
+        </Card>
+      ))}
+    </div>
   )
 }
 
@@ -223,17 +380,21 @@ function AssetsTab({ balances }: { balances: Balance[] }) {
       <ScrollArea className="max-h-[640px]">
         <div className="grid grid-cols-12 px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border bg-muted/30">
           <span className="col-span-4">{t('wallet.col.asset')}</span>
-          <span className="col-span-3 text-right">{t('wallet.col.available')}</span>
-          <span className="col-span-3 text-right">{t('wallet.col.rubValue')}</span>
-          <span className="col-span-2 text-right">{t('wallet.col.usdValue')}</span>
+          <span className="col-span-2 text-right">{t('wallet.col.available')}</span>
+          <span className="col-span-2 text-right">24h</span>
+          <span className="col-span-2 text-right">{t('wallet.col.rubValue')}</span>
+          <span className="col-span-2 text-right">{t('wallet.col.actions') || 'Действия'}</span>
         </div>
         {balances.map((b) => {
           const rub = b.amount * priceRub(b.asset)
           const usd = b.amount * priceUsd(b.asset)
+          const tk = tickers.find((t) => t.symbol === b.asset)
+          const change24h = tk?.change24h ?? 0
+          const isCrypto = b.asset !== 'RUB' && b.asset !== 'USDT'
           return (
             <div
               key={b.asset}
-              className="grid grid-cols-12 px-3 py-3 items-center border-b border-border/60 last:border-0 hover:bg-muted/40 transition"
+              className="grid grid-cols-12 px-3 py-3 items-center border-b border-border/60 last:border-0 hover:bg-muted/40 transition group"
             >
               <div className="col-span-4 flex items-center gap-2.5">
                 <CoinIcon symbol={b.asset} size={28} />
@@ -250,14 +411,55 @@ function AssetsTab({ balances }: { balances: Balance[] }) {
                   </div>
                 </div>
               </div>
-              <div className="col-span-3 text-right font-mono tabular-nums text-sm">
+              <div className="col-span-2 text-right font-mono tabular-nums text-sm">
                 {formatAmount(b.amount, b.asset)}
               </div>
-              <div className="col-span-3 text-right font-mono tabular-nums text-sm">
-                {formatPrice(rub, 'rub')}
+              <div className="col-span-2 text-right font-mono tabular-nums text-sm">
+                {isCrypto && tk ? (
+                  <span className={cn('inline-flex items-center gap-0.5 text-xs font-semibold px-1.5 py-0.5 rounded',
+                    change24h >= 0 ? 'text-success bg-success/10' : 'text-destructive bg-destructive/10')}>
+                    {change24h >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                    {change24h >= 0 ? '+' : ''}{change24h.toFixed(2)}%
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground text-xs">—</span>
+                )}
               </div>
-              <div className="col-span-2 text-right font-mono tabular-nums text-sm text-muted-foreground">
-                {formatPrice(usd, 'usd')}
+              <div className="col-span-2 text-right">
+                <div className="font-mono tabular-nums text-sm">{formatPrice(rub, 'rub')}</div>
+                <div className="font-mono tabular-nums text-[11px] text-muted-foreground">
+                  {formatPrice(usd, 'usd')}
+                </div>
+              </div>
+              <div className="col-span-2 flex items-center justify-end gap-1">
+                <button
+                  onClick={() => document.getElementById('wallet-tab-deposit')?.click()}
+                  className="p-1.5 rounded-lg text-success hover:bg-success/10 transition opacity-60 group-hover:opacity-100"
+                  title={t('wallet.deposit')}
+                >
+                  <ArrowDownToLine className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => document.getElementById('wallet-tab-withdraw')?.click()}
+                  className="p-1.5 rounded-lg text-destructive hover:bg-destructive/10 transition opacity-60 group-hover:opacity-100"
+                  title={t('wallet.withdraw')}
+                >
+                  <ArrowUpFromLine className="w-3.5 h-3.5" />
+                </button>
+                {(b.asset === 'BTC' || b.asset === 'ETH' || b.asset === 'USDT') && (
+                  <button
+                    onClick={() => {
+                      const setView = useAppStore.getState().setView
+                      const setSelectedPair = useAppStore.getState().setSelectedPair
+                      setSelectedPair(`${b.asset}/RUB`)
+                      setView('trade')
+                    }}
+                    className="p-1.5 rounded-lg text-primary hover:bg-primary/10 transition opacity-60 group-hover:opacity-100"
+                    title={t('wallet.trade') || 'Торговать'}
+                  >
+                    <ArrowLeftRight className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
           )
@@ -917,6 +1119,8 @@ export function WalletView() {
         </div>
 
         <TotalBalanceCard balances={balances} />
+
+        <WalletStatsRow balances={balances} />
 
         <Tabs defaultValue="assets" className="w-full">
           <TabsList className="h-9 bg-muted/60 p-1">

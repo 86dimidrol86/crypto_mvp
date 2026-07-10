@@ -1964,3 +1964,54 @@ Stage Summary:
   - Features: более детализированные иконки (закон/замок/глобус с текстовыми символами).
   - VLM предлагает добавить "FAQ" или "Как это работает" в Asset Security.
 - Git: коммит запланирован после этой записи worklog.
+
+---
+Task ID: CRON-REVIEW-2 (webDevReview #2)
+Agent: Orchestrator (cron-triggered)
+Task: Оценить статус проекта, QA через agent-browser, продолжить улучшения стилизации + новые функции.
+
+Work Log:
+1. Прочитал worklog.md (1966 строк) — контекст: MVP v2.0 стабилен, предыдущий раунд (CRON-REVIEW-1) добавил Quick Trade виджет на home + polish Hero/MarketGrid/Features (VLM 7→8/10).
+2. QA-проверка:
+   - `bun run lint` → exit 0 (0 errors, 0 warnings) ✓
+   - dev.log: чистый, GET / 200, POST /api/auth 200, без ошибок ✓
+   - agent-browser (1440×900): залогинился как USER demo, home рендерится (VLM 8/10, Quick Trade виден).
+3. VLM-анализ 3 вьюх (markets 8/10, wallet 7/10, portfolio 9/10) — все "OK", багов нет. VLM рекомендация по wallet: "заполнить пустую зону графиком баланса", "убрать избыточное ≈USD", "унифицировать стили".
+4. Фокус работы выбран: **улучшить Wallet view** — добавить distribution bar + 3 stat cards + 24h change column + actions в таблице.
+
+5. Реализация (wallet-view.tsx):
+   - **TotalBalanceCard enhancement**: добавил asset distribution мини stacked bar (BTC #F0B90B / ETH #a78bfa / USDT #22c55e / RUB #38bdf8) с легендой (цветной квадрат + символ + % от общего). Animate-pulse на decorative blur. Responsive: flex-col на мобиле, flex-row на desktop. Кнопки deposit/withdraw с фиксированной высотой h-10.
+   - **Новый компонент WalletStatsRow**: 3 mini KPI cards в grid sm:grid-cols-3:
+     1) Активных активов (count balances > 0) — WalletIcon, bg-primary/10, text-primary
+     2) P&L за 24ч (sum of amount * change24h * price для crypto) — TrendingUp/TrendingDown, bg-success/10 или bg-destructive/10, формат "+32 909 ₽" + "+1.31%"
+     3) Заблокировано (sum of locked * price) — Lock icon, bg-muted/40
+     Каждая карточка: иконка в квадрате 10×10 + label (uppercase) + value (font-mono tabular-nums) + sub (цветной). Hover:border-primary/30.
+   - **AssetsTab enhancement**: переработал таблицу с 12-col grid:
+     * col-span-4: Актив (CoinIcon 28px + symbol + name)
+     * col-span-2: Доступно (formatAmount)
+     * col-span-2: 24h change badge (TrendingUp/Down + % в цветном pill bg-success/10 или bg-destructive/10) для crypto; "—" для RUB/USDT
+     * col-span-2: RUB + USD (две строки, USD меньше/muted)
+     * col-span-2: Действия — 3 icon buttons (deposit ArrowDownToLine green / withdraw ArrowUpFromLine red / trade ArrowLeftRight primary для BTC/ETH/USDT), opacity 60→100% на hover строки, title атрибуты
+     * Trade button: useAppStore.getState().setSelectedPair + setView('trade') — прямой переход на торговлю
+   - **Импорты**: добавил TrendingUp, TrendingDown, Lock в lucide-react import.
+   - **i18n**: добавил 9 новых ключей RU+EN: wallet.col.actions, wallet.trade, wallet.stats.{assets,assetsSub,pnl24h,locked,lockedSub}.
+
+6. Тестирование через agent-browser:
+   - Wallet v3 → VLM: **8/10** (было 7/10). Подтверждено: distribution bar с % (RUB 49.7%, BTC 24.2%, USDT 9.8%, ETH 16.3%), 3 stat cards (4 актива / +32 909 ₽ +1.31% / 0 ₽ locked), таблица с 24h change badges (+3.30% BTC, +2.76% ETH) и action иконками. Общая стоимость: 2.51M ₽ ≈ $32,895.
+7. `bun run lint` → exit 0 ✓
+8. dev.log: чистый, /api/wallet 200 в 25-52ms, без ошибок.
+
+Stage Summary:
+- **Статус проекта**: MVP v2.0 стабилен. 18 views, 5 ролей, 33 API, 21 Prisma model, lint clean, dev.log clean. Все основные вьюхи (home/markets/wallet/portfolio/trade) рендерятся без багов.
+- **Что сделано в этом раунде (CRON-REVIEW-2)**:
+  1. **Wallet TotalBalanceCard**: добавлен asset distribution stacked bar с легендой (4 цвета, % по каждому активу) — закрывает рекомендацию "заполнить пустую зону".
+  2. **Новый WalletStatsRow**: 3 KPI cards (Активы / P&L 24ч / Locked) с цветовыми индикаторами и иконками.
+  3. **Wallet AssetsTab**: переработанная таблица с 24h change badge + RUB/USD в одном столбце + actions (deposit/withdraw/trade иконки с прямым переходом на trade).
+  4. i18n: +9 ключей RU+EN.
+  5. VLM-оценка wallet выросла с **7/10 → 8/10**.
+- **Нерешённые вопросы / рекомендации на следующий раунд**:
+  - Markets: добавить hover tooltip на volume column, улучшить выравнивание заголовков.
+  - Portfolio: увеличить ширину колонки "Доля", добавить интерактивность (hover на диаграмме).
+  - Trade: добавить Quick Trade preset для limit vs market (рекомендация из CRON-REVIEW-1).
+  - Общие: унифицировать отступы между вьюхами, добавить "FAQ" в Asset Security на home.
+- Git: коммит запланирован после этой записи worklog.
