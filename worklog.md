@@ -2185,3 +2185,50 @@ Stage Summary:
   - Markets: hover tooltip на sparkline для точных значений.
   - Общие: унифицировать отступы между всеми вьюхами.
 - Git: коммит запланирован после этой записи worklog.
+
+---
+Task ID: CRON-REVIEW-6 (webDevReview #6)
+Agent: Orchestrator (cron-triggered)
+Task: Оценить статус проекта, QA через agent-browser, продолжить улучшения стилизации + новые функции.
+
+Work Log:
+1. Прочитал worklog.md (2187 строк) — контекст: MVP v2.0 стабилен. Предыдущие раунды: Home (Quick Trade), Wallet (distribution+KPI), Portfolio (Quick Actions+legend), Markets (icons+sparkline+range bar), Help+Home FAQ.
+2. QA-проверка:
+   - `bun run lint` → exit 0 (0 errors, 0 warnings) ✓
+   - dev.log: чистый, GET / 200, /api/profile/* 200, без runtime errors ✓
+   - agent-browser (1440×900): залогинился как USER demo.
+3. VLM-анализ 3 вьюх: Margin 7/10 (пустые зоны, выравнивание), P2P 8/10 (ширина колонок), Payments 9/10 (мелкие цифры). Багов нет.
+4. Фокус работы выбран: **улучшить Margin view** — empty states с иконками + AccountSummaryCard polish (VLM рекомендация из этого раунда).
+
+5. Реализация (margin-view.tsx):
+   - **OpenPositionsTable empty state**: px-3 py-10 → px-3 py-12 text-center flex flex-col items-center. Иконка CheckCircle2 в круглой плашке w-14 h-14 rounded-2xl bg-primary/10 mb-3 (было просто mx-auto text-muted-foreground/40). Текст: text-sm font-medium text-foreground/80 (было muted), hint с max-w-xs.
+   - **PositionHistory empty state**: px-3 py-8 → px-3 py-10 flex flex-col items-center. Иконка XCircle в плашке w-12 h-12 rounded-2xl bg-muted/40 mb-2.5. Текст: text-sm font-medium text-foreground/80, hint с max-w-xs.
+   - **AccountSummaryCard enhancement**: каждая метрика теперь в отдельной карточке:
+     * Equity: p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors + Wallet иконка (2.5×2.5) перед label
+     * Unrealized PnL: p-2 rounded-lg bg-muted/30 + TrendingUp/Down иконка (зависит от знака PnL) перед label
+     * Used: p-2 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors
+     * Available: p-2 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors + Lock иконка + font-semibold text-primary
+   - **Warning/critical badges**: теперь условные — marginRatio >= 80 → destructive badge с bg-destructive/10 px-2 py-1 rounded-md + Flame иконка; marginRatio >= 50 → warning badge с bg-warning/10 + AlertTriangle иконка + "Высокая нагрузка" текст. Раньше был только critical при >= 80.
+   - **Импорты**: добавил Lock в lucide-react import.
+
+6. Тестирование через agent-browser:
+   - Margin v2 → VLM: **8/10** (было 7/10). Подтверждено: иконки в круглых плашках для empty states, hover эффекты на карточках метрик, цветовая дифференциация (primary для available, muted для used). Margin level bar уже существовал (MarginLevelBar компонент).
+7. `bun run lint` → exit 0 ✓
+8. dev.log: чистый, /api/payments 200, без ошибок ✓
+
+Stage Summary:
+- **Статус проекта**: MVP v2.0 стабилен. 18 views, 5 ролей, 33 API, 21 Prisma model, lint clean, dev.log clean.
+- **Что сделано в этом раунде (CRON-REVIEW-6)**:
+  1. **Margin OpenPositionsTable empty state**: иконка в круглой плашке (w-14 h-14 rounded-2xl bg-primary/10), лучший текст (font-medium text-foreground/80), hint с max-w-xs.
+  2. **Margin PositionHistory empty state**: иконка XCircle в плашке (w-12 h-12 rounded-2xl bg-muted/40), консистентный стиль с OpenPositions.
+  3. **Margin AccountSummaryCard**: 4 метрики в отдельных карточках с hover эффектами, иконки перед labels (Wallet/TrendingUp/TrendingDown/Lock), available выделена bg-primary/5 + font-semibold.
+  4. **Margin warning badges**: добавлен промежуточный warning level (50-80% → AlertTriangle + "Высокая нагрузка"), critical остался при >= 80%.
+  5. VLM-оценка margin выросла с **7/10 → 8/10**.
+- **Нерешённые вопросы / рекомендации на следующий раунд**:
+  - Trade: добавить limit/market toggle для Quick Trade preset (рекомендация из CRON-REVIEW-1, всё ещё не реализовано — давняя).
+  - P2P: адаптивные колонки "Рекламодатель" и "Способ оплаты" с обрезкой текста.
+  - Payments: увеличить шрифт ключевых цифр (курс, комиссия), empty state для "Мои платежи".
+  - News: уменьшить отступы между карточками.
+  - Profile: уменьшить отступы в "Последние сделки", увеличить шрифт в "Мои активы".
+  - Общие: унифицировать отступы между всеми вьюхами.
+- Git: коммит запланирован после этой записи worklog.

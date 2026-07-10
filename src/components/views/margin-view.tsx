@@ -33,6 +33,7 @@ import {
   Info,
   GripVertical,
   RotateCcw,
+  Lock,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '@/lib/store'
@@ -386,14 +387,18 @@ function AccountSummaryCard({
       </div>
       <div className="p-3 space-y-3 overflow-y-auto scrollbar-thin">
         <div className="grid grid-cols-2 gap-2.5">
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t('margin.account.equity')}</div>
+          <div className="p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+              <Wallet className="w-2.5 h-2.5 text-primary/70" />
+              {t('margin.account.equity')}
+            </div>
             <div className="text-base font-mono font-bold tabular-nums mt-0.5">
               {formatNumber(Math.round(netEquity))} ₽
             </div>
           </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          <div className="p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+              {unrealizedPnl >= 0 ? <TrendingUp className="w-2.5 h-2.5 text-success/70" /> : <TrendingDown className="w-2.5 h-2.5 text-destructive/70" />}
               {t('margin.account.unrealizedPnl')}
             </div>
             <div
@@ -409,7 +414,7 @@ function AccountSummaryCard({
               {fmtSignedRub(unrealizedPnl)}
             </div>
           </div>
-          <div>
+          <div className="p-2 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
               {t('margin.account.used')}
             </div>
@@ -417,11 +422,12 @@ function AccountSummaryCard({
               {formatNumber(Math.round(usedMargin))} ₽
             </div>
           </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          <div className="p-2 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+              <Lock className="w-2.5 h-2.5 text-primary/70" />
               {t('margin.account.available')}
             </div>
-            <div className="text-xs font-mono tabular-nums mt-0.5 text-primary">
+            <div className="text-xs font-mono tabular-nums mt-0.5 text-primary font-semibold">
               {formatNumber(Math.round(availableMargin))} ₽
             </div>
           </div>
@@ -429,12 +435,17 @@ function AccountSummaryCard({
 
         <div className="pt-2 border-t border-border">
           <MarginLevelBar ratio={marginRatio} label={t('margin.account.marginLevel')} />
-          {marginRatio >= 80 && (
-            <div className="mt-2 flex items-center gap-1.5 text-[10px] text-destructive">
+          {marginRatio >= 80 ? (
+            <div className="mt-2 flex items-center gap-1.5 text-[10px] text-destructive bg-destructive/10 px-2 py-1 rounded-md">
               <Flame className="w-3 h-3" />
               {t('margin.account.critical')}
             </div>
-          )}
+          ) : marginRatio >= 50 ? (
+            <div className="mt-2 flex items-center gap-1.5 text-[10px] text-warning bg-warning/10 px-2 py-1 rounded-md">
+              <AlertTriangle className="w-3 h-3" />
+              {t('margin.account.warning') || 'Высокая нагрузка'}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -869,10 +880,12 @@ function OpenPositionsTable({
           ))}
         </div>
       ) : open.length === 0 ? (
-        <div className="px-3 py-10 text-center">
-          <CheckCircle2 className="w-7 h-7 mx-auto text-muted-foreground/40 mb-2" />
-          <p className="text-sm text-muted-foreground">{t('margin.positions.empty')}</p>
-          <p className="text-[11px] text-muted-foreground/70 mt-1">
+        <div className="px-3 py-12 text-center flex flex-col items-center">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-3">
+            <CheckCircle2 className="w-7 h-7 text-primary/70" />
+          </div>
+          <p className="text-sm font-medium text-foreground/80">{t('margin.positions.empty')}</p>
+          <p className="text-[11px] text-muted-foreground mt-1 max-w-xs">
             {t('margin.positions.emptyHint')}
           </p>
         </div>
@@ -921,9 +934,12 @@ function PositionHistory({
         </span>
       </div>
       {closed.length === 0 ? (
-        <div className="px-3 py-8 text-center">
-          <p className="text-sm text-muted-foreground">{t('margin.history.empty')}</p>
-          <p className="text-[11px] text-muted-foreground/70 mt-1">
+        <div className="px-3 py-10 text-center flex flex-col items-center">
+          <div className="w-12 h-12 rounded-2xl bg-muted/40 flex items-center justify-center mb-2.5">
+            <XCircle className="w-6 h-6 text-muted-foreground/60" />
+          </div>
+          <p className="text-sm font-medium text-foreground/80">{t('margin.history.empty')}</p>
+          <p className="text-[11px] text-muted-foreground mt-1 max-w-xs">
             {t('margin.history.emptyHint')}
           </p>
         </div>
