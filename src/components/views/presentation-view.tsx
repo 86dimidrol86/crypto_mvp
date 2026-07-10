@@ -69,7 +69,7 @@ const SLIDES = [
                     <div className="flex-1 h-0.5 bg-primary/30" />
                     <ArrowRight className="w-5 h-5 text-primary shrink-0" />
                   </div>
-                  <div className="text-[9px] text-muted-foreground mt-0.5">банк: 0.5-1%</div>
+                  <div className="text-[9px] text-muted-foreground mt-0.5">банк: 0.5-2%</div>
                 </motion.div>
 
                 {/* Bank */}
@@ -108,7 +108,7 @@ const SLIDES = [
               {/* Row 2: Revenue split */}
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.1 }} className="mt-4 grid grid-cols-3 gap-3">
                 <div className="text-center p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
-                  <div className="text-2xl font-bold text-amber-400">0.5-1%</div>
+                  <div className="text-2xl font-bold text-amber-400">0.5-2%</div>
                   <div className="text-[10px] text-muted-foreground">Банк<br/>за перевод ₽</div>
                 </div>
                 <div className="text-center p-3 rounded-xl bg-primary/5 border border-primary/20">
@@ -151,8 +151,8 @@ const SLIDES = [
               </div>
               <div className="space-y-3">
                 {[
-                  { step: '1', title: 'Перевод ₽ на спецсчёт', desc: 'Пользователь → спецсчёт биржи в банке', fee: '0.5-1%', who: 'Банк' },
-                  { step: '2', title: 'Конвертация ₽ → Цифровой ₽', desc: 'Банк → платформа цифрового рубля ЦБ РФ (ФЗ-259)', fee: '0.1-0.3%', who: 'Банк + ЦБ' },
+                  { step: '1', title: 'Перевод ₽ на спецсчёт', desc: 'Пользователь → спецсчёт биржи в банке', fee: '0.5-2%', who: 'Банк' },
+                  { step: '2', title: 'Конвертация ₽ → Цифровой ₽', desc: 'Банк → платформа цифрового рубля ЦБ РФ (ФЗ-259)', fee: '0.1-0.5%', who: 'Банк + ЦБ' },
                   { step: '3', title: 'Зачисление на биржу', desc: 'Цифровой ₽ → баланс пользователя на бирже', fee: '—', who: 'Биржа' },
                 ].map((s, i) => (
                   <motion.div key={s.step} initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 + i * 0.15 }} className="flex items-start gap-3 p-3 rounded-lg bg-muted/20">
@@ -170,7 +170,7 @@ const SLIDES = [
               </div>
               <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-center">
                 <div className="text-xs text-muted-foreground">Итого банк зарабатывает на вводе:</div>
-                <div className="text-2xl font-bold text-amber-400">0.6-1.3%</div>
+                <div className="text-2xl font-bold text-amber-400">0.6-2.4%</div>
               </div>
             </Card>
           </motion.div>
@@ -185,8 +185,8 @@ const SLIDES = [
               <div className="space-y-3">
                 {[
                   { step: '1', title: 'Списание с биржи', desc: 'Баланс пользователя → конвертация в ₽', fee: '0.5%', who: 'Биржа' },
-                  { step: '2', title: 'Конвертация Цифровой ₽ → ₽', desc: 'ЦБ РФ → банк (ФЗ-259, ФЗ-1194918-8)', fee: '0.1-0.3%', who: 'Банк + ЦБ' },
-                  { step: '3', title: 'Перевод ₽ пользователю', desc: 'Спецсчёт → личный счёт пользователя', fee: '0.5-1%', who: 'Банк' },
+                  { step: '2', title: 'Конвертация Цифровой ₽ → ₽', desc: 'ЦБ РФ → банк (ФЗ-259, ФЗ-1194918-8)', fee: '0.1-0.5%', who: 'Банк + ЦБ' },
+                  { step: '3', title: 'Перевод ₽ пользователю', desc: 'Спецсчёт → личный счёт пользователя', fee: '0.5-2%', who: 'Банк' },
                 ].map((s, i) => (
                   <motion.div key={s.step} initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 + i * 0.15 }} className="flex items-start gap-3 p-3 rounded-lg bg-muted/20">
                     <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center text-xs font-bold text-primary shrink-0 mt-0.5">{s.step}</div>
@@ -203,7 +203,7 @@ const SLIDES = [
               </div>
               <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-center">
                 <div className="text-xs text-muted-foreground">Итого банк зарабатывает на выводе:</div>
-                <div className="text-2xl font-bold text-amber-400">0.6-1.3%</div>
+                <div className="text-2xl font-bold text-amber-400">0.6-2.4%</div>
               </div>
             </Card>
           </motion.div>
@@ -219,7 +219,7 @@ const SLIDES = [
               </div>
               <div className="flex gap-4 text-sm">
                 <span>Биржа: <b className="text-primary">0.1-0.5%</b></span>
-                <span>Банк (эквайринг): <b className="text-amber-400">0.05-0.2%</b></span>
+                <span>Банк (эквайринг): <b className="text-amber-400">0.05-0.3%</b></span>
               </div>
             </div>
           </Card>
@@ -294,9 +294,9 @@ const SLIDES = [
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }} className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           {[
-            { v: '1.2-2.6%', l: 'с каждого ввода/вывода' },
+            { v: '1.2-4.8%', l: 'с каждого ввода/вывода' },
             { v: '$20B+', l: 'объём крипторынка РФ/год' },
-            { v: '0.05-0.2%', l: 'эквайринг сделок' },
+            { v: '0.05-0.3%', l: 'эквайринг сделок' },
             { v: '01.09.2026', l: 'цифровой рубль — старт' },
           ].map((s, i) => (
             <Card key={i} className="p-4 text-center min-w-[120px]">
